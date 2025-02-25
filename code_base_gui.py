@@ -10,7 +10,7 @@ import appdirs  # For cross-platform user data directory
 class RepoPromptGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Repo Prompt")
+        self.root.title("Code Base")
         self.root.geometry("800x600")
 
         # Dark mode color scheme
@@ -27,9 +27,14 @@ class RepoPromptGUI:
         self.token_count = 0
         self.ignore_patterns = []
 
-        # Templates directory using appdirs
-        self.template_dir = os.path.join(appdirs.user_data_dir("CodeBase"), "templates")
+        # User data directory for templates and recent folders
+        self.user_data_dir = appdirs.user_data_dir("CodeBase")
+        self.template_dir = os.path.join(self.user_data_dir, "templates")
+        self.recent_folders_file = os.path.join(self.user_data_dir, "recent_folders.txt")
         os.makedirs(self.template_dir, exist_ok=True)
+
+        # Load recent folders
+        self.recent_folders = self.load_recent_folders()
 
         # Header
         self.header_label = tk.Label(root, text="CodeBase", font=("Arial", 16), bg='#2b2b2b', fg=self.text_color)
@@ -104,17 +109,123 @@ class RepoPromptGUI:
                                                           font=("Arial", 10))
         self.base_prompt_text.pack(fill="both", expand=True)
 
-        # Save and Load buttons for Base Prompt
-        self.save_template_button = tk.Button(self.base_prompt_frame, text="Save Template", command=self.save_template,
+        # Buttons for Base Prompt in a horizontal frame
+        button_frame = tk.Frame(self.base_prompt_frame, bg='#2b2b2b')
+        button_frame.pack(pady=5)
+        self.save_template_button = tk.Button(button_frame, text="Save Template", command=self.save_template,
                                               bg=self.button_bg, fg=self.button_fg)
-        self.save_template_button.pack(pady=5)
-        self.load_template_button = tk.Button(self.base_prompt_frame, text="Load Template", command=self.load_template,
+        self.save_template_button.grid(row=0, column=0, padx=5)
+        self.load_template_button = tk.Button(button_frame, text="Load Template", command=self.load_template,
                                               bg=self.button_bg, fg=self.button_fg)
-        self.load_template_button.pack(pady=5)
+        self.load_template_button.grid(row=0, column=1, padx=5)
+        self.clear_text_button = tk.Button(button_frame, text="Clear Text", command=self.clear_base_prompt,
+                                           bg=self.button_bg, fg=self.button_fg)
+        self.clear_text_button.grid(row=0, column=2, padx=5)
+
+    ### New Methods for Added Features ###
+
+    def clear_base_prompt(self):
+        """Clear all text in the Base Prompt text area."""
+        self.base_prompt_text.delete(1.0, tk.END)
+
+    def load_recent_folders(self):
+        """Load recent folders from the history file."""
+        if os.path.exists(self.recent_folders_file):
+            with open(self.recent_folders_file, 'r') as file:
+                return [line.strip() for line in file.readlines() if line.strip()]
+        return []
+
+    def save_recent_folders(self):
+        """Save recent folders to the history file."""
+        with open(self.recent_folders_file, 'w') as file:
+            for folder in self.recent_folders:
+                file.write(f"{folder}\n")
+
+    def update_recent_folders(self, new_folder):
+        """Update the recent folders list with a new selection, limiting to 10 entries."""
+        if new_folder in self.recent_folders:
+            self.recent_folders.remove(new_folder)
+        self.recent_folders.insert(0, new_folder)
+        if len(self.recent_folders) > 10:
+            self.recent_folders = self.recent_folders[:10]
+        self.save_recent_folders()
+
+    def open_folder_dialog(self):
+        """Custom dialog for selecting a folder with a recent folders dropdown."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Select Repository Folder")
+        dialog.geometry("400x200")
+        dialog.configure(bg=self.header_color)  # Set dialog background to border color
+
+        # Outer frame to act as the border
+        border_frame = tk.Frame(dialog, bg=self.header_color)
+        border_frame.pack(fill="both", expand=True, padx=2, pady=2)  # 2px border thickness
+
+        # Inner frame for dialog content
+        inner_frame = tk.Frame(border_frame, bg='#3c3c3c')
+        inner_frame.pack(fill="both", expand=True)
+
+        # Title label inside inner frame
+        title_label = tk.Label(inner_frame, text="Select Repository Folder", 
+                            font=("Arial", 12, "bold"), bg='#3c3c3c', fg=self.text_color)
+        title_label.pack(pady=5)
+
+        # Truncate long paths for dropdown
+        def truncate_path(path, max_length=50):
+            if len(path) > max_length:
+                return "…/" + path[-(max_length - 3):]
+            return path
+
+        recent_folders_truncated = [truncate_path(folder) for folder in self.recent_folders]
+
+        # Dropdown label and combobox
+        tk.Label(inner_frame, text="Recent Folders:", bg='#3c3c3c', fg=self.text_color).pack(pady=5)
+        folder_var = tk.StringVar()
+        folder_dropdown = ttk.Combobox(inner_frame, textvariable=folder_var, 
+                                    values=recent_folders_truncated, state="readonly")
+        folder_dropdown.pack(pady=5, fill="x")
+
+        # Browse button
+        def browse_folder():
+            folder = filedialog.askdirectory()
+            if folder:
+                folder_var.set(folder)
+
+        browse_button = tk.Button(inner_frame, text="Browse", command=browse_folder,
+                                bg=self.button_bg, fg=self.button_fg)
+        browse_button.pack(pady=5)
+
+        # OK button
+        def confirm_selection():
+            selected = folder_var.get()
+            if selected:
+                for folder in self.recent_folders:
+                    if truncate_path(folder) == selected:
+                        selected = folder
+                        break
+                dialog.selected_folder = selected
+                dialog.destroy()
+            else:
+                messagebox.showwarning("No Selection", "Please select a folder.")
+
+        ok_button = tk.Button(inner_frame, text="OK", command=confirm_selection,
+                            bg=self.button_bg, fg=self.button_fg)
+        ok_button.pack(pady=10)
+
+        dialog.transient(self.root)
+        dialog.grab_set()
+        self.root.wait_window(dialog)
+        return getattr(dialog, 'selected_folder', None)
+
+    ### Updated Method ###
 
     def select_repo(self):
-        self.repo_path = filedialog.askdirectory()
-        if self.repo_path:
+        """Open custom dialog to select repo folder with recent folders dropdown."""
+        selected_folder = self.open_folder_dialog()
+        if selected_folder:
+            self.repo_path = selected_folder
+            self.update_recent_folders(selected_folder)
+
             gitignore_path = os.path.join(self.repo_path, '.gitignore')
             self.ignore_patterns = self.parse_gitignore(gitignore_path)
 
@@ -135,6 +246,8 @@ class RepoPromptGUI:
 
             # Update Folder Structure
             self.populate_tree(self.repo_path)
+
+    ### Original Methods (Unchanged) ###
 
     def populate_tree(self, root_dir):
         self.tree.delete(*self.tree.get_children())
