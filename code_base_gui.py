@@ -1,6 +1,6 @@
 import os
 import tkinter as tk
-from tkinter import filedialog, scrolledtext
+from tkinter import filedialog, scrolledtext, IntVar
 import pyperclip
 import fnmatch
 import mimetypes
@@ -18,7 +18,7 @@ class RepoPromptGUI:
         self.button_bg = '#4a4a4a'
         self.button_fg = '#ffffff'
         self.header_color = '#add8e6'
-        self.status_color = '#ffff00'  # Yellow for status message
+        self.status_color = '#ffff00'
 
         self.repo_path = None
         self.file_contents = ""
@@ -51,14 +51,20 @@ class RepoPromptGUI:
         self.info_label = tk.Label(self.left_frame, text="Token Count: 0", bg='#2b2b2b', fg=self.text_color)
         self.info_label.pack(pady=5)
 
-        # Copy Contents button and its status label
+        # Copy Contents button and status
         self.copy_button = tk.Button(self.left_frame, text="Copy Contents", command=self.copy_to_clipboard,
                                      state=tk.DISABLED, bg=self.button_bg, fg=self.button_fg)
         self.copy_button.pack(pady=10)
         self.copy_status_label = tk.Label(self.left_frame, text="", font=("Arial", 8), bg='#2b2b2b', fg=self.status_color)
         self.copy_status_label.pack()
 
-        # Copy Structure button and its status label
+        # Checkbox to prepend Base Prompt
+        self.prepend_var = IntVar()
+        self.prepend_checkbox = tk.Checkbutton(self.left_frame, text="Prepend Base Prompt", variable=self.prepend_var,
+                                               bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
+        self.prepend_checkbox.pack(pady=5)
+
+        # Copy Structure button and status
         self.copy_structure_button = tk.Button(self.left_frame, text="Copy Structure", command=self.copy_structure_to_clipboard,
                                                state=tk.DISABLED, bg=self.button_bg, fg=self.button_fg)
         self.copy_structure_button.pack(pady=10)
@@ -76,12 +82,24 @@ class RepoPromptGUI:
                                                       font=("Arial", 10), state=tk.DISABLED)
         self.content_text.pack(fill="both", expand=True)
 
-        # Tab 2: Folder Structure
+        # Tab 2: Folder Structure (Treeview)
         self.structure_frame = tk.Frame(self.notebook, bg='#2b2b2b')
         self.notebook.add(self.structure_frame, text="Folder Structure")
-        self.structure_text = scrolledtext.ScrolledText(self.structure_frame, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color,
-                                                        font=("Arial", 10), state=tk.DISABLED)
-        self.structure_text.pack(fill="both", expand=True)
+        self.tree = ttk.Treeview(self.structure_frame, show="tree", style="Custom.Treeview")
+        self.tree.pack(fill="both", expand=True)
+        style = ttk.Style()
+        style.configure("Custom.Treeview", background="#3c3c3c", foreground=self.text_color, fieldbackground="#3c3c3c")
+        style.map("Custom.Treeview", background=[('selected', '#4a4a4a')], foreground=[('selected', self.text_color)])
+        scrollbar = ttk.Scrollbar(self.structure_frame, orient="vertical", command=self.tree.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.tree.configure(yscrollcommand=scrollbar.set)
+
+        # Tab 3: Base Prompt
+        self.base_prompt_frame = tk.Frame(self.notebook, bg='#2b2b2b')
+        self.notebook.add(self.base_prompt_frame, text="Base Prompt")
+        self.base_prompt_text = scrolledtext.ScrolledText(self.base_prompt_frame, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color,
+                                                          font=("Arial", 10))
+        self.base_prompt_text.pack(fill="both", expand=True)
 
     def select_repo(self):
         self.repo_path = filedialog.askdirectory()
@@ -105,11 +123,25 @@ class RepoPromptGUI:
             self.content_text.config(state=tk.DISABLED)
 
             # Update Folder Structure
-            folder_structure = self.generate_folder_structure(self.repo_path)
-            self.structure_text.config(state=tk.NORMAL)
-            self.structure_text.delete(1.0, tk.END)
-            self.structure_text.insert(tk.END, folder_structure)
-            self.structure_text.config(state=tk.DISABLED)
+            self.populate_tree(self.repo_path)
+
+    def populate_tree(self, root_dir):
+        self.tree.delete(*self.tree.get_children())
+        root_basename = os.path.basename(root_dir)
+        root_icon = "📁" if os.path.isdir(root_dir) else "📄"
+        root_id = self.tree.insert("", "end", text=f"{root_icon} {root_basename}", open=True)
+        self.build_tree(root_dir, root_id)
+
+    def build_tree(self, path, parent_id):
+        if self.is_ignored(path):
+            return
+        items = [item for item in sorted(os.listdir(path)) if not self.is_ignored(os.path.join(path, item))]
+        for item in items:
+            item_path = os.path.join(path, item)
+            icon = "📁" if os.path.isdir(item_path) else "📄"
+            item_id = self.tree.insert(parent_id, "end", text=f"{icon} {item}", open=False)
+            if os.path.isdir(item_path):
+                self.build_tree(item_path, item_id)
 
     def parse_gitignore(self, gitignore_path):
         ignore_patterns = []
@@ -151,52 +183,42 @@ class RepoPromptGUI:
                         print(f"Error reading {file_path}: {e}")
         return "\n".join(file_contents)
 
-    def generate_folder_structure(self, root_dir):
-        def build_tree(path, prefix, indent):
-            if self.is_ignored(path):
-                return []
-            basename = os.path.basename(path)
-            icon = "📁" if os.path.isdir(path) else "📄"
-            lines = [indent + prefix + icon + basename]
-            if os.path.isdir(path):
-                items = [item for item in sorted(os.listdir(path)) if not self.is_ignored(os.path.join(path, item))]
-                for i, item in enumerate(items):
-                    item_path = os.path.join(path, item)
-                    if i < len(items) - 1:
-                        sub_prefix = "├── "
-                        sub_indent = indent + "│   "
-                    else:
-                        sub_prefix = "└── "
-                        sub_indent = indent + "    "
-                    lines.extend(build_tree(item_path, sub_prefix, sub_indent))
+    def generate_folder_structure_text(self):
+        def traverse_tree(item_id, prefix="", indent=""):
+            lines = []
+            item_text = self.tree.item(item_id, "text")
+            lines.append(f"{indent}{prefix}{item_text}")
+            children = self.tree.get_children(item_id)
+            for i, child_id in enumerate(children):
+                if i == len(children) - 1:
+                    sub_prefix = "└── "
+                    sub_indent = indent + "    "
+                else:
+                    sub_prefix = "├── "
+                    sub_indent = indent + "│   "
+                lines.extend(traverse_tree(child_id, sub_prefix, sub_indent))
             return lines
 
-        root_basename = os.path.basename(root_dir)
-        structure = ["── 📁" + root_basename]
-        items = [item for item in sorted(os.listdir(root_dir)) if not self.is_ignored(os.path.join(root_dir, item))]
-        for i, item in enumerate(items):
-            item_path = os.path.join(root_dir, item)
-            if i < len(items) - 1:
-                sub_prefix = "├── "
-                sub_indent = "│   "
-            else:
-                sub_prefix = "└── "
-                sub_indent = "    "
-            sub_tree = build_tree(item_path, sub_prefix, sub_indent)
-            structure.extend(sub_tree)
-        return "\n".join(structure)
+        root_items = self.tree.get_children()
+        if not root_items:
+            return ""
+        return "\n".join(traverse_tree(root_items[0]))
 
     def show_status_message(self, label, message):
-        """Display a temporary status message under the specified label."""
         label.config(text=message)
-        self.root.after(10000, lambda: label.config(text=""))  # Clear after 10 seconds
+        self.root.after(10000, lambda: label.config(text=""))
 
     def copy_to_clipboard(self):
-        pyperclip.copy(self.file_contents)
+        if self.prepend_var.get() == 1:
+            base_prompt = self.base_prompt_text.get(1.0, tk.END).strip()
+            content_to_copy = base_prompt + "\n\n" + self.file_contents
+        else:
+            content_to_copy = self.file_contents
+        pyperclip.copy(content_to_copy)
         self.show_status_message(self.copy_status_label, "Copy Successful!")
 
     def copy_structure_to_clipboard(self):
-        structure_content = self.structure_text.get(1.0, tk.END).strip()
+        structure_content = self.generate_folder_structure_text()
         pyperclip.copy(structure_content)
         self.show_status_message(self.copy_structure_status_label, "Copy Successful!")
 
