@@ -1,6 +1,6 @@
 import os
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, scrolledtext
 import pyperclip
 import fnmatch
 import mimetypes
@@ -9,21 +9,54 @@ class RepoPromptGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Repo Prompt")
+        self.root.geometry("800x600")  # Resize window to 800x600 pixels
+        
+        # Set dark mode colors
+        self.root.configure(bg='#2b2b2b')  # Dark grey background
+        self.text_color = '#ffffff'  # White text
+        self.button_bg = '#4a4a4a'  # Medium grey for buttons
+        self.button_fg = '#ffffff'  # White text for buttons
+        self.header_color = '#add8e6'  # Light dark blue for version
         
         self.repo_path = None
         self.file_contents = ""
         self.token_count = 0
         self.ignore_patterns = []
         
-        # Create GUI elements
-        self.select_button = tk.Button(root, text="Select Repo Folder", command=self.select_repo)
-        self.select_button.pack(pady=10)
+        # Header: "CodeBase v1.0"
+        self.header_label = tk.Label(root, text="CodeBase", font=("Arial", 16), bg='#2b2b2b', fg=self.text_color)
+        self.header_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        self.version_label = tk.Label(root, text="v1.0", font=("Arial", 10), bg='#2b2b2b', fg=self.header_color)
+        self.version_label.grid(row=0, column=1, padx=5, pady=10, sticky="w")
         
-        self.info_label = tk.Label(root, text="Token Count: 0")
+        # Left frame for buttons and token count
+        self.left_frame = tk.Frame(root, bg='#2b2b2b')
+        self.left_frame.grid(row=1, column=0, padx=10, pady=10, sticky="ns")
+        
+        # Right frame for text area
+        self.right_frame = tk.Frame(root, bg='#2b2b2b')
+        self.right_frame.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
+        
+        # Configure grid to make right frame expandable
+        root.grid_columnconfigure(1, weight=1)
+        root.grid_rowconfigure(1, weight=1)
+        
+        # Left frame contents (buttons and token count)
+        self.select_button = tk.Button(self.left_frame, text="Select Repo Folder", command=self.select_repo,
+                                       bg=self.button_bg, fg=self.button_fg)
+        self.select_button.pack(pady=10)  # Added padding for better margins
+        
+        self.info_label = tk.Label(self.left_frame, text="Token Count: 0", bg='#2b2b2b', fg=self.text_color)
         self.info_label.pack(pady=5)
         
-        self.copy_button = tk.Button(root, text="Copy Contents", command=self.copy_to_clipboard, state=tk.DISABLED)
-        self.copy_button.pack(pady=10)
+        self.copy_button = tk.Button(self.left_frame, text="Copy Contents", command=self.copy_to_clipboard,
+                                     state=tk.DISABLED, bg=self.button_bg, fg=self.button_fg)
+        self.copy_button.pack(pady=10)  # Added padding for better margins
+        
+        # Right frame: Text area for first 500 tokens
+        self.text_area = scrolledtext.ScrolledText(self.right_frame, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color,
+                                                   font=("Arial", 10), state=tk.DISABLED)
+        self.text_area.pack(fill="both", expand=True)
         
     def select_repo(self):
         self.repo_path = filedialog.askdirectory()
@@ -35,8 +68,17 @@ class RepoPromptGUI:
             # Read files, skipping ignored and binary files
             self.file_contents = self.read_repo_files(self.repo_path)
             self.token_count = len(self.file_contents.split())  # Count words as tokens
-            self.info_label.config(text=f"Token Count: {self.token_count}")
+            formatted_count = f"{self.token_count:,}".replace(",", " ")
+            self.info_label.config(text=f"Token Count: {formatted_count}")
             self.copy_button.config(state=tk.NORMAL)
+            
+            # Display first 500 tokens in text area
+            words = self.file_contents.split()
+            preview_text = " ".join(words[:500])
+            self.text_area.config(state=tk.NORMAL)
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, preview_text)
+            self.text_area.config(state=tk.DISABLED)
     
     def parse_gitignore(self, gitignore_path):
         """Read .gitignore and return a list of patterns to ignore."""
@@ -66,7 +108,6 @@ class RepoPromptGUI:
         """Read files from the repository, skipping ignored and binary files."""
         file_contents = []
         for dirpath, dirnames, filenames in os.walk(root_dir):
-            # Skip ignored directories
             dirnames[:] = [d for d in dirnames if not self.is_ignored(os.path.join(dirpath, d))]
             for filename in filenames:
                 file_path = os.path.join(dirpath, filename)
