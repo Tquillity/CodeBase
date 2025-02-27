@@ -1,6 +1,6 @@
 import os
 import tkinter as tk
-from tkinter import filedialog, scrolledtext, IntVar, messagebox
+from tkinter import filedialog, scrolledtext, IntVar, messagebox, ttk
 import pyperclip
 import fnmatch
 import mimetypes
@@ -163,6 +163,11 @@ class RepoPromptGUI:
         scrollbar = ttk.Scrollbar(self.structure_frame, orient="vertical", command=self.tree.yview)
         scrollbar.pack(side="right", fill="y")
         self.tree.configure(yscrollcommand=scrollbar.set)
+
+        # Bind double-click event for folder expansion
+        self.tree.tag_bind('folder', '<Double-1>', self.on_double_click)
+        # Bind TreeviewOpen event for arrow expansion
+        self.tree.bind('<<TreeviewOpen>>', self.on_treeview_open)
 
         # Tab 3: Base Prompt
         self.base_prompt_frame = tk.Frame(self.notebook, bg='#2b2b2b')
@@ -405,22 +410,70 @@ class RepoPromptGUI:
     def build_tree(self, path, parent_id):
         if self.is_ignored(path):
             return
-        items = [item for item in sorted(os.listdir(path)) if not self.is_ignored(os.path.join(path, item))]
-        for item in items:
-            item_path = os.path.join(path, item)
-            icon = "📁" if os.path.isdir(item_path) else "📄"
-            tag = 'folder' if os.path.isdir(item_path) else 'file'
-            item_id = self.tree.insert(parent_id, "end", text=f"{icon} {item}", open=False, tags=(tag,))
-            if os.path.isdir(item_path):
-                # Add dummy child for lazy loading
-                self.tree.insert(item_id, "end", text="Loading...", tags=('dummy',))
-                self.tree.tag_bind(tag, '<Double-1>', lambda e, p=item_path, i=item_id: self.expand_folder(p, i))
+        try:
+            items = [item for item in sorted(os.listdir(path)) if not self.is_ignored(os.path.join(path, item))]
+            for item in items:
+                item_path = os.path.join(path, item)
+                icon = "📁" if os.path.isdir(item_path) else "📄"
+                tag = 'folder' if os.path.isdir(item_path) else 'file'
+                item_id = self.tree.insert(parent_id, "end", text=f"{icon} {item}", 
+                                           values=(item_path,), open=False, tags=(tag,))
+                if os.path.isdir(item_path):
+                    self.tree.insert(item_id, "end", text="Loading...", tags=('dummy',))
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to list directory {path}: {str(e)}")
+
+    def on_double_click(self, event):
+        """Handle double-click event to expand a folder."""
+        item_id = self.tree.identify_row(event.y)
+        if 'folder' in self.tree.item(item_id, "tags"):
+            item_path = self.tree.item(item_id, "values")[0]  # Retrieve stored path
+            self.expand_folder(item_path, item_id)
+
+    def on_treeview_open(self, event):
+        """Handle TreeviewOpen event when a folder is expanded via arrow."""
+        item_id = self.tree.focus()  # Get the currently focused item
+        if 'folder' in self.tree.item(item_id, "tags"):
+            # Check if the folder has only the "Loading..." dummy node
+            children = self.tree.get_children(item_id)
+            if children and all(self.tree.item(child, "text") == "Loading..." for child in children):
+                item_path = self.tree.item(item_id, "values")[0]  # Retrieve stored path
+                self.expand_folder(item_path, item_id)
 
     def expand_folder(self, path, item_id):
-        # Remove dummy node
-        for child in self.tree.get_children(item_id):
-            self.tree.delete(child)
-        self.build_tree(path, item_id)
+        """Expand a folder by loading its contents."""
+        try:
+            # Show loading state
+            original_text = self.tree.item(item_id, "text")
+            self.tree.item(item_id, text=f"{original_text} (Loading...)")
+            self.root.update_idletasks()  # Refresh UI
+
+            # Remove dummy "Loading..." node
+            for child in self.tree.get_children(item_id):
+                self.tree.delete(child)
+
+            # Load actual contents
+            self.build_tree(path, item_id)
+
+            # Restore original text
+            self.tree.item(item_id, text=original_text)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to expand folder {path}: {str(e)}")
+            self.tree.item(item_id, text=original_text)  # Reset text on error
+
+    def get_full_path(self, item_id):
+        """Reconstruct the full path based on tree hierarchy."""
+        path_parts = []
+        while item_id:
+            item_text = self.tree.item(item_id, "text")
+            # Remove icon and space
+            item_name = item_text[2:].strip()
+            path_parts.append(item_name)
+            item_id = self.tree.parent(item_id)
+        # Reverse to get root to leaf order
+        path_parts.reverse()
+        # Assume the root directory is the repo_path
+        return os.path.join(self.repo_path, *path_parts[1:])  # Skip the root node itself
 
     def parse_gitignore(self, gitignore_path):
         ignore_patterns = []
