@@ -356,10 +356,10 @@ class RepoPromptGUI:
 
             # Update Content Preview
             words = self.file_contents.split()
-            preview_text = " ".join(words[:500])
+            preview_text = " ".join(words[:5000])
             self.content_text.config(state=tk.NORMAL)
             self.content_text.delete(1.0, tk.END)
-            self.content_text.insert(tk.END, preview_text)
+            self.content_text.insert(tk.END, self.file_contents)
             self.content_text.config(state=tk.DISABLED)
 
             # Update Folder Structure
