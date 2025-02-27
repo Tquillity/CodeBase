@@ -354,12 +354,34 @@ class RepoPromptGUI:
             self.copy_button.config(state=tk.NORMAL)
             self.copy_structure_button.config(state=tk.NORMAL)
 
-            # Update Content Preview
-            words = self.file_contents.split()
-            preview_text = " ".join(words[:5000])
+            # Update Content Preview with red filenames
             self.content_text.config(state=tk.NORMAL)
             self.content_text.delete(1.0, tk.END)
-            self.content_text.insert(tk.END, self.file_contents)
+
+            # Configure the "filename" tag before inserting text
+            self.content_text.tag_configure("filename", foreground="red")
+
+            # Split into sections based on "\nFile: "
+            if self.file_contents.startswith("File: "):
+                # Remove the first "File: " and split the rest
+                sections = self.file_contents[len("File: "):].split("\nFile: ")
+                # Reconstruct each section by prepending "File: "
+                sections = ["File: " + s for s in sections]
+            else:
+                sections = []
+
+            # Process each section
+            for section in sections:
+                filename_end = section.find("\nContent:\n")
+                if filename_end != -1:
+                    filename = section[6:filename_end].strip()
+                    content = section[filename_end + 11:]
+                    self.content_text.insert(tk.END, f"File: {filename}\n", "filename")
+                    self.content_text.insert(tk.END, f"Content:\n{content}\n\n")
+                else:
+                    # Fallback for malformed sections, though unlikely with this split
+                    self.content_text.insert(tk.END, section + "\n\n")
+
             self.content_text.config(state=tk.DISABLED)
 
             # Update Folder Structure
