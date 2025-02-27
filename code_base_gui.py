@@ -8,25 +8,51 @@ import tkinter.ttk as ttk
 import appdirs  # For cross-platform user data directory
 
 class Tooltip:
-    """Simple tooltip class for Tkinter widgets."""
+    """Simple tooltip class for Tkinter widgets with improved positioning and delay."""
     def __init__(self, widget, text):
         self.widget = widget
         self.text = text
         self.tip = None
-        self.widget.bind("<Enter>", self.show_tip)
+        self.id = None
+        self.widget.bind("<Enter>", self.schedule_show)
         self.widget.bind("<Leave>", self.hide_tip)
 
+    def schedule_show(self, event):
+        # Cancel any pending tooltip if the mouse moves quickly
+        if self.id:
+            self.widget.after_cancel(self.id)
+        # Schedule tooltip to show after a 500ms delay
+        self.id = self.widget.after(500, lambda: self.show_tip(event))
+
     def show_tip(self, event):
-        x, y, _, _ = self.widget.bbox("insert")
-        x += self.widget.winfo_rootx() + 25
-        y += self.widget.winfo_rooty() + 25
+        if self.tip:  # Avoid creating multiple tooltips
+            return
+        # Position tooltip 25 pixels below and to the right of the widget
+        x = self.widget.winfo_rootx() + 25
+        y = self.widget.winfo_rooty() + 25
         self.tip = tk.Toplevel(self.widget)
-        self.tip.wm_overrideredirect(True)
+        self.tip.wm_overrideredirect(True)  # Remove window decorations
         self.tip.wm_geometry(f"+{x}+{y}")
         label = tk.Label(self.tip, text=self.text, bg="#ffffe0", relief="solid", borderwidth=1)
         label.pack()
+        # Adjust position to stay within screen boundaries
+        self.tip.update_idletasks()  # Update geometry info
+        tip_width = self.tip.winfo_width()
+        tip_height = self.tip.winfo_height()
+        screen_width = self.tip.winfo_screenwidth()
+        screen_height = self.tip.winfo_screenheight()
+        if x + tip_width > screen_width:
+            x = screen_width - tip_width
+        if y + tip_height > screen_height:
+            y = screen_height - tip_height
+        self.tip.wm_geometry(f"+{x}+{y}")
 
     def hide_tip(self, event):
+        # Cancel scheduled tooltip if mouse leaves before delay
+        if self.id:
+            self.widget.after_cancel(self.id)
+            self.id = None
+        # Destroy tooltip if it exists
         if self.tip:
             self.tip.destroy()
             self.tip = None
@@ -90,7 +116,7 @@ class RepoPromptGUI:
 
         self.copy_button = tk.Button(self.left_frame, text="Copy Contents (Ctrl+C)", command=self.copy_to_clipboard,
                                      state=tk.DISABLED, bg=self.button_bg, fg=self.button_fg)
-        self.copy_button.pack(pady=10)
+        self.copy_button.pack(pady=0)
         Tooltip(self.copy_button, "Copy file contents to clipboard")
         self.copy_status_label = tk.Label(self.left_frame, text="", font=("Arial", 8), bg='#2b2b2b', fg=self.status_color)
         self.copy_status_label.pack()
@@ -156,10 +182,7 @@ class RepoPromptGUI:
                                               bg=self.button_bg, fg=self.button_fg)
         self.load_template_button.grid(row=0, column=1, padx=5)
         Tooltip(self.load_template_button, "Load a saved template into the Base Prompt")
-        self.clear_text_button = tk.Button(button_frame, text="Clear Text (Ctrl+X)", command=self.clear_base_prompt,
-                                           bg=self.button_bg, fg=self.button_fg)
-        self.clear_text_button.grid(row=0, column=2, padx=5)
-        Tooltip(self.clear_text_button, "Clear all text in the Base Prompt")
+
         self.delete_template_button = tk.Button(button_frame, text="Delete Template", command=self.delete_template,
                                                 bg=self.button_bg, fg=self.button_fg)
         self.delete_template_button.grid(row=0, column=3, padx=5)
@@ -176,14 +199,24 @@ class RepoPromptGUI:
         self.root.bind('<Control-c>', lambda e: self.copy_to_clipboard())
         self.root.bind('<Control-s>', lambda e: self.save_template())
         self.root.bind('<Control-l>', lambda e: self.load_template())
-        self.root.bind('<Control-x>', lambda e: self.clear_base_prompt())
         self.root.bind('<Control-r>', lambda e: self.select_repo())
+
+        # Add clear buttons at the bottom
+        clear_button_frame = tk.Frame(self.left_frame, bg='#2b2b2b')
+        clear_button_frame.pack(side='bottom', fill='x')
+
+        self.clear_button = tk.Button(clear_button_frame, text="Clear", command=self.clear_current,
+                                    bg=self.button_bg, fg=self.button_fg)
+        Tooltip(self.clear_button, "Clear data in the current tab")
+        self.clear_button.pack(side='left', padx=5, pady=5)
+
+        self.clear_all_button = tk.Button(clear_button_frame, text="Clear All", command=self.clear_all,
+                                        bg=self.button_bg, fg=self.button_fg)
+        Tooltip(self.clear_all_button, "Clear data in all tabs")
+        self.clear_all_button.pack(side='left', padx=5, pady=5)
 
     ### New Methods for Added Features ###
 
-    def clear_base_prompt(self):
-        """Clear all text in the Base Prompt text area."""
-        self.base_prompt_text.delete(1.0, tk.END)
 
     def load_recent_folders(self):
         """Load recent folders from the history file."""
@@ -283,12 +316,20 @@ class RepoPromptGUI:
             self.ignore_patterns = self.parse_gitignore(gitignore_path)
 
             # Check for cached contents
-            if os.path.exists(self.cache_file) and os.path.getmtime(self.cache_file) > os.path.getmtime(self.repo_path):
+            if os.path.exists(self.cache_file):
                 with open(self.cache_file, 'r', encoding='utf-8') as f:
-                    self.file_contents = f.read()
+                    cached_repo_path = f.readline().strip()  # Read the first line (repo path)
+                    if cached_repo_path == self.repo_path and os.path.getmtime(self.cache_file) > os.path.getmtime(self.repo_path):
+                        self.file_contents = f.read()  # Read the remaining contents
+                    else:
+                        self.file_contents = self.read_repo_files(self.repo_path)
+                        with open(self.cache_file, 'w', encoding='utf-8') as f:
+                            f.write(self.repo_path + '\n')  # Write repo path as first line
+                            f.write(self.file_contents)     # Write file contents
             else:
                 self.file_contents = self.read_repo_files(self.repo_path)
                 with open(self.cache_file, 'w', encoding='utf-8') as f:
+                    f.write(self.repo_path + '\n')
                     f.write(self.file_contents)
 
             self.token_count = len(self.file_contents.split())
@@ -455,6 +496,39 @@ class RepoPromptGUI:
         if template_file and messagebox.askyesno("Confirm", "Are you sure you want to delete this template?"):
             os.remove(template_file)
             messagebox.showinfo("Deleted", "Template deleted successfully!")
+
+    def clear_current(self):
+        current_index = self.notebook.index('current')
+        if current_index == 0:  # Content Preview tab
+            self.content_text.config(state=tk.NORMAL)
+            self.content_text.delete(1.0, tk.END)
+            self.content_text.config(state=tk.DISABLED)
+            self.file_contents = ""
+            self.token_count = 0
+            self.info_label.config(text="Token Count: 0")
+            self.copy_button.config(state=tk.DISABLED)
+        elif current_index == 1:  # Folder Structure tab
+            self.tree.delete(*self.tree.get_children())
+            self.copy_structure_button.config(state=tk.DISABLED)
+        elif current_index == 2:  # Base Prompt tab
+            self.base_prompt_text.delete(1.0, tk.END)
+
+    def clear_all(self):
+        # Clear Content Preview
+        self.content_text.config(state=tk.NORMAL)
+        self.content_text.delete(1.0, tk.END)
+        self.content_text.config(state=tk.DISABLED)
+        self.file_contents = ""
+        self.token_count = 0
+        self.info_label.config(text="Token Count: 0")
+        self.copy_button.config(state=tk.DISABLED)
+        
+        # Clear Folder Structure
+        self.tree.delete(*self.tree.get_children())
+        self.copy_structure_button.config(state=tk.DISABLED)
+        
+        # Clear Base Prompt
+        self.base_prompt_text.delete(1.0, tk.END)
 
     def show_about(self):
         """Show about information."""
