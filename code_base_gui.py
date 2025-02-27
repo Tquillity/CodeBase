@@ -206,17 +206,16 @@ class RepoPromptGUI:
         clear_button_frame.pack(side='bottom', fill='x')
 
         self.clear_button = tk.Button(clear_button_frame, text="Clear", command=self.clear_current,
-                                    bg=self.button_bg, fg=self.button_fg)
+                                      bg=self.button_bg, fg=self.button_fg)
         Tooltip(self.clear_button, "Clear data in the current tab")
         self.clear_button.pack(side='left', padx=5, pady=5)
 
         self.clear_all_button = tk.Button(clear_button_frame, text="Clear All", command=self.clear_all,
-                                        bg=self.button_bg, fg=self.button_fg)
+                                          bg=self.button_bg, fg=self.button_fg)
         Tooltip(self.clear_all_button, "Clear data in all tabs")
         self.clear_all_button.pack(side='left', padx=5, pady=5)
 
     ### New Methods for Added Features ###
-
 
     def load_recent_folders(self):
         """Load recent folders from the history file."""
@@ -232,19 +231,19 @@ class RepoPromptGUI:
                 file.write(f"{folder}\n")
 
     def update_recent_folders(self, new_folder):
-        """Update the recent folders list with a new selection, limiting to 10 entries."""
+        """Update the recent folders list with a new selection, limiting to 20 entries."""
         if new_folder in self.recent_folders:
             self.recent_folders.remove(new_folder)
         self.recent_folders.insert(0, new_folder)
-        if len(self.recent_folders) > 10:
-            self.recent_folders = self.recent_folders[:10]
+        if len(self.recent_folders) > 20:
+            self.recent_folders = self.recent_folders[:20]
         self.save_recent_folders()
 
     def open_folder_dialog(self):
-        """Custom dialog for selecting a folder with a recent folders dropdown."""
+        """Custom dialog for selecting a folder with a recent folders list and dropdown."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Select Repository Folder")
-        dialog.geometry("400x200")
+        dialog.geometry("400x300")
         dialog.configure(bg=self.header_color)
 
         # Outer frame for border
@@ -257,8 +256,8 @@ class RepoPromptGUI:
 
         # Title label
         title_label = tk.Label(inner_frame, text="Select Repository Folder",
-                               font=("Arial", 12, "bold"), bg='#3c3c3c', fg=self.text_color)
-        title_label.pack(pady=5)
+                            font=("Arial", 12, "bold"), bg='#3c3c3c', fg=self.text_color)
+        title_label.pack(pady=10)
 
         # Truncate long paths
         def truncate_path(path, max_length=50):
@@ -266,12 +265,29 @@ class RepoPromptGUI:
                 return "…/" + path[-(max_length - 3):]
             return path
 
-        recent_folders_truncated = [truncate_path(folder) for folder in self.recent_folders]
-
+        # Recent folders (permanent list for top 5)
         tk.Label(inner_frame, text="Recent Folders:", bg='#3c3c3c', fg=self.text_color).pack(pady=5)
+
+        # Frame for the list with a border
+        list_frame = tk.Frame(inner_frame, bg='#2b2b2b', relief="groove", borderwidth=2)
+        list_frame.pack(pady=5, padx=20, fill="x")
+
         folder_var = tk.StringVar()
-        folder_dropdown = ttk.Combobox(inner_frame, textvariable=folder_var, values=recent_folders_truncated, state="readonly")
-        folder_dropdown.pack(pady=5, fill="x")
+
+        for i, folder in enumerate(self.recent_folders[:5]):
+            truncated = truncate_path(folder)
+            # Alternate background colors for better readability
+            bg_color = '#3c3c3c' if i % 2 == 0 else '#4a4a4a'
+            folder_label = tk.Label(list_frame, text=truncated, bg=bg_color, fg=self.text_color, cursor="hand2", anchor="w")
+            folder_label.pack(fill="x", padx=5, pady=2)
+            folder_label.bind("<Button-1>", lambda e, t=truncated: folder_var.set(t))
+
+        # If more than 5 recent folders, show the rest in a dropdown
+        if len(self.recent_folders) > 5:
+            tk.Label(inner_frame, text="More Recent Folders:", bg='#3c3c3c', fg=self.text_color).pack(pady=5)
+            additional_folders = [truncate_path(folder) for folder in self.recent_folders[5:20]]
+            folder_dropdown = ttk.Combobox(inner_frame, textvariable=folder_var, values=additional_folders, state="readonly")
+            folder_dropdown.pack(pady=5, fill="x", padx=20)
 
         def browse_folder():
             folder = filedialog.askdirectory()
@@ -279,8 +295,8 @@ class RepoPromptGUI:
                 folder_var.set(folder)
 
         browse_button = tk.Button(inner_frame, text="Browse", command=browse_folder,
-                                  bg=self.button_bg, fg=self.button_fg)
-        browse_button.pack(pady=5)
+                                bg=self.button_bg, fg=self.button_fg)
+        browse_button.pack(pady=10)
 
         def confirm_selection():
             selected = folder_var.get()
@@ -295,7 +311,7 @@ class RepoPromptGUI:
                 messagebox.showwarning("No Selection", "Please select a folder.")
 
         ok_button = tk.Button(inner_frame, text="OK", command=confirm_selection,
-                              bg=self.button_bg, fg=self.button_fg)
+                            bg=self.button_bg, fg=self.button_fg)
         ok_button.pack(pady=10)
 
         dialog.transient(self.root)
