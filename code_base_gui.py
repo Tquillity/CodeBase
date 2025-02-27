@@ -145,6 +145,15 @@ class RepoPromptGUI:
         self.notebook = ttk.Notebook(self.right_frame)
         self.notebook.pack(fill="both", expand=True)
 
+        # Customize Notebook style
+        style = ttk.Style()
+        style.configure("Custom.TNotebook", background='#2b2b2b')  # Notebook background
+        style.configure("Custom.TNotebook.Tab", background='#3c3c3c', foreground=self.text_color)  # Unselected tabs
+        style.map("Custom.TNotebook.Tab",
+                background=[('selected', self.header_color)],  # Selected tab background
+                foreground=[('selected', '#2b2b2b')])  # Dark text for contrast on blue
+        self.notebook.configure(style="Custom.TNotebook")
+
         # Tab 1: Content Preview
         self.content_frame = tk.Frame(self.notebook, bg='#2b2b2b')
         self.notebook.add(self.content_frame, text="Content Preview")
@@ -278,14 +287,31 @@ class RepoPromptGUI:
         list_frame.pack(pady=5, padx=20, fill="x")
 
         folder_var = tk.StringVar()
+        selected_label = None  # Track the currently selected label
+
+        def select_folder(event, label, folder):
+            nonlocal selected_label
+            folder_var.set(folder)
+            # Reset previous selection
+            if selected_label and selected_label != label:
+                selected_label.config(bg=selected_label.default_bg, fg=self.text_color)
+            # Highlight new selection with dark text for contrast
+            label.config(bg=self.header_color, fg='#2b2b2b')
+            selected_label = label
+
+        def double_click_select(event, folder):
+            folder_var.set(folder)
+            confirm_selection()
 
         for i, folder in enumerate(self.recent_folders[:5]):
             truncated = truncate_path(folder)
             # Alternate background colors for better readability
             bg_color = '#3c3c3c' if i % 2 == 0 else '#4a4a4a'
             folder_label = tk.Label(list_frame, text=truncated, bg=bg_color, fg=self.text_color, cursor="hand2", anchor="w")
+            folder_label.default_bg = bg_color  # Store default background
             folder_label.pack(fill="x", padx=5, pady=2)
-            folder_label.bind("<Button-1>", lambda e, t=truncated: folder_var.set(t))
+            folder_label.bind("<Button-1>", lambda e, l=folder_label, f=truncated: select_folder(e, l, f))
+            folder_label.bind("<Double-1>", lambda e, f=truncated: double_click_select(e, f))
 
         # If more than 5 recent folders, show the rest in a dropdown
         if len(self.recent_folders) > 5:
