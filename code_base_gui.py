@@ -412,8 +412,8 @@ class RepoPromptGUI:
 
         tk.Label(inner_frame, text="Select Repository Folder", font=("Arial", 12, "bold"), bg='#3c3c3c', fg=self.text_color).pack(pady=10)
 
-        # Shorten paths longer than 50 chars
-        def truncate_path(path, max_length=50):
+        # Shorten paths longer than 50 chars, reserving space for the "X"
+        def truncate_path(path, max_length=45):  # Reduced from 50 to account for "X"
             if len(path) > max_length:
                 return "…/" + path[-(max_length - 3):]
             return path
@@ -439,21 +439,53 @@ class RepoPromptGUI:
             folder_var.set(folder)
             confirm_selection()
 
-        # Populate recent folders list (top 5)
-        for i, folder in enumerate(self.recent_folders[:5]):
-            truncated = truncate_path(folder)
-            bg_color = '#3c3c3c' if i % 2 == 0 else '#4a4a4a'
-            folder_label = tk.Label(list_frame, text=truncated, bg=bg_color, fg=self.text_color, cursor="hand2", anchor="w")
-            folder_label.default_bg = bg_color
-            folder_label.pack(fill="x", padx=5, pady=2)
-            folder_label.bind("<Button-1>", lambda e, l=folder_label, f=truncated: select_folder(e, l, f))
-            folder_label.bind("<Double-1>", lambda e, f=truncated: double_click_select(e, f))
+        # Refresh the folder list dynamically
+        def refresh_folder_list():
+            # Clear current list
+            for widget in list_frame.winfo_children():
+                widget.destroy()
+            # Repopulate with updated folders
+            for i, folder in enumerate(self.recent_folders[:5]):
+                truncated = truncate_path(folder)
+                bg_color = '#3c3c3c' if i % 2 == 0 else '#4a4a4a'
+                item_frame = tk.Frame(list_frame, bg=bg_color)
+                item_frame.pack(fill="x", padx=5, pady=2)
+
+                folder_label = tk.Label(item_frame, text=truncated, bg=bg_color, fg=self.text_color, cursor="hand2", anchor="w")
+                folder_label.default_bg = bg_color
+                folder_label.pack(side="left", fill="x", expand=True)
+                folder_label.bind("<Button-1>", lambda e, l=folder_label, f=folder: select_folder(e, l, f))
+                folder_label.bind("<Double-1>", lambda e, f=folder: double_click_select(e, f))
+
+                remove_btn = tk.Label(item_frame, text="✕", bg=bg_color, fg='#FF4500', font=("Arial", 10), cursor="hand2")
+                remove_btn.pack(side="right", padx=(5, 0))
+                remove_btn.bind("<Button-1>", lambda e, f=folder: remove_folder(f))
+                remove_btn.bind("<Enter>", lambda e, b=remove_btn: b.config(fg="#FF6347"))
+                remove_btn.bind("<Leave>", lambda e, b=remove_btn: b.config(fg="#FF4500"))
+                Tooltip(remove_btn, f"Remove {truncated} from recent folders")
+            # Update dropdown if it exists
+            if len(self.recent_folders) > 5 and hasattr(dropdown_frame, 'dropdown'):
+                dropdown_frame.dropdown['values'] = [truncate_path(f) for f in self.recent_folders[5:20]]
+
+        # Remove folder from recent list and refresh UI
+        def remove_folder(folder):
+            if folder in self.recent_folders:
+                self.recent_folders.remove(folder)
+                self.save_recent_folders()
+                refresh_folder_list()  # Refresh the list instead of reopening dialog
+
+        # Initial population of folder list
+        refresh_folder_list()
 
         # Add dropdown for additional folders if >5
+        dropdown_frame = tk.Frame(inner_frame, bg='#3c3c3c')
+        dropdown_frame.pack(pady=5, fill="x", padx=20)
         if len(self.recent_folders) > 5:
-            tk.Label(inner_frame, text="More Recent Folders:", bg='#3c3c3c', fg=self.text_color).pack(pady=5)
-            additional_folders = [truncate_path(folder) for folder in self.recent_folders[5:20]]
-            ttk.Combobox(inner_frame, textvariable=folder_var, values=additional_folders, state="readonly").pack(pady=5, fill="x", padx=20)
+            tk.Label(dropdown_frame, text="More Recent Folders:", bg='#3c3c3c', fg=self.text_color).pack(pady=5)
+            dropdown_frame.dropdown = ttk.Combobox(dropdown_frame, textvariable=folder_var, 
+                                                  values=[truncate_path(f) for f in self.recent_folders[5:20]], 
+                                                  state="readonly")
+            dropdown_frame.dropdown.pack(pady=5, fill="x")
 
         # Open file explorer for manual folder selection
         def browse_folder():
