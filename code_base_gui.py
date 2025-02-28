@@ -790,7 +790,7 @@ class RepoPromptGUI:
 
     # Show about dialog
     def show_about(self):
-        messagebox.showinfo("About", "CodeBase v1.0\nA tool to scan repositories and copy contents.\n© 2023 Your Name")
+                messagebox.showinfo("About", "CodeBase v1.0\nA tool to scan repositories and copy contents.\n\nTo be released under\nMIT License Soon\n©2025 Mikael Sundh")
 
     # Search the content of the currently focused tab
     def search_tab(self):
