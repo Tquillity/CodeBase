@@ -54,6 +54,76 @@ class Tooltip:
             self.tip = None
 
 class RepoPromptGUI:
+    # Add hover effect to buttons, changes bg color on mouse enter/leave
+    def add_button_hover(self, button):
+        button.bind("<Enter>", lambda e: button.config(bg="#5a5a5a"))
+        button.bind("<Leave>", lambda e: button.config(bg=self.button_bg))
+
+    # Load recent folders from file, return empty list if file doesn’t exist
+    def load_recent_folders(self):
+        if os.path.exists(self.recent_folders_file):
+            with open(self.recent_folders_file, 'r') as file:
+                return [line.strip() for line in file.readlines() if line.strip()]
+        return []
+
+    # Save recent folders to file
+    def save_recent_folders(self):
+        with open(self.recent_folders_file, 'w') as file:
+            for folder in self.recent_folders:
+                file.write(f"{folder}\n")
+
+    # Update recent folders list, keep max 20 entries
+    def update_recent_folders(self, new_folder):
+        if new_folder in self.recent_folders:
+            self.recent_folders.remove(new_folder)
+        self.recent_folders.insert(0, new_folder)
+        if len(self.recent_folders) > 20:
+            self.recent_folders = self.recent_folders[:20]
+        self.save_recent_folders()
+
+    # Copy content to clipboard, optionally prepend base prompt
+    def copy_to_clipboard(self):
+        if self.prepend_var.get() == 1:
+            base_prompt = self.base_prompt_text.get(1.0, tk.END).strip()
+            content_to_copy = base_prompt + "\n\n" + self.file_contents
+        else:
+            content_to_copy = self.file_contents
+        pyperclip.copy(content_to_copy)
+        self.show_status_message("Copy Successful!")
+
+    # Copy folder structure to clipboard
+    def copy_structure_to_clipboard(self):
+        structure_content = self.generate_folder_structure_text()
+        pyperclip.copy(structure_content)
+        self.show_status_message("Copy Successful!")
+
+    # Save base prompt as template file
+    def save_template(self):
+        template_name = filedialog.asksaveasfilename(initialdir=self.template_dir, defaultextension=".txt",
+                                                     filetypes=[("Text files", "*.txt")], title="Save Template")
+        if template_name:
+            with open(template_name, 'w', encoding='utf-8') as file:
+                file.write(self.base_prompt_text.get(1.0, tk.END).strip())
+            messagebox.showinfo("Saved", "Template saved successfully!")
+
+    # Load template into base prompt
+    def load_template(self):
+        template_file = filedialog.askopenfilename(initialdir=self.template_dir, filetypes=[("Text files", "*.txt")],
+                                                   title="Load Template")
+        if template_file:
+            with open(template_file, 'r', encoding='utf-8') as file:
+                template_content = file.read()
+            self.base_prompt_text.delete(1.0, tk.END)
+            self.base_prompt_text.insert(tk.END, template_content)
+
+    # Delete selected template file after confirmation
+    def delete_template(self):
+        template_file = filedialog.askopenfilename(initialdir=self.template_dir, filetypes=[("Text files", "*.txt")],
+                                                   title="Delete Template")
+        if template_file and messagebox.askyesno("Confirm", "Are you sure you want to delete this template?"):
+            os.remove(template_file)
+            messagebox.showinfo("Deleted", "Template deleted successfully!")
+
     def __init__(self, root):
         self.root = root
         self.root.title("CodeBase")
@@ -328,33 +398,6 @@ class RepoPromptGUI:
         self.status_bar = tk.Label(root, text="Ready", bg='#2b2b2b', fg=self.status_color, bd=1, relief="sunken", anchor="w")
         self.status_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
 
-    # Add hover effect to buttons, changes bg color on mouse enter/leave
-    def add_button_hover(self, button):
-        button.bind("<Enter>", lambda e: button.config(bg="#5a5a5a"))
-        button.bind("<Leave>", lambda e: button.config(bg=self.button_bg))
-
-    # Load recent folders from file, return empty list if file doesn’t exist
-    def load_recent_folders(self):
-        if os.path.exists(self.recent_folders_file):
-            with open(self.recent_folders_file, 'r') as file:
-                return [line.strip() for line in file.readlines() if line.strip()]
-        return []
-
-    # Save recent folders to file
-    def save_recent_folders(self):
-        with open(self.recent_folders_file, 'w') as file:
-            for folder in self.recent_folders:
-                file.write(f"{folder}\n")
-
-    # Update recent folders list, keep max 20 entries
-    def update_recent_folders(self, new_folder):
-        if new_folder in self.recent_folders:
-            self.recent_folders.remove(new_folder)
-        self.recent_folders.insert(0, new_folder)
-        if len(self.recent_folders) > 20:
-            self.recent_folders = self.recent_folders[:20]
-        self.save_recent_folders()
-
     # Dialog for selecting repo folder with recent folders list
     def open_folder_dialog(self):
         dialog = tk.Toplevel(self.root)
@@ -557,26 +600,11 @@ class RepoPromptGUI:
             if os.path.exists(self.cache_file):
                 with open(self.cache_file, 'r', encoding='utf-8') as f:
                     cached_repo_path = f.readline().strip()
-                    if cached_repo_path == self.repo_path and os.path.getmtime(self.cache_file) > os.path.getmtime(self.repo_path):
-                        self.file_contents = f.read()
-                        # Populate self.loaded_files from cached file_contents
-                        self.loaded_files = set()
-                        if self.file_contents.startswith("File: "):
-                            sections = self.file_contents[len("File: "):].split("\nFile: ")
-                            sections = ["File: " + s for s in sections]
-                        else:
-                            sections = []
-                        for section in sections:
-                            filename_end = section.find("\nContent:\n")
-                            if filename_end != -1:
-                                file_path = section[6:filename_end].strip()
-                                self.loaded_files.add(os.path.normcase(file_path))
-                    else:
-                        print("Reading files from repository...")
-                        self.file_contents = self.read_repo_files(self.repo_path)
-                        with open(self.cache_file, 'w', encoding='utf-8') as f:
-                            f.write(self.repo_path + '\n')
-                            f.write(self.file_contents)
+                print("Reading files from repository...")
+                self.file_contents = self.read_repo_files(self.repo_path)
+                with open(self.cache_file, 'w', encoding='utf-8') as f:
+                    f.write(self.repo_path + '\n')
+                    f.write(self.file_contents)
             else:
                 print("Reading files from repository...")
                 self.file_contents = self.read_repo_files(self.repo_path)
@@ -700,10 +728,12 @@ class RepoPromptGUI:
         mime_type, _ = mimetypes.guess_type(file_path)
         ext = os.path.splitext(file_path)[1].lower()
         filename = os.path.basename(file_path)
+        excluded = filename in self.exclude_files and self.exclude_files[filename].get() == 1
+        print(f"Checking {file_path}: MIME={mime_type}, Ext={ext}, Excluded={excluded}")
         return (
             (mime_type and mime_type.startswith('text')) or
             (ext in self.text_extensions_default and self.text_extensions_enabled[ext].get() == 1)
-        ) and not (filename in self.exclude_files and self.exclude_files[filename].get() == 1)
+        ) and not excluded
 
     # Read all text files in repo, format with "File:" and "Content:", track loaded files
     def read_repo_files(self, root_dir):
@@ -790,49 +820,6 @@ class RepoPromptGUI:
             else:
                 self.status_bar.config(text="Ready", fg=self.status_color)
         self.root.after(5000, fade_out)
-
-    # Copy content to clipboard, optionally prepend base prompt
-    def copy_to_clipboard(self):
-        if self.prepend_var.get() == 1:
-            base_prompt = self.base_prompt_text.get(1.0, tk.END).strip()
-            content_to_copy = base_prompt + "\n\n" + self.file_contents
-        else:
-            content_to_copy = self.file_contents
-        pyperclip.copy(content_to_copy)
-        self.show_status_message("Copy Successful!")
-
-    # Copy folder structure to clipboard
-    def copy_structure_to_clipboard(self):
-        structure_content = self.generate_folder_structure_text()
-        pyperclip.copy(structure_content)
-        self.show_status_message("Copy Successful!")
-
-    # Save base prompt as template file
-    def save_template(self):
-        template_name = filedialog.asksaveasfilename(initialdir=self.template_dir, defaultextension=".txt",
-                                                     filetypes=[("Text files", "*.txt")], title="Save Template")
-        if template_name:
-            with open(template_name, 'w', encoding='utf-8') as file:
-                file.write(self.base_prompt_text.get(1.0, tk.END).strip())
-            messagebox.showinfo("Saved", "Template saved successfully!")
-
-    # Load template into base prompt
-    def load_template(self):
-        template_file = filedialog.askopenfilename(initialdir=self.template_dir, filetypes=[("Text files", "*.txt")],
-                                                   title="Load Template")
-        if template_file:
-            with open(template_file, 'r', encoding='utf-8') as file:
-                template_content = file.read()
-            self.base_prompt_text.delete(1.0, tk.END)
-            self.base_prompt_text.insert(tk.END, template_content)
-
-    # Delete selected template file after confirmation
-    def delete_template(self):
-        template_file = filedialog.askopenfilename(initialdir=self.template_dir, filetypes=[("Text files", "*.txt")],
-                                                   title="Delete Template")
-        if template_file and messagebox.askyesno("Confirm", "Are you sure you want to delete this template?"):
-            os.remove(template_file)
-            messagebox.showinfo("Deleted", "Template deleted successfully!")
 
     # Clear current tab’s content
     def clear_current(self):
