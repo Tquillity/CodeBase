@@ -56,7 +56,7 @@ class Tooltip:
 class RepoPromptGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("CodeBase")
+        self.root.title("Code Base")
         self.root.geometry("1024x600")
 
         # Set up dark mode colors
@@ -73,6 +73,29 @@ class RepoPromptGUI:
         self.file_contents = ""
         self.token_count = 0
         self.ignore_patterns = []
+
+        # Settings for file reading
+        self.text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx',
+                                        '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg',
+                                        '.gitignore', '.yml', '.yaml', '.toml', '.ini', '.properties',
+                                        '.csv', '.tsv', '.log', '.sql', '.sh', '.bash', '.zsh', '.fish',
+                                        '.awk', '.sed', '.bat', '.cmd', '.ps1', '.php', '.rb', '.erb',
+                                        '.haml', '.slim', '.pl', '.lua', '.r', '.m', '.mm', '.asm', '.v',
+                                        '.vhdl', '.verilog', '.s', '.swift', '.kt', '.kts', '.go', '.rs',
+                                        '.dart', '.vue', '.pug', '.coffee', '.proto', '.dockerfile',
+                                        '.make', '.tf', '.hcl', '.sol', '.gradle', '.groovy', '.scala',
+                                        '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm',
+                                        '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', '.bib',
+                                        '.sty', '.cls', '.cs', '.fs', '.fsx'}
+        self.text_extensions_enabled = {ext: IntVar(value=1) for ext in self.text_extensions_default}
+        self.exclude_files_default = {
+            'package-lock.json': IntVar(value=0),
+            'yarn.lock': IntVar(value=0),
+            'composer.lock': IntVar(value=0),
+            'Gemfile.lock': IntVar(value=0),
+            'poetry.lock': IntVar(value=0)
+        }
+        self.exclude_files = self.exclude_files_default.copy()
 
         # Set up user data dirs
         self.user_data_dir = appdirs.user_data_dir("CodeBase")
@@ -114,6 +137,12 @@ class RepoPromptGUI:
         self.select_button.pack(pady=10)
         self.add_button_hover(self.select_button)
         Tooltip(self.select_button, "Choose a repository folder to scan")
+
+        self.settings_button = tk.Button(self.left_frame, text="Repo Settings", command=self.open_settings_dialog,
+                                         bg=self.button_bg, fg=self.button_fg)
+        self.settings_button.pack(pady=5)
+        self.add_button_hover(self.settings_button)
+        Tooltip(self.settings_button, "Customize file reading settings")
 
         self.info_label = tk.Label(self.left_frame, text="Token Count: 0", bg='#2b2b2b', fg=self.text_color)
         self.info_label.pack(pady=5)
@@ -343,6 +372,104 @@ class RepoPromptGUI:
         self.root.wait_window(dialog)
         return getattr(dialog, 'selected_folder', None)
 
+    # Open settings dialog for customizing file reading options
+    def open_settings_dialog(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Repo Folder Settings")
+        dialog.geometry("860x645")
+        dialog.configure(bg='#2b2b2b')
+
+        # Notebook for settings tabs
+        notebook = ttk.Notebook(dialog)
+        notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        style = ttk.Style()
+        style.configure("Settings.TNotebook", background='#2b2b2b')
+        style.configure("Settings.TNotebook.Tab", background='#3c3c3c', foreground=self.text_color)
+        style.map("Settings.TNotebook.Tab", background=[('selected', self.header_color)], foreground=[('selected', '#2b2b2b')])
+        notebook.configure(style="Settings.TNotebook")
+
+        # File Extensions Tab
+        ext_frame = tk.Frame(notebook, bg='#2b2b2b')
+        notebook.add(ext_frame, text="File Extensions")
+        ext_canvas = tk.Canvas(ext_frame, bg='#2b2b2b')
+        ext_scrollbar = ttk.Scrollbar(ext_frame, orient="vertical", command=ext_canvas.yview)
+        ext_scrollable_frame = tk.Frame(ext_canvas, bg='#2b2b2b')
+
+        ext_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: ext_canvas.configure(scrollregion=ext_canvas.bbox("all"))
+        )
+
+        ext_canvas.create_window((0, 0), window=ext_scrollable_frame, anchor="nw")
+        ext_canvas.configure(yscrollcommand=ext_scrollbar.set)
+
+        ext_canvas.pack(side="left", fill="both", expand=True)
+        ext_scrollbar.pack(side="right", fill="y")
+
+        tk.Label(ext_scrollable_frame, text="Select file extensions to include:", bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, columnspan=3, pady=5)
+        for i, ext in enumerate(sorted(self.text_extensions_default)):
+            row = (i // 9) + 1  # Integer division to place 3 per row
+            col = i % 9       # Modulo to cycle through columns 0, 1, 2
+            cb = tk.Checkbutton(ext_scrollable_frame, text=ext, variable=self.text_extensions_enabled[ext],
+                                bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
+            cb.grid(row=row, column=col, sticky="w", padx=5, pady=2)
+
+        # Excluded Files Tab
+        exclude_frame = tk.Frame(notebook, bg='#2b2b2b')
+        notebook.add(exclude_frame, text="Exclude Files")
+        tk.Label(exclude_frame, text="Select files to exclude:", bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, pady=5)
+        for i, file in enumerate(sorted(self.exclude_files_default.keys())):
+            cb = tk.Checkbutton(exclude_frame, text=file, variable=self.exclude_files[file],
+                                bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
+            cb.grid(row=i+1, column=0, sticky="w", padx=10, pady=2)
+
+        # Apply & Refresh Button
+        def apply_and_refresh():
+            if self.repo_path and os.path.isdir(self.repo_path):
+                print("Applying new settings and refreshing repository...")
+                self.file_contents = self.read_repo_files(self.repo_path)
+                with open(self.cache_file, 'w', encoding='utf-8') as f:
+                    f.write(self.repo_path + '\n')
+                    f.write(self.file_contents)
+
+                # Update token count and enable copy buttons
+                self.token_count = len(self.file_contents.split())
+                formatted_count = f"{self.token_count:,}".replace(",", " ")
+                self.info_label.config(text=f"Token Count: {formatted_count}")
+                self.copy_button.config(state=tk.NORMAL)
+                self.copy_structure_button.config(state=tk.NORMAL)
+
+                # Populate content preview with red filenames
+                self.content_text.config(state=tk.NORMAL)
+                self.content_text.delete(1.0, tk.END)
+                self.content_text.tag_configure("filename", foreground="red")
+                if self.file_contents.startswith("File: "):
+                    sections = self.file_contents[len("File: "):].split("\nFile: ")
+                    sections = ["File: " + s for s in sections]
+                else:
+                    sections = []
+                for section in sections:
+                    filename_end = section.find("\nContent:\n")
+                    if filename_end != -1:
+                        filename = section[6:filename_end].strip()
+                        content = section[filename_end + 11:]
+                        self.content_text.insert(tk.END, f"File: {filename}\n", "filename")
+                        self.content_text.insert(tk.END, f"Content:\n{content}\n\n")
+                    else:
+                        self.content_text.insert(tk.END, section + "\n\n")
+                self.content_text.config(state=tk.DISABLED)
+
+                self.show_status_message("Settings Applied and Refreshed!")
+            else:
+                messagebox.showwarning("No Repo Loaded", "No repository loaded to refresh. Settings will apply on next load.")
+            dialog.destroy()
+
+        tk.Button(dialog, text="Apply & Refresh with new Settings", command=apply_and_refresh, 
+                  bg=self.button_bg, fg=self.button_fg).pack(pady=10)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        self.root.wait_window(dialog)
+
     # Load and process selected repository
     def select_repo(self):
         selected_folder = self.open_folder_dialog()
@@ -365,7 +492,7 @@ class RepoPromptGUI:
                         self.file_contents = self.read_repo_files(self.repo_path)
                         with open(self.cache_file, 'w', encoding='utf-8') as f:
                             f.write(self.repo_path + '\n')
-                            f.write(self.file_contents)     
+                            f.write(self.file_contents)
             else:
                 print("Reading files from repository...")
                 self.file_contents = self.read_repo_files(self.repo_path)
@@ -481,23 +608,15 @@ class RepoPromptGUI:
             return True
         return False
 
-    # Detect if file is text-based using MIME type
+    # Detect if file is text-based using MIME type and user settings
     def is_text_file(self, file_path):
         mime_type, _ = mimetypes.guess_type(file_path)
         ext = os.path.splitext(file_path)[1].lower()
-        text_extensions = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx', 
-                        '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg', 
-                        '.gitignore', '.yml', '.yaml', '.toml', '.ini', '.properties', 
-                        '.csv', '.tsv', '.log', '.sql', '.sh', '.bash', '.zsh', '.fish', 
-                        '.awk', '.sed', '.bat', '.cmd', '.ps1', '.php', '.rb', '.erb', 
-                        '.haml', '.slim', '.pl', '.lua', '.r', '.m', '.mm', '.asm', '.v', 
-                        '.vhdl', '.verilog', '.s', '.swift', '.kt', '.kts', '.go', '.rs', 
-                        '.dart', '.vue', '.pug', '.coffee', '.proto', '.dockerfile', 
-                        '.make', '.tf', '.hcl', '.sol', '.gradle', '.groovy', '.scala', 
-                        '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm', 
-                        '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', '.bib', 
-                        '.sty', '.cls', '.cs', '.fs', '.fsx'}
-        return (mime_type and mime_type.startswith('text')) or ext in text_extensions
+        filename = os.path.basename(file_path)
+        return (
+            (mime_type and mime_type.startswith('text')) or
+            (ext in self.text_extensions_default and self.text_extensions_enabled[ext].get() == 1)
+        ) and not (filename in self.exclude_files and self.exclude_files[filename].get() == 1)
 
     # Read all text files in repo, format with "File:" and "Content:"
     def read_repo_files(self, root_dir):
