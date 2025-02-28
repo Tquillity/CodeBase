@@ -240,6 +240,15 @@ class RepoPromptGUI:
         self.tree.tag_bind('folder', '<Double-1>', self.on_double_click)
         self.tree.bind('<<TreeviewOpen>>', self.on_treeview_open)
 
+        # Add Expand/Collapse All button to Folder Structure tab
+        self.expand_collapse_var = tk.BooleanVar(value=True)  # True for Expand, False for Collapse
+        self.expand_collapse_button = tk.Button(self.structure_frame, text="Expand All",
+                                              command=self.toggle_expand_collapse,
+                                              bg=self.button_bg, fg=self.button_fg)
+        self.expand_collapse_button.pack(side=tk.TOP, pady=5)
+        self.add_button_hover(self.expand_collapse_button)
+        Tooltip(self.expand_collapse_button, "Expand or collapse all folders")
+
         # Base Prompt tab
         self.base_prompt_frame = tk.Frame(self.notebook, bg='#2b2b2b')
         self.notebook.add(self.base_prompt_frame, text="Base Prompt")
@@ -790,7 +799,37 @@ class RepoPromptGUI:
 
     # Show about dialog
     def show_about(self):
-                messagebox.showinfo("About", "CodeBase v1.0\nA tool to scan repositories and copy contents.\n\nTo be released under\nMIT License Soon\n©2025 Mikael Sundh")
+        messagebox.showinfo("About", "CodeBase v1.0\nA tool to scan repositories and copy contents.\n\nTo be released under\nMIT License Soon\n©2025 Mikael Sundh")
+
+    # Expand all nodes in the tree recursively
+    def expand_all(self, item=""):
+        for child in self.tree.get_children(item):
+            if 'folder' in self.tree.item(child, "tags"):
+                self.tree.item(child, open=True)
+                children = self.tree.get_children(child)
+                if children and self.tree.item(children[0], "text") == "Loading...":
+                    item_path = self.tree.item(child, "values")[0]
+                    self.expand_folder(item_path, child)
+                self.expand_all(child)
+
+    # Collapse all nodes in the tree recursively
+    def collapse_all(self, item=""):
+        for child in self.tree.get_children(item):
+            if 'folder' in self.tree.item(child, "tags"):
+                self.tree.item(child, open=False)
+                self.collapse_all(child)
+
+    # Toggle between expand all and collapse all
+    def toggle_expand_collapse(self):
+        if self.expand_collapse_var.get():
+            self.expand_all()
+            self.expand_collapse_button.config(text="Collapse All")
+            self.expand_collapse_var.set(False)
+        else:
+            self.collapse_all()
+            self.expand_collapse_button.config(text="Expand All")
+            self.expand_collapse_var.set(True)
+        self.show_status_message("Folder structure updated")
 
     # Search the content of the currently focused tab
     def search_tab(self):
