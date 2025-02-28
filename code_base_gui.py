@@ -56,8 +56,8 @@ class Tooltip:
 class RepoPromptGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Code Base")
-        self.root.geometry("1024x600")
+        self.root.title("CodeBase")
+        self.root.geometry("1200x800")
 
         # Set up dark mode colors
         self.root.configure(bg='#2b2b2b')
@@ -65,7 +65,7 @@ class RepoPromptGUI:
         self.button_bg = '#4a4a4a'
         self.button_fg = '#ffffff'
         self.header_color = '#add8e6'
-        self.status_color = '#ffff00'
+        self.status_color = '#FF4500'
         self.folder_color = '#FFD700'
 
         # Initialize repo-related vars
@@ -113,8 +113,12 @@ class RepoPromptGUI:
         self.version_label = tk.Label(root, text="v1.0", font=("Arial", 10), bg='#2b2b2b', fg=self.header_color)
         self.version_label.grid(row=0, column=1, padx=5, pady=10, sticky="w")
 
+        # Current repo label setup
+        self.repo_label = tk.Label(root, text="Current Repo Loaded: None", font=("Arial", 14), bg='#2b2b2b', fg='#FF4500')
+        self.repo_label.grid(row=0, column=2, padx=50, pady=10, sticky="w")
+
         # Add horizontal separator below header
-        tk.Frame(root, bg='#4a4a4a', height=1).grid(row=1, column=0, columnspan=2, sticky="ew")
+        tk.Frame(root, bg='#4a4a4a', height=1).grid(row=1, column=0, columnspan=3, sticky="ew")
 
         # Left frame for controls
         self.left_frame = tk.Frame(root, bg='#2b2b2b')
@@ -180,6 +184,41 @@ class RepoPromptGUI:
         style.configure("Custom.TNotebook.Tab", background='#3c3c3c', foreground=self.text_color)
         style.map("Custom.TNotebook.Tab", background=[('selected', self.header_color)], foreground=[('selected', '#2b2b2b')])
         self.notebook.configure(style="Custom.TNotebook")
+
+        # Search bar setup with navigation buttons
+        search_frame = tk.Frame(self.right_frame, bg='#2b2b2b')
+        search_frame.pack(side=tk.TOP, anchor="ne", pady=5, padx=10)
+        self.search_var = tk.StringVar()
+        self.search_entry = tk.Entry(search_frame, textvariable=self.search_var, bg='#3c3c3c', fg=self.text_color, 
+                                     insertbackground=self.text_color, width=60, font=("Arial", 12))
+        self.search_entry.pack(side=tk.LEFT, padx=5, pady=2, ipady=5)  # ipady for internal height
+        self.search_button = tk.Button(search_frame, text="Search", command=self.search_tab, bg=self.button_bg, fg=self.button_fg, 
+                                       font=("Arial", 16))
+        self.search_button.pack(side=tk.LEFT, pady=2, ipadx=5, ipady=5)  # Padding in pack for size
+        self.add_button_hover(self.search_button)
+        Tooltip(self.search_entry, "Enter text to search in the current tab")
+        Tooltip(self.search_button, "Search the current tab")
+
+        # Add navigation buttons
+        self.next_button = tk.Button(search_frame, text="Next", command=self.next_match,
+                                     bg=self.button_bg, fg=self.button_fg, font=("Arial", 16))
+        self.next_button.pack(side=tk.LEFT, pady=2, ipadx=5, ipady=5)
+        self.add_button_hover(self.next_button)
+        Tooltip(self.next_button, "Go to the next search match")
+
+        self.prev_button = tk.Button(search_frame, text="Prev", command=self.prev_match,
+                                     bg=self.button_bg, fg=self.button_fg, font=("Arial", 16))
+        self.prev_button.pack(side=tk.LEFT, pady=2, ipadx=5, ipady=5)
+        self.add_button_hover(self.prev_button)
+        Tooltip(self.prev_button, "Go to the previous search match")
+
+        # Bind arrow keys to navigation
+        self.search_entry.bind("<Down>", lambda e: self.next_match())
+        self.search_entry.bind("<Up>", lambda e: self.prev_match())
+
+        # Initialize match tracking
+        self.match_positions = {}  # Dictionary to store matches per tab
+        self.current_match_index = {}  # Dictionary to store current match index per tab
 
         # Content Preview tab
         self.content_frame = tk.Frame(self.notebook, bg='#2b2b2b')
@@ -477,6 +516,10 @@ class RepoPromptGUI:
             self.repo_path = os.path.realpath(selected_folder)
             self.update_recent_folders(self.repo_path)
 
+            # Update repo label with current repo name
+            repo_name = os.path.basename(self.repo_path)
+            self.repo_label.config(text=f"Current Repo Loaded: {repo_name}")
+
             gitignore_path = os.path.join(self.repo_path, '.gitignore')
             self.ignore_patterns = self.parse_gitignore(gitignore_path)
 
@@ -743,10 +786,182 @@ class RepoPromptGUI:
         self.tree.delete(*self.tree.get_children())
         self.copy_structure_button.config(state=tk.DISABLED)
         self.base_prompt_text.delete(1.0, tk.END)
+        self.repo_label.config(text="Current Repo Loaded: None")
 
     # Show about dialog
     def show_about(self):
         messagebox.showinfo("About", "CodeBase v1.0\nA tool to scan repositories and copy contents.\n© 2023 Your Name")
+
+    # Search the content of the currently focused tab
+    def search_tab(self):
+        """Search the current tab, highlight matches with focused in blue and others in yellow, and enable navigation."""
+        query = self.search_var.get()  # Case-sensitive search
+        if not query:
+            return
+
+        current_tab = self.notebook.index(self.notebook.select())
+        match_found = False
+
+        # Clear previous highlights
+        if current_tab == 0:  # Content Preview
+            self.content_text.tag_remove("highlight", "1.0", tk.END)
+            self.content_text.tag_remove("focused_highlight", "1.0", tk.END)
+        elif current_tab == 1:  # Folder Structure
+            for item in self.tree.get_children():
+                self.tree.item(item, tags=self.tree.item(item, "tags")[0])  # Reset to original tag
+        elif current_tab == 2:  # Base Prompt
+            self.base_prompt_text.tag_remove("highlight", "1.0", tk.END)
+            self.base_prompt_text.tag_remove("focused_highlight", "1.0", tk.END)
+
+        # Perform search based on the current tab
+        if current_tab in [0, 2]:  # Content Preview or Base Prompt
+            text_widget = self.content_text if current_tab == 0 else self.base_prompt_text
+            if current_tab == 0:
+                text_widget.config(state=tk.NORMAL)  # Temporarily enable for searching
+            matches = []
+            start_pos = "1.0"
+            while True:
+                pos = text_widget.search(query, start_pos, stopindex=tk.END, nocase=0)  # Case-sensitive search
+                if not pos:
+                    break
+                end_pos = f"{pos}+{len(query)}c"
+                matches.append((pos, end_pos))
+                start_pos = end_pos
+            self.match_positions[current_tab] = matches
+            self.current_match_index[current_tab] = 0 if matches else -1
+            # Apply highlights
+            for i, match in enumerate(matches):
+                if i == self.current_match_index.get(current_tab, -1):
+                    text_widget.tag_add("focused_highlight", match[0], match[1])
+                else:
+                    text_widget.tag_add("highlight", match[0], match[1])
+            text_widget.tag_config("highlight", background="#FFFF00", foreground="#000000")  # Yellow for non-focused
+            text_widget.tag_config("focused_highlight", background=self.header_color, foreground="#000000")  # Blue for focused
+            if matches:
+                self.center_match(text_widget, matches[0][0])  # Center the first match
+                match_found = True
+            if current_tab == 0:
+                text_widget.config(state=tk.DISABLED)  # Restore disabled state
+        elif current_tab == 1:  # Folder Structure
+            matches = []
+            def collect_matches(item):
+                nonlocal match_found
+                item_text = self.tree.item(item, "text")  # Case-sensitive
+                if query in item_text:
+                    matches.append(item)
+                    match_found = True
+                for child in self.tree.get_children(item):
+                    collect_matches(child)
+            collect_matches("")  # Start from root
+            self.match_positions[current_tab] = matches
+            self.current_match_index[current_tab] = 0 if matches else -1
+            # Apply highlights
+            for i, item in enumerate(matches):
+                if i == self.current_match_index.get(current_tab, -1):
+                    self.tree.item(item, tags=("focused_highlight",))
+                else:
+                    self.tree.item(item, tags=("highlight",))
+            self.tree.tag_configure("highlight", background="#FFFF00", foreground="#000000")  # Yellow for non-focused
+            self.tree.tag_configure("focused_highlight", background=self.header_color, foreground="#000000")  # Blue for focused
+            if matches:
+                self.tree.see(matches[0])  # Make the first match visible
+                self.tree.selection_set(matches[0])  # Select it
+                match_found = True
+
+        # Update status bar
+        if match_found:
+            self.show_status_message("Search Successful")
+        else:
+            self.show_status_message("Search Found Nothing")
+
+    # Center the match in the text widget view
+    def center_match(self, text_widget, pos):
+        """Scroll the text widget to center the match at the given position."""
+        text_widget.see(pos)  # Ensure the match is visible
+        top, bottom = text_widget.yview()  # Get current visible fraction
+        delta = bottom - top  # Visible fraction range
+        line = int(text_widget.index(pos).split('.')[0])  # Line number of the match
+        total_lines = int(text_widget.index("end").split('.')[0])  # Total lines
+        if total_lines > 0:
+            f = (line - 1) / total_lines  # Approximate fraction of the match
+            new_top = max(0, min(1 - delta, f - delta / 2))  # Calculate new top to center
+            text_widget.yview_moveto(new_top)  # Scroll to center
+
+    # Navigate to the next search match
+    def next_match(self):
+        """Navigate to the next search match in the current tab."""
+        current_tab = self.notebook.index(self.notebook.select())
+        matches = self.match_positions.get(current_tab, [])
+        if not matches:
+            return
+        index = self.current_match_index.get(current_tab, -1)
+        if index < len(matches) - 1:
+            # Remove old focused highlight
+            if current_tab in [0, 2]:
+                text_widget = self.content_text if current_tab == 0 else self.base_prompt_text
+                if current_tab == 0:
+                    text_widget.config(state=tk.NORMAL)
+                old_pos, old_end = matches[index]
+                text_widget.tag_remove("focused_highlight", old_pos, old_end)
+                text_widget.tag_add("highlight", old_pos, old_end)
+            elif current_tab == 1:
+                old_item = matches[index]
+                self.tree.item(old_item, tags=("highlight",))
+
+            # Move to next match
+            index += 1
+            self.current_match_index[current_tab] = index
+            if current_tab in [0, 2]:
+                text_widget = self.content_text if current_tab == 0 else self.base_prompt_text
+                pos, end = matches[index]
+                text_widget.tag_remove("highlight", pos, end)
+                text_widget.tag_add("focused_highlight", pos, end)
+                self.center_match(text_widget, pos)
+                if current_tab == 0:
+                    text_widget.config(state=tk.DISABLED)
+            elif current_tab == 1:
+                item = matches[index]
+                self.tree.item(item, tags=("focused_highlight",))
+                self.tree.see(item)
+                self.tree.selection_set(item)
+
+    # Navigate to the previous search match
+    def prev_match(self):
+        """Navigate to the previous search match in the current tab."""
+        current_tab = self.notebook.index(self.notebook.select())
+        matches = self.match_positions.get(current_tab, [])
+        if not matches:
+            return
+        index = self.current_match_index.get(current_tab, -1)
+        if index > 0:
+            # Remove old focused highlight
+            if current_tab in [0, 2]:
+                text_widget = self.content_text if current_tab == 0 else self.base_prompt_text
+                if current_tab == 0:
+                    text_widget.config(state=tk.NORMAL)
+                old_pos, old_end = matches[index]
+                text_widget.tag_remove("focused_highlight", old_pos, old_end)
+                text_widget.tag_add("highlight", old_pos, old_end)
+            elif current_tab == 1:
+                old_item = matches[index]
+                self.tree.item(old_item, tags=("highlight",))
+
+            # Move to previous match
+            index -= 1
+            self.current_match_index[current_tab] = index
+            if current_tab in [0, 2]:
+                text_widget = self.content_text if current_tab == 0 else self.base_prompt_text
+                pos, end = matches[index]
+                text_widget.tag_remove("highlight", pos, end)
+                text_widget.tag_add("focused_highlight", pos, end)
+                self.center_match(text_widget, pos)
+                if current_tab == 0:
+                    text_widget.config(state=tk.DISABLED)
+            elif current_tab == 1:
+                item = matches[index]
+                self.tree.item(item, tags=("focused_highlight",))
+                self.tree.see(item)
+                self.tree.selection_set(item)
 
 if __name__ == "__main__":
     root = tk.Tk()
