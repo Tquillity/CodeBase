@@ -56,7 +56,7 @@ class Tooltip:
 class RepoPromptGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Code Base")
+        self.root.title("CodeBase")
         self.root.geometry("1024x600")
 
         # Set up dark mode colors
@@ -354,17 +354,20 @@ class RepoPromptGUI:
             self.ignore_patterns = self.parse_gitignore(gitignore_path)
 
             # Load from cache if valid, otherwise read files
+            print(f"Cache file exists: {os.path.exists(self.cache_file)}")
             if os.path.exists(self.cache_file):
                 with open(self.cache_file, 'r', encoding='utf-8') as f:
                     cached_repo_path = f.readline().strip()
                     if cached_repo_path == self.repo_path and os.path.getmtime(self.cache_file) > os.path.getmtime(self.repo_path):
                         self.file_contents = f.read()
                     else:
+                        print("Reading files from repository...")
                         self.file_contents = self.read_repo_files(self.repo_path)
                         with open(self.cache_file, 'w', encoding='utf-8') as f:
                             f.write(self.repo_path + '\n')
-                            f.write(self.file_contents)
+                            f.write(self.file_contents)     
             else:
+                print("Reading files from repository...")
                 self.file_contents = self.read_repo_files(self.repo_path)
                 with open(self.cache_file, 'w', encoding='utf-8') as f:
                     f.write(self.repo_path + '\n')
@@ -481,7 +484,20 @@ class RepoPromptGUI:
     # Detect if file is text-based using MIME type
     def is_text_file(self, file_path):
         mime_type, _ = mimetypes.guess_type(file_path)
-        return mime_type and mime_type.startswith('text')
+        ext = os.path.splitext(file_path)[1].lower()
+        text_extensions = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx', 
+                        '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg', 
+                        '.gitignore', '.yml', '.yaml', '.toml', '.ini', '.properties', 
+                        '.csv', '.tsv', '.log', '.sql', '.sh', '.bash', '.zsh', '.fish', 
+                        '.awk', '.sed', '.bat', '.cmd', '.ps1', '.php', '.rb', '.erb', 
+                        '.haml', '.slim', '.pl', '.lua', '.r', '.m', '.mm', '.asm', '.v', 
+                        '.vhdl', '.verilog', '.s', '.swift', '.kt', '.kts', '.go', '.rs', 
+                        '.dart', '.vue', '.pug', '.coffee', '.proto', '.dockerfile', 
+                        '.make', '.tf', '.hcl', '.sol', '.gradle', '.groovy', '.scala', 
+                        '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm', 
+                        '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', '.bib', 
+                        '.sty', '.cls', '.cs', '.fs', '.fsx'}
+        return (mime_type and mime_type.startswith('text')) or ext in text_extensions
 
     # Read all text files in repo, format with "File:" and "Content:"
     def read_repo_files(self, root_dir):
