@@ -73,6 +73,7 @@ class RepoPromptGUI:
         self.file_contents = ""
         self.token_count = 0
         self.ignore_patterns = []
+        self.loaded_files = set()  # Track files loaded into content
 
         # Settings for file reading
         self.text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx',
@@ -230,6 +231,32 @@ class RepoPromptGUI:
         # Folder Structure tab
         self.structure_frame = tk.Frame(self.notebook, bg='#2b2b2b')
         self.notebook.add(self.structure_frame, text="Folder Structure")
+        
+        # Frame for buttons in Folder Structure tab
+        structure_button_frame = tk.Frame(self.structure_frame, bg='#2b2b2b')
+        structure_button_frame.pack(side=tk.TOP, fill='x', pady=5)
+
+        # Expand/Collapse All button
+        self.expand_collapse_var = tk.BooleanVar(value=True)  # True for Expand, False for Collapse
+        self.expand_collapse_button = tk.Button(structure_button_frame, text="Expand All",
+                                              command=self.toggle_expand_collapse,
+                                              bg=self.button_bg, fg=self.button_fg)
+        self.expand_collapse_button.pack(side=tk.LEFT, padx=5)
+        self.add_button_hover(self.expand_collapse_button)
+        Tooltip(self.expand_collapse_button, "Expand or collapse all folders")
+
+        # Show Unloaded Files toggle
+        self.show_unloaded_var = IntVar(value=0)  # Default to off
+        self.show_unloaded_checkbox = tk.Checkbutton(structure_button_frame, 
+                                                    text="Show Unloaded Files", 
+                                                    variable=self.show_unloaded_var,
+                                                    command=self.update_tree_strikethrough,
+                                                    bg='#2b2b2b', fg=self.text_color,
+                                                    selectcolor='#4a4a4a')
+        self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=5)
+        Tooltip(self.show_unloaded_checkbox, "Toggle strikethrough on files not loaded in content")
+
+        # Treeview setup
         self.tree = ttk.Treeview(self.structure_frame, show="tree", style="Custom.Treeview")
         self.tree.pack(fill="both", expand=True)
         style.configure("Custom.Treeview", background="#3c3c3c", foreground=self.text_color, fieldbackground="#3c3c3c")
@@ -239,15 +266,7 @@ class RepoPromptGUI:
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.tag_bind('folder', '<Double-1>', self.on_double_click)
         self.tree.bind('<<TreeviewOpen>>', self.on_treeview_open)
-
-        # Add Expand/Collapse All button to Folder Structure tab
-        self.expand_collapse_var = tk.BooleanVar(value=True)  # True for Expand, False for Collapse
-        self.expand_collapse_button = tk.Button(self.structure_frame, text="Expand All",
-                                              command=self.toggle_expand_collapse,
-                                              bg=self.button_bg, fg=self.button_fg)
-        self.expand_collapse_button.pack(side=tk.TOP, pady=5)
-        self.add_button_hover(self.expand_collapse_button)
-        Tooltip(self.expand_collapse_button, "Expand or collapse all folders")
+        self.tree.tag_configure('unloaded', font=(None, -10, 'overstrike'))  # Strikethrough tag
 
         # Base Prompt tab
         self.base_prompt_frame = tk.Frame(self.notebook, bg='#2b2b2b')
@@ -507,6 +526,8 @@ class RepoPromptGUI:
                         self.content_text.insert(tk.END, section + "\n\n")
                 self.content_text.config(state=tk.DISABLED)
 
+                # Repopulate tree to reflect new loaded files
+                self.populate_tree(self.repo_path)
                 self.show_status_message("Settings Applied and Refreshed!")
             else:
                 messagebox.showwarning("No Repo Loaded", "No repository loaded to refresh. Settings will apply on next load.")
@@ -518,11 +539,10 @@ class RepoPromptGUI:
         dialog.grab_set()
         self.root.wait_window(dialog)
 
-    # Load and process selected repository
     def select_repo(self):
         selected_folder = self.open_folder_dialog()
         if selected_folder and os.path.isdir(selected_folder):
-            self.repo_path = os.path.realpath(selected_folder)
+            self.repo_path = os.path.abspath(selected_folder)
             self.update_recent_folders(self.repo_path)
 
             # Update repo label with current repo name
@@ -539,6 +559,18 @@ class RepoPromptGUI:
                     cached_repo_path = f.readline().strip()
                     if cached_repo_path == self.repo_path and os.path.getmtime(self.cache_file) > os.path.getmtime(self.repo_path):
                         self.file_contents = f.read()
+                        # Populate self.loaded_files from cached file_contents
+                        self.loaded_files = set()
+                        if self.file_contents.startswith("File: "):
+                            sections = self.file_contents[len("File: "):].split("\nFile: ")
+                            sections = ["File: " + s for s in sections]
+                        else:
+                            sections = []
+                        for section in sections:
+                            filename_end = section.find("\nContent:\n")
+                            if filename_end != -1:
+                                file_path = section[6:filename_end].strip()
+                                self.loaded_files.add(os.path.normcase(file_path))
                     else:
                         print("Reading files from repository...")
                         self.file_contents = self.read_repo_files(self.repo_path)
@@ -588,10 +620,11 @@ class RepoPromptGUI:
         self.tree.delete(*self.tree.get_children())
         root_basename = os.path.basename(root_dir)
         root_icon = "📁" if os.path.isdir(root_dir) else "📄"
-        root_id = self.tree.insert("", "end", text=f"{root_icon} {root_basename}", open=True, tags=('folder',))
+        root_id = self.tree.insert("", "end", text=f"{root_icon} {root_basename}", open=True, tags=('folder',), values=(root_dir,))
         self.build_tree(root_dir, root_id)
         self.tree.tag_configure('folder', foreground=self.folder_color)
         self.tree.tag_configure('file', foreground=self.text_color)
+        self.update_tree_strikethrough()  # Update strikethrough after populating
 
     # Build tree nodes for given path, add dummy "Loading..." for folders
     def build_tree(self, path, parent_id):
@@ -603,7 +636,8 @@ class RepoPromptGUI:
                 item_path = os.path.join(path, item)
                 icon = "📁" if os.path.isdir(item_path) else "📄"
                 tag = 'folder' if os.path.isdir(item_path) else 'file'
-                item_id = self.tree.insert(parent_id, "end", text=f"{icon} {item}", values=(item_path,), open=False, tags=(tag,))
+                tags = [tag]  # Only set basic tag here, let update_tree_strikethrough handle 'unloaded'
+                item_id = self.tree.insert(parent_id, "end", text=f"{icon} {item}", values=(item_path,), open=False, tags=tags)
                 if os.path.isdir(item_path):
                     self.tree.insert(item_id, "end", text="Loading...", tags=('dummy',))
         except Exception as e:
@@ -635,6 +669,7 @@ class RepoPromptGUI:
                 self.tree.delete(child)
             self.build_tree(path, item_id)
             self.tree.item(item_id, text=original_text)
+            self.update_tree_strikethrough()  # Update strikethrough after expanding
         except Exception as e:
             messagebox.showerror("Error", f"Failed to expand folder {path}: {str(e)}")
             self.tree.item(item_id, text=original_text)
@@ -670,23 +705,56 @@ class RepoPromptGUI:
             (ext in self.text_extensions_default and self.text_extensions_enabled[ext].get() == 1)
         ) and not (filename in self.exclude_files and self.exclude_files[filename].get() == 1)
 
-    # Read all text files in repo, format with "File:" and "Content:"
+    # Read all text files in repo, format with "File:" and "Content:", track loaded files
     def read_repo_files(self, root_dir):
+        self.loaded_files.clear()  # Reset loaded files
         file_contents = []
         for dirpath, dirnames, filenames in os.walk(root_dir):
             dirnames[:] = [d for d in dirnames if not self.is_ignored(os.path.join(dirpath, d))]
             for filename in filenames:
-                file_path = os.path.join(dirpath, filename)
+                file_path = os.path.normcase(os.path.join(dirpath, filename))
                 if not self.is_ignored(file_path) and self.is_text_file(file_path):
                     try:
                         with open(file_path, 'r', encoding='utf-8') as file:
                             content = file.read()
                             file_contents.append(f"File: {file_path}\nContent:\n{content}\n")
+                            self.loaded_files.add(file_path)
                     except UnicodeDecodeError:
                         messagebox.showwarning("File Skipped", f"Skipping {filename}: Not a UTF-8 text file")
                     except Exception as e:
                         messagebox.showerror("Error", f"Failed to read {filename}: {str(e)}")
+        print(f"Loaded files: {self.loaded_files}")  # Debug output
+        print(f"Loaded files: {self.loaded_files}")  # Debug output
         return "\n".join(file_contents)
+
+    # Update strikethrough in tree based on toggle state
+    def update_tree_strikethrough(self):
+        def update_item(item):
+            values = self.tree.item(item, "values")
+            # Check if values exists and has at least one element
+            if values and len(values) > 0:
+                item_path = os.path.normcase(values[0])
+                tags = list(self.tree.item(item, "tags"))
+                if 'file' in tags:
+                    print(f"File: {item_path}, Loaded: {item_path in self.loaded_files}")
+                    if self.show_unloaded_var.get() and item_path not in self.loaded_files:
+                        if 'unloaded' not in tags:
+                            tags.append('unloaded')
+                    else:
+                        if 'unloaded' in tags:
+                            tags.remove('unloaded')
+                    self.tree.item(item, tags=tags)
+            # Recursively update children
+            for child in self.tree.get_children(item):
+                update_item(child)
+
+        # Only proceed if the tree has items
+        children = self.tree.get_children()
+        if children:
+            update_item(children[0])
+            self.show_status_message("Unloaded files visibility updated")
+        else:
+            self.show_status_message("No tree items to update")
 
     # Generate ASCII tree structure text, optional icons
     def generate_folder_structure_text(self):
@@ -775,8 +843,10 @@ class RepoPromptGUI:
             self.content_text.config(state=tk.DISABLED)
             self.file_contents = ""
             self.token_count = 0
+            self.loaded_files.clear()
             self.info_label.config(text="Token Count: 0")
             self.copy_button.config(state=tk.DISABLED)
+            self.update_tree_strikethrough()
         elif current_index == 1:
             self.tree.delete(*self.tree.get_children())
             self.copy_structure_button.config(state=tk.DISABLED)
@@ -790,12 +860,14 @@ class RepoPromptGUI:
         self.content_text.config(state=tk.DISABLED)
         self.file_contents = ""
         self.token_count = 0
+        self.loaded_files.clear()
         self.info_label.config(text="Token Count: 0")
         self.copy_button.config(state=tk.DISABLED)
         self.tree.delete(*self.tree.get_children())
         self.copy_structure_button.config(state=tk.DISABLED)
         self.base_prompt_text.delete(1.0, tk.END)
         self.repo_label.config(text="Current Repo Loaded: None")
+        self.update_tree_strikethrough()
 
     # Show about dialog
     def show_about(self):
