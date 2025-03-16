@@ -17,7 +17,6 @@ class FileHandler:
         self.recent_folders = self.load_recent_folders()
         self.cache_file = os.path.join(self.gui.settings.user_data_dir, "cache.txt")
 
-        # File extensions and exclusions
         self.text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx',
                                         '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg',
                                         '.gitignore', '.yml', '.yaml', '.toml', '.ini', '.properties',
@@ -96,17 +95,15 @@ class FileHandler:
             for filename in filenames:
                 file_path = os.path.normcase(os.path.join(dirpath, filename))
                 if not self.is_ignored(file_path) and self.is_text_file(file_path):
-                    item_id = self.find_tree_item(file_path)
-                    if item_id and 'selected' in self.gui.tree.item(item_id, "tags"):
-                        try:
-                            with open(file_path, 'r', encoding='utf-8') as file:
-                                content = file.read()
-                                file_contents.append(f"File: {file_path}\nContent:\n{content}\n")
-                                self.loaded_files.add(file_path)
-                        except UnicodeDecodeError:
-                            print(f"Skipping {filename}: Not a UTF-8 text file")
-                        except Exception as e:
-                            print(f"Skipping {filename}: {str(e)}")
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as file:
+                            content = file.read()
+                            file_contents.append(f"File: {file_path}\nContent:\n{content}\n")
+                            self.loaded_files.add(file_path)
+                    except UnicodeDecodeError:
+                        print(f"Skipping {filename}: Not a UTF-8 text file")
+                    except Exception as e:
+                        print(f"Skipping {filename}: {str(e)}")
         return "\n".join(file_contents)
 
     def parse_gitignore(self, gitignore_path):
@@ -138,7 +135,7 @@ class FileHandler:
 
     def populate_tree(self):
         self.gui.tree.delete(*self.gui.tree.get_children())
-        root_id = self.gui.tree.insert("", "end", text=f"📁 {os.path.basename(self.repo_path)}", open=True, tags=('folder', 'selected'), values=(self.repo_path,))
+        root_id = self.gui.tree.insert("", "end", text=f"📁 {os.path.basename(self.repo_path)}", values=(self.repo_path, "☑"), open=True, tags=('folder', 'selected'))
         self.build_tree(self.repo_path, root_id)
         expansion = self.gui.settings.get('app', 'expansion', 'Collapsed')
         if expansion == 'Expanded':
@@ -152,6 +149,7 @@ class FileHandler:
         else:
             self.collapse_all()
         self.update_expand_collapse_button()
+        self.update_tree_tags()
 
     def build_tree(self, path, parent_id):
         if self.is_ignored(path):
@@ -161,7 +159,7 @@ class FileHandler:
             if not self.is_ignored(item_path):
                 icon = "📁" if os.path.isdir(item_path) else "📄"
                 tag = 'folder' if os.path.isdir(item_path) else 'file'
-                item_id = self.gui.tree.insert(parent_id, "end", text=f"{icon} {item}", values=(item_path,), open=False, tags=(tag, 'selected'))
+                item_id = self.gui.tree.insert(parent_id, "end", text=f"{icon} {item}", values=(item_path, "☑"), open=False, tags=(tag, 'selected'))
                 if os.path.isdir(item_path):
                     self.gui.tree.insert(item_id, "end", text="Loading...", tags=('dummy',))
 
@@ -175,53 +173,84 @@ class FileHandler:
         if 'folder' in self.gui.tree.item(item_id, "tags"):
             self.expand_folder(item_id)
 
-    def expand_folder(self, item_id_or_path):
-        if isinstance(item_id_or_path, str):
-            item_id = self.find_tree_item(item_id_or_path)
-            if not item_id:
-                return
-        else:
-            item_id = item_id_or_path
+    def expand_folder(self, item_id):
         item_path = self.gui.tree.item(item_id, "values")[0]
         for child in self.gui.tree.get_children(item_id):
             self.gui.tree.delete(child)
         self.build_tree(item_path, item_id)
         self.update_tree_strikethrough()
+        self.update_tree_tags()
 
-    def toggle_selection(self, event):
-        item_id = self.gui.tree.identify_row(event.y)
-        if item_id:
-            tags = list(self.gui.tree.item(item_id, "tags"))
+    def on_tree_click(self, event):
+        region = self.gui.tree.identify_region(event.x, event.y)
+        if region == "cell":
+            column = self.gui.tree.identify_column(event.x)
+            if column == "#2":  # "checkbox" column
+                item_id = self.gui.tree.identify_row(event.y)
+                self.toggle_checkbox(item_id)
+
+    def toggle_checkbox(self, item_id):
+        values = self.gui.tree.item(item_id, "values")
+        current_state = values[1]
+        new_state = "☐" if current_state == "☑" else "☑"
+        tags = list(self.gui.tree.item(item_id, "tags"))
+        if new_state == "☑":
+            if 'unselected' in tags:
+                tags.remove('unselected')
+            if 'selected' not in tags:
+                tags.append('selected')
+        else:
             if 'selected' in tags:
                 tags.remove('selected')
+            if 'unselected' not in tags:
+                tags.append('unselected')
+        self.gui.tree.item(item_id, values=(values[0], new_state), tags=tags)
+        item_path = values[0]
+        if os.path.isfile(item_path):
+            if new_state == "☑" and self.is_text_file(item_path):
+                self.loaded_files.add(item_path)
             else:
-                tags.append('selected')
-            self.gui.tree.item(item_id, tags=tags)
-            if 'folder' in tags:
-                self.propagate_selection(item_id, 'selected' in tags)
-            self.update_tree_strikethrough()
+                self.loaded_files.discard(item_path)
+        elif os.path.isdir(item_path):
+            self.update_folder_selection(item_id, new_state == "☑")
+        self.file_contents = self.generate_file_contents()
+        self.gui.update_content_preview()
+        self.token_count = len(self.file_contents.split())
+        self.gui.show_status_message("Content updated")
 
-    def propagate_selection(self, item_id, selected):
+    def update_folder_selection(self, item_id, selected):
         for child in self.gui.tree.get_children(item_id):
+            child_path = self.gui.tree.item(child, "values")[0]
             tags = list(self.gui.tree.item(child, "tags"))
-            if selected and 'selected' not in tags:
-                tags.append('selected')
-            elif not selected and 'selected' in tags:
-                tags.remove('selected')
-            self.gui.tree.item(child, tags=tags)
-            if 'folder' in tags:
-                self.propagate_selection(child, selected)
+            if selected:
+                if 'unselected' in tags:
+                    tags.remove('unselected')
+                if 'selected' not in tags:
+                    tags.append('selected')
+            else:
+                if 'selected' in tags:
+                    tags.remove('selected')
+                if 'unselected' not in tags:
+                    tags.append('unselected')
+            self.gui.tree.item(child, values=(child_path, "☑" if selected else "☐"), tags=tags)
+            if os.path.isfile(child_path):
+                if selected and self.is_text_file(child_path):
+                    self.loaded_files.add(child_path)
+                else:
+                    self.loaded_files.discard(child_path)
+            elif os.path.isdir(child_path):
+                self.update_folder_selection(child, selected)
 
-    def find_tree_item(self, path):
-        def search(item):
-            if self.gui.tree.item(item, "values") and self.gui.tree.item(item, "values")[0] == path:
-                return item
-            for child in self.gui.tree.get_children(item):
-                result = search(child)
-                if result:
-                    return result
-            return None
-        return search(self.gui.tree.get_children()[0]) if self.gui.tree.get_children() else None
+    def generate_file_contents(self):
+        file_contents = []
+        for file_path in sorted(self.loaded_files):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    file_contents.append(f"File: {file_path}\nContent:\n{content}\n")
+            except Exception as e:
+                print(f"Error reading {file_path}: {str(e)}")
+        return "\n".join(file_contents)
 
     def copy_contents(self):
         content = self.gui.base_prompt_text.get(1.0, tk.END).strip() + "\n\n" + self.file_contents if self.gui.prepend_var.get() else self.file_contents
@@ -264,6 +293,27 @@ class FileHandler:
                         tags.append('unloaded')
                 elif 'unloaded' in tags:
                     tags.remove('unloaded')
+                self.gui.tree.item(item, tags=tags)
+            for child in self.gui.tree.get_children(item):
+                update_item(child)
+        if self.gui.tree.get_children():
+            update_item(self.gui.tree.get_children()[0])
+
+    def update_tree_tags(self):
+        def update_item(item):
+            values = self.gui.tree.item(item, "values")
+            if values and len(values) > 0:
+                tags = list(self.gui.tree.item(item, "tags"))
+                if values[1] == "☑":
+                    if 'unselected' in tags:
+                        tags.remove('unselected')
+                    if 'selected' not in tags:
+                        tags.append('selected')
+                else:
+                    if 'selected' in tags:
+                        tags.remove('selected')
+                    if 'unselected' not in tags:
+                        tags.append('unselected')
                 self.gui.tree.item(item, tags=tags)
             for child in self.gui.tree.get_children(item):
                 update_item(child)
@@ -325,7 +375,7 @@ class FileHandler:
         if not query:
             return
         current_tab = self.gui.notebook.index(self.gui.notebook.select())
-        if current_tab == 3:  # Settings tab
+        if current_tab == 3:
             return
         matches = []
         if current_tab in [0, 2]:

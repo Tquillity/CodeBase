@@ -8,7 +8,7 @@ from settings import SettingsManager
 class RepoPromptGUI:
     def __init__(self, root):
         self.root = root
-        self.version = "2.0"  # Dynamic version
+        self.version = "2.0"
         self.root.title(f"CodeBase v{self.version}")
         self.root.geometry("1200x800")
         self.root.configure(bg='#2b2b2b')
@@ -66,7 +66,6 @@ class RepoPromptGUI:
         self.include_icons_checkbox.pack(pady=5)
         Tooltip(self.include_icons_checkbox, "Toggle icons in structure")
         
-        # Add clear buttons
         clear_button_frame = tk.Frame(self.left_frame, bg='#2b2b2b')
         clear_button_frame.pack(side='bottom', fill='x')
         self.clear_button = self.add_button(clear_button_frame, "Clear", self.clear_current, "Clear data in current tab")
@@ -78,7 +77,6 @@ class RepoPromptGUI:
         self.root.grid_columnconfigure(2, weight=1)
         self.root.grid_rowconfigure(2, weight=1)
 
-        # Notebook
         self.notebook = ttk.Notebook(self.right_frame)
         self.notebook.pack(fill="both", expand=True)
         style = ttk.Style()
@@ -88,7 +86,6 @@ class RepoPromptGUI:
         self.notebook.configure(style="Custom.TNotebook")
         self.notebook.bind('<Tab>', self.cycle_tabs)
 
-        # Search frame
         search_frame = tk.Frame(self.right_frame, bg='#2b2b2b')
         search_frame.pack(side=tk.TOP, anchor="ne", pady=5, padx=10)
         self.search_var = tk.StringVar()
@@ -103,7 +100,6 @@ class RepoPromptGUI:
         self.search_entry.bind("<Down>", lambda e: self.file_handler.next_match())
         self.search_entry.bind("<Up>", lambda e: self.file_handler.prev_match())
 
-        # Tabs
         self.content_text = scrolledtext.ScrolledText(self.notebook, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10), state=tk.DISABLED)
         self.notebook.add(self.content_text, text="Content Preview")
 
@@ -115,7 +111,11 @@ class RepoPromptGUI:
         self.show_unloaded_checkbox = tk.Checkbutton(structure_button_frame, text="Show Unloaded Files", variable=self.show_unloaded_var, command=self.file_handler.update_tree_strikethrough, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=5)
         Tooltip(self.show_unloaded_checkbox, "Toggle strikethrough on unloaded files")
-        self.tree = ttk.Treeview(self.structure_frame, show="tree", style="Custom.Treeview")
+        self.tree = ttk.Treeview(self.structure_frame, columns=("path", "checkbox"), show=["tree", "headings"], style="Custom.Treeview")
+        self.tree.column("#0", width=300)
+        self.tree.column("path", width=0, stretch=tk.NO)
+        self.tree.column("checkbox", width=30, anchor="center")
+        self.tree.heading("checkbox", text="")
         self.tree.pack(fill="both", expand=True)
         style.configure("Custom.Treeview", background="#3c3c3c", foreground=self.text_color, fieldbackground="#3c3c3c")
         style.map("Custom.Treeview", background=[('selected', '#4a4a4a')], foreground=[('selected', self.text_color)])
@@ -125,9 +125,10 @@ class RepoPromptGUI:
         self.tree.tag_bind('folder', '<Double-1>', self.file_handler.on_double_click)
         self.tree.tag_bind('file', '<Double-1>', self.jump_to_file_content)
         self.tree.bind('<<TreeviewOpen>>', self.file_handler.on_treeview_open)
-        self.tree.bind('<Button-1>', self.file_handler.toggle_selection)
+        self.tree.bind('<Button-1>', self.file_handler.on_tree_click)
         self.tree.tag_configure('unloaded', font=(None, -10, 'overstrike'))
         self.tree.tag_configure('selected', foreground='#00FF00')
+        self.tree.tag_configure('unselected', foreground='#FF0000')
 
         self.base_prompt_text = scrolledtext.ScrolledText(self.notebook, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10))
         self.notebook.add(self.base_prompt_text, text="Base Prompt")
@@ -179,7 +180,7 @@ class RepoPromptGUI:
 
     def add_button(self, parent, text, command, tooltip, state=tk.NORMAL):
         btn = tk.Button(parent, text=text, command=command, bg=self.button_bg, fg=self.button_fg, state=state)
-        btn.pack(pady=5)
+        btn.pack(pady=5, side=tk.LEFT if parent != self.left_frame else tk.TOP)
         btn.bind("<Enter>", lambda e: btn.config(bg="#5a5a5a"))
         btn.bind("<Leave>", lambda e: btn.config(bg=self.button_bg))
         Tooltip(btn, tooltip)
@@ -217,9 +218,11 @@ class RepoPromptGUI:
         self.copy_button.config(state=tk.NORMAL)
         self.copy_all_button.config(state=tk.NORMAL)
         self.copy_structure_button.config(state=tk.NORMAL)
+        self.update_content_preview()
+
+    def update_content_preview(self):
         self.content_text.config(state=tk.NORMAL)
         self.content_text.delete(1.0, tk.END)
-        self.content_text.tag_configure("filename", foreground="red")
         if self.file_handler.file_contents:
             sections = self.file_handler.file_contents.split("\n\n")
             for section in sections:
@@ -235,7 +238,7 @@ class RepoPromptGUI:
                 else:
                     self.content_text.insert(tk.END, section + "\n\n")
         self.content_text.config(state=tk.DISABLED)
-        self.file_handler.populate_tree()
+        self.content_text.tag_configure("filename", foreground="red")
 
     def refresh_repo(self):
         if self.file_handler.repo_path:
@@ -343,3 +346,8 @@ class RepoPromptGUI:
 
     def show_about(self):
         messagebox.showinfo("About", f"CodeBase v{self.version}\nA tool to scan repositories and copy contents.\n\nTo be released under\nMIT License Soon\n©2025 Mikael Sundh")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = RepoPromptGUI(root)
+    root.mainloop()
