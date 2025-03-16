@@ -4,6 +4,7 @@ from tkinter import ttk, scrolledtext, messagebox
 from widgets import Tooltip, FolderDialog, SettingsDialog
 from file_handler import FileHandler
 from settings import SettingsManager
+import appdirs
 
 class RepoPromptGUI:
     def __init__(self, root):
@@ -13,7 +14,6 @@ class RepoPromptGUI:
         self.root.geometry("1200x800")
         self.root.configure(bg='#2b2b2b')
         self.settings = SettingsManager()
-        self.file_handler = FileHandler(self)
         
         # Colors
         self.text_color = '#ffffff'
@@ -28,17 +28,42 @@ class RepoPromptGUI:
         self.include_icons_var = tk.IntVar(value=1)
         self.show_unloaded_var = tk.IntVar(value=0)
         self.expand_collapse_var = tk.BooleanVar(value=True)
-        self.template_dir = os.path.join(self.settings.user_data_dir, "templates")
+        self.user_data_dir = appdirs.user_data_dir("CodeBase")
+        self.template_dir = os.path.join(self.user_data_dir, "templates")
+        self.recent_folders_file = os.path.join(self.user_data_dir, "recent_folders.txt")
         os.makedirs(self.template_dir, exist_ok=True)
         self.match_positions = {}
         self.current_match_index = {}
+        self.file_states = {}
+        self.recent_folders = self.load_recent_folders()
 
         # Progress bar
         self.progress = ttk.Progressbar(self.root, mode='indeterminate')
 
+        self.file_handler = FileHandler(self)
+        
         self.setup_ui()
         self.bind_keys()
         self.apply_default_tab()
+
+    def load_recent_folders(self):
+        if os.path.exists(self.recent_folders_file):
+            with open(self.recent_folders_file, 'r') as file:
+                return [line.strip() for line in file.readlines() if line.strip()]
+        return []
+
+    def save_recent_folders(self):
+        with open(self.recent_folders_file, 'w') as file:
+            for folder in self.recent_folders:
+                file.write(f"{folder}\n")
+
+    def update_recent_folders(self, new_folder):
+        if new_folder in self.recent_folders:
+            self.recent_folders.remove(new_folder)
+        self.recent_folders.insert(0, new_folder)
+        if len(self.recent_folders) > 20:
+            self.recent_folders = self.recent_folders[:20]
+        self.save_recent_folders()
 
     def setup_header(self):
         tk.Label(self.root, text="CodeBase", font=("Arial", 16), bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, padx=10, pady=10, sticky="w")
@@ -100,7 +125,12 @@ class RepoPromptGUI:
         self.search_entry.bind("<Down>", lambda e: self.file_handler.next_match())
         self.search_entry.bind("<Up>", lambda e: self.file_handler.prev_match())
 
-        self.content_text = scrolledtext.ScrolledText(self.notebook, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10), state=tk.DISABLED)
+        self.content_text = scrolledtext.ScrolledText(self.notebook, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10), state=tk.NORMAL)
+        self.content_text.pack(fill="both", expand=True)
+        self.content_text.tag_configure("filename", foreground="red")
+        self.content_text.tag_configure("toggle", foreground="#00FF00", underline=True)
+        self.content_text.bind("<Motion>", self.on_mouse_move)
+        self.content_text.bind("<Leave>", lambda event: self.content_text.config(cursor=""))
         self.notebook.add(self.content_text, text="Content Preview")
 
         self.structure_frame = tk.Frame(self.notebook, bg='#2b2b2b')
@@ -201,6 +231,14 @@ class RepoPromptGUI:
         self.notebook.select(next_index)
         return 'break'
 
+    def on_mouse_move(self, event):
+        index = self.content_text.index(f"@{event.x},{event.y}")
+        tags = self.content_text.tag_names(index)
+        if "toggle" in tags:
+            self.content_text.config(cursor="hand2")
+        else:
+            self.content_text.config(cursor="")
+
     def select_repo(self):
         self.progress.grid(row=3, column=0, columnspan=3, sticky="ew")
         self.progress.start()
@@ -220,25 +258,127 @@ class RepoPromptGUI:
         self.copy_structure_button.config(state=tk.NORMAL)
         self.update_content_preview()
 
+    def populate_tree(self, root_dir):
+        self.tree.delete(*self.tree.get_children())
+        root_basename = os.path.basename(root_dir)
+        root_icon = "📁" if os.path.isdir(root_dir) else "📄"
+        root_id = self.tree.insert("", "end", text=f"{root_icon} {root_basename}", open=True, tags=('folder',), values=(root_dir,))
+        self.build_tree(root_dir, root_id)
+        self.tree.tag_configure('folder', foreground=self.folder_color)
+        self.tree.tag_configure('file', foreground=self.text_color)
+        self.file_handler.update_tree_strikethrough()
+
+    def build_tree(self, path, parent_id):
+        if self.file_handler.is_ignored(path):
+            return
+        try:
+            items = [item for item in sorted(os.listdir(path)) if not self.file_handler.is_ignored(os.path.join(path, item))]
+            for item in items:
+                item_path = os.path.join(path, item)
+                icon = "📁" if os.path.isdir(item_path) else "📄"
+                tag = 'folder' if os.path.isdir(item_path) else 'file'
+                tags = [tag]
+                item_id = self.tree.insert(parent_id, "end", text=f"{icon} {item}", values=(item_path,), open=False, tags=tags)
+                if os.path.isdir(item_path):
+                    self.tree.insert(item_id, "end", text="Loading...", tags=('dummy',))
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to list directory {path}: {str(e)}")
+
     def update_content_preview(self):
         self.content_text.config(state=tk.NORMAL)
         self.content_text.delete(1.0, tk.END)
+        self.file_states.clear()
+
         if self.file_handler.file_contents:
-            sections = self.file_handler.file_contents.split("\n\n")
+            sections = self.file_handler.file_contents.split("===FILE_SEPARATOR===\n")
             for section in sections:
-                if section.startswith("File: "):
+                if section.strip() and section.startswith("File: "):
                     filename_end = section.find("\nContent:\n")
                     if filename_end != -1:
-                        filename = section[6:filename_end].strip()
+                        file_path = section[6:filename_end].strip()
                         content = section[filename_end + 11:]
-                        self.content_text.insert(tk.END, f"File: {filename}\n", "filename")
-                        self.content_text.insert(tk.END, f"Content:\n{content}\n\n")
-                    else:
-                        self.content_text.insert(tk.END, section + "\n\n")
-                else:
-                    self.content_text.insert(tk.END, section + "\n\n")
+                        file_id = file_path
+                        self.file_states[file_id] = True
+                        toggle_tag = f"toggle_{file_id}"
+                        content_tag = f"content_{file_id}"
+
+                        self.content_text.insert(tk.END, "[-]", ("toggle", toggle_tag))
+                        self.content_text.insert(tk.END, f" File: {file_path}\n", "filename")
+                        self.content_text.insert(tk.END, f"Content:\n{content}\n\n", content_tag)
+                        self.content_text.tag_bind(toggle_tag, "<Button-1>", lambda event, fid=file_id: self.toggle_content(fid))
         self.content_text.config(state=tk.DISABLED)
-        self.content_text.tag_configure("filename", foreground="red")
+
+    def toggle_content(self, file_id):
+        self.content_text.config(state=tk.NORMAL)
+        current_state = self.file_states.get(file_id, True)
+        new_state = not current_state
+        self.file_states[file_id] = new_state
+
+        toggle_tag = f"toggle_{file_id}"
+        content_tag = f"content_{file_id}"
+
+        ranges = self.content_text.tag_ranges(toggle_tag)
+        if ranges and len(ranges) == 2:
+            start, end = ranges[0], ranges[1]
+            self.content_text.delete(start, end)
+            new_text = "[-]" if new_state else "[+]"
+            self.content_text.insert(start, new_text, ("toggle", toggle_tag))
+
+        self.content_text.tag_configure(content_tag, elide=not new_state)
+        self.content_text.config(state=tk.DISABLED)
+
+    def search_tab(self):
+        query = self.search_var.get()
+        if not query:
+            return
+        current_tab = self.notebook.index(self.notebook.select())
+        if current_tab == 3:
+            return
+        matches = []
+        if current_tab in [0, 2]:
+            text_widget = self.content_text if current_tab == 0 else self.base_prompt_text
+            text_widget.tag_remove("highlight", "1.0", tk.END)
+            text_widget.tag_remove("focused_highlight", "1.0", tk.END)
+            start_pos = "1.0"
+            while True:
+                pos = text_widget.search(query, start_pos, stopindex=tk.END, nocase=0)
+                if not pos:
+                    break
+                end_pos = f"{pos}+{len(query)}c"
+                matches.append((pos, end_pos))
+                start_pos = end_pos
+            text_widget.tag_config("highlight", background="#FFFF00", foreground="#000000")
+            text_widget.tag_config("focused_highlight", background="#add8e6", foreground="#000000")
+        elif current_tab == 1:
+            self.tree.tag_configure("highlight", background="#FFFF00", foreground="#000000")
+            self.tree.tag_configure("focused_highlight", background="#add8e6", foreground="#000000")
+            def collect_matches(item):
+                item_text = self.tree.item(item, "text")
+                if query in item_text:
+                    matches.append(item)
+                for child in self.tree.get_children(item):
+                    collect_matches(child)
+            if self.tree.get_children():
+                collect_matches(self.tree.get_children()[0])
+
+        self.match_positions[current_tab] = matches
+        self.current_match_index[current_tab] = 0 if matches else -1
+        for i, match in enumerate(matches):
+            if current_tab in [0, 2]:
+                text_widget.tag_add("focused_highlight" if i == 0 else "highlight", match[0], match[1])
+            elif current_tab == 1:
+                tags = [t for t in self.tree.item(match, "tags") if t not in ("highlight", "focused_highlight")]
+                tags.append("focused_highlight" if i == 0 else "highlight")
+                self.tree.item(match, tags=tags)
+                if i == 0:
+                    self.tree.see(match)
+                    self.tree.selection_set(match)
+        if matches:
+            if current_tab in [0, 2]:
+                self.file_handler.center_match(text_widget, matches[0][0])
+            self.show_status_message("Search Successful")
+        else:
+            self.show_status_message("Search Found Nothing")
 
     def refresh_repo(self):
         if self.file_handler.repo_path:
@@ -311,9 +451,7 @@ class RepoPromptGUI:
     def clear_current(self):
         current_index = self.notebook.index('current')
         if current_index == 0:
-            self.content_text.config(state=tk.NORMAL)
             self.content_text.delete(1.0, tk.END)
-            self.content_text.config(state=tk.DISABLED)
             self.file_handler.file_contents = ""
             self.file_handler.token_count = 0
             self.file_handler.loaded_files.clear()
@@ -328,9 +466,7 @@ class RepoPromptGUI:
         self.show_status_message("Current tab cleared")
 
     def clear_all(self):
-        self.content_text.config(state=tk.NORMAL)
         self.content_text.delete(1.0, tk.END)
-        self.content_text.config(state=tk.DISABLED)
         self.file_handler.file_contents = ""
         self.file_handler.token_count = 0
         self.file_handler.loaded_files.clear()

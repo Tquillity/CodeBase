@@ -12,12 +12,10 @@ class FileHandler:
         self.repo_path = None
         self.file_contents = ""
         self.token_count = 0
-        self.ignore_patterns = []
         self.loaded_files = set()
-        self.recent_folders = self.load_recent_folders()
-        self.cache_file = os.path.join(self.gui.settings.user_data_dir, "cache.txt")
-
-        # File extensions and exclusions
+        self.ignore_patterns = []
+        self.recent_folders = gui.file_handler.recent_folders if hasattr(gui, 'file_handler') else gui.load_recent_folders()
+        
         self.text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx',
                                         '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg',
                                         '.gitignore', '.yml', '.yaml', '.toml', '.ini', '.properties',
@@ -32,97 +30,56 @@ class FileHandler:
                                         '.sty', '.cls', '.cs', '.fs', '.fsx'}
         self.text_extensions_enabled = {ext: tk.IntVar(value=1) for ext in self.text_extensions_default}
         self.exclude_files_default = {
-            'package-lock.json': tk.IntVar(value=0), 'yarn.lock': tk.IntVar(value=0),
-            'composer.lock': tk.IntVar(value=0), 'Gemfile.lock': tk.IntVar(value=0),
+            'package-lock.json': tk.IntVar(value=0),
+            'yarn.lock': tk.IntVar(value=0),
+            'composer.lock': tk.IntVar(value=0),
+            'Gemfile.lock': tk.IntVar(value=0),
             'poetry.lock': tk.IntVar(value=0)
         }
         self.exclude_files = self.exclude_files_default.copy()
-        self.gui.settings.load_repo_settings(self.text_extensions_enabled, self.exclude_files)
 
-    def load_recent_folders(self):
-        recent_file = os.path.join(self.gui.settings.user_data_dir, "recent_folders.txt")
-        if os.path.exists(recent_file):
-            with open(recent_file, 'r') as f:
-                return [line.strip() for line in f.readlines() if line.strip()]
-        return []
-
-    def save_recent_folders(self):
-        recent_file = os.path.join(self.gui.settings.user_data_dir, "recent_folders.txt")
-        with open(recent_file, 'w') as f:
-            for folder in self.recent_folders:
-                f.write(f"{folder}\n")
-
-    def update_recent_folders(self, new_folder):
-        if new_folder in self.recent_folders:
-            self.recent_folders.remove(new_folder)
-        self.recent_folders.insert(0, new_folder)
-        if len(self.recent_folders) > 20:
-            self.recent_folders = self.recent_folders[:20]
-        self.save_recent_folders()
-
-    def load_repo(self, path):
-        self.repo_path = os.path.abspath(path)
-        self.update_recent_folders(self.repo_path)
-        self.ignore_patterns = self.parse_gitignore(os.path.join(path, '.gitignore'))
-        self.gui.show_status_message("Loading repository...")
-        if os.path.exists(self.cache_file):
-            with open(self.cache_file, 'r', encoding='utf-8') as f:
-                cached_path = f.readline().strip()
-                if cached_path == self.repo_path:
-                    self.file_contents = f.read()
-                    self.token_count = len(self.file_contents.split())
-                    self.gui.root.after(0, self._post_load)
-                    return
-        Thread(target=self._load_repo_thread, args=(path,), daemon=True).start()
-
-    def _load_repo_thread(self, path):
-        self.file_contents = self.read_repo_files(path)
-        self.token_count = len(self.file_contents.split())
-        with open(self.cache_file, 'w', encoding='utf-8') as f:
-            f.write(self.repo_path + '\n')
-            f.write(self.file_contents)
-        self.gui.root.after(0, self._post_load)
-
-    def _post_load(self):
-        self.populate_tree()
-        self.gui.refresh_ui()
-        self.gui.show_status_message("Repository loaded")
-
-    def read_repo_files(self, root_dir):
+    def load_repo(self, folder):
+        self.repo_path = os.path.abspath(folder)
+        self.gui.update_recent_folders(self.repo_path)
+        self.ignore_patterns = self.parse_gitignore(os.path.join(self.repo_path, '.gitignore'))
+        
+        # Populate loaded_files by scanning the repository
         self.loaded_files.clear()
-        file_contents = []
-        for dirpath, dirnames, filenames in os.walk(root_dir):
+        for dirpath, dirnames, filenames in os.walk(self.repo_path):
             dirnames[:] = [d for d in dirnames if not self.is_ignored(os.path.join(dirpath, d))]
             for filename in filenames:
                 file_path = os.path.normcase(os.path.join(dirpath, filename))
                 if not self.is_ignored(file_path) and self.is_text_file(file_path):
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as file:
-                            content = file.read()
-                            file_contents.append(f"File: {file_path}\nContent:\n{content}\n")
-                            self.loaded_files.add(file_path)
-                    except UnicodeDecodeError:
-                        print(f"Skipping {filename}: Not a UTF-8 text file")
-                    except Exception as e:
-                        print(f"Skipping {filename}: {str(e)}")
-        return "\n".join(file_contents)
+                    self.loaded_files.add(file_path)
+        
+        # Generate file contents after populating loaded_files
+        self.file_contents = self.generate_file_contents()
+        self.token_count = len(self.file_contents.split())
+        self.gui.populate_tree(self.repo_path)
+
+    def save_recent_folders(self):
+        with open(self.gui.recent_folders_file, 'w') as file:
+            for folder in self.recent_folders:
+                file.write(f"{folder}\n")
 
     def parse_gitignore(self, gitignore_path):
-        patterns = []
+        ignore_patterns = []
         if os.path.exists(gitignore_path):
             with open(gitignore_path, 'r') as file:
                 for line in file:
                     line = line.strip()
                     if line and not line.startswith('#'):
-                        patterns.append(line)
-        return patterns
+                        ignore_patterns.append(line)
+        return ignore_patterns
 
     def is_ignored(self, path):
         rel_path = os.path.relpath(path, self.repo_path)
         for pattern in self.ignore_patterns:
             if fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(os.path.basename(path), pattern):
                 return True
-        return '.git' in rel_path.split(os.sep)
+        if '.git' in rel_path.split(os.sep):
+            return True
+        return False
 
     def is_text_file(self, file_path):
         mime_type, _ = mimetypes.guess_type(file_path)
@@ -134,12 +91,23 @@ class FileHandler:
             (ext in self.text_extensions_default and self.text_extensions_enabled[ext].get() == 1)
         ) and not excluded
 
-    def populate_tree(self):
+    def generate_file_contents(self):
+        file_contents = []
+        for file_path in sorted(self.loaded_files):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    file_contents.append(f"File: {file_path}\nContent:\n{content}\n===FILE_SEPARATOR===\n")
+            except Exception as e:
+                print(f"Error reading {file_path}: {str(e)}")
+        return ''.join(file_contents)
+
+    def populate_tree(self, root_dir):
         self.gui.tree.delete(*self.gui.tree.get_children())
-        root_id = self.gui.tree.insert("", "end", text=f"📁 {os.path.basename(self.repo_path)}", 
-                                      values=(self.repo_path, "☑"), open=True, 
+        root_id = self.gui.tree.insert("", "end", text=f"📁 {os.path.basename(root_dir)}", 
+                                      values=(root_dir, "☑"), open=True, 
                                       tags=('folder', 'selected'))
-        self.build_tree(self.repo_path, root_id, selected=True)
+        self.build_tree(root_dir, root_id, selected=True)
         expansion = self.gui.settings.get('app', 'expansion', 'Collapsed')
         if expansion == 'Expanded':
             self.expand_all()
@@ -247,17 +215,6 @@ class FileHandler:
                     self.loaded_files.discard(child_path)
             elif os.path.isdir(child_path):
                 self.update_folder_selection(child, selected)
-
-    def generate_file_contents(self):
-        file_contents = []
-        for file_path in sorted(self.loaded_files):
-            try:
-                with open(file_path, 'r', encoding='utf-8') as file:
-                    content = file.read()
-                    file_contents.append(f"File: {file_path}\nContent:\n{content}\n")
-            except Exception as e:
-                print(f"Error reading {file_path}: {str(e)}")
-        return "\n".join(file_contents)
 
     def find_tree_item(self, path):
         def search(item):
