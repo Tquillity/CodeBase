@@ -146,8 +146,7 @@ class FileHandler:
     def on_double_click(self, event):
         item_id = self.gui.tree.identify_row(event.y)
         if 'folder' in self.gui.tree.item(item_id, "tags"):
-            item_path = self.gui.tree.item(item_id, "values")[0]
-            self.expand_folder(item_path, item_id)
+            self.expand_folder(item_id)
 
     def on_treeview_open(self, event):
         item_id = self.gui.tree.focus()
