@@ -115,7 +115,8 @@ class RepoPromptGUI:
         self.tree.column("#0", width=300)
         self.tree.column("path", width=0, stretch=tk.NO)
         self.tree.column("checkbox", width=30, anchor="center")
-        self.tree.heading("checkbox", text="")
+        self.tree.heading("#0", text="Name")
+        self.tree.heading("checkbox", text="Select/Deselect")
         self.tree.pack(fill="both", expand=True)
         style.configure("Custom.Treeview", background="#3c3c3c", foreground=self.text_color, fieldbackground="#3c3c3c")
         style.map("Custom.Treeview", background=[('selected', '#4a4a4a')], foreground=[('selected', self.text_color)])
@@ -125,10 +126,9 @@ class RepoPromptGUI:
         self.tree.tag_bind('folder', '<Double-1>', self.file_handler.on_double_click)
         self.tree.tag_bind('file', '<Double-1>', self.jump_to_file_content)
         self.tree.bind('<<TreeviewOpen>>', self.file_handler.on_treeview_open)
-        self.tree.bind('<Button-1>', self.file_handler.on_tree_click)
+        self.tree.bind('<Button-1>', self.file_handler.toggle_selection)
         self.tree.tag_configure('unloaded', font=(None, -10, 'overstrike'))
         self.tree.tag_configure('selected', foreground='#00FF00')
-        self.tree.tag_configure('unselected', foreground='#FF0000')
 
         self.base_prompt_text = scrolledtext.ScrolledText(self.notebook, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10))
         self.notebook.add(self.base_prompt_text, text="Base Prompt")
@@ -180,7 +180,7 @@ class RepoPromptGUI:
 
     def add_button(self, parent, text, command, tooltip, state=tk.NORMAL):
         btn = tk.Button(parent, text=text, command=command, bg=self.button_bg, fg=self.button_fg, state=state)
-        btn.pack(pady=5, side=tk.LEFT if parent != self.left_frame else tk.TOP)
+        btn.pack(pady=5)
         btn.bind("<Enter>", lambda e: btn.config(bg="#5a5a5a"))
         btn.bind("<Leave>", lambda e: btn.config(bg=self.button_bg))
         Tooltip(btn, tooltip)
