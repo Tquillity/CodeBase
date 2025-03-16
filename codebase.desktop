@@ -1,5 +1,5 @@
 [Desktop Entry]
-Version=1.0
+Version=1.5
 Name=CodeBase
 Comment=A tool to scan repositories and copy contents
 Exec=@EXEC_PATH@
