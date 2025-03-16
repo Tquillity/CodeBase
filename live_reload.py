@@ -22,7 +22,7 @@ class RestartHandler(FileSystemEventHandler):
             self.start_script()
 
 if __name__ == "__main__":
-    script_to_watch = "code_base_gui.py"  # Replace with your script’s name if different
+    script_to_watch = "main.py"
     event_handler = RestartHandler(script_to_watch)
     observer = Observer()
     observer.schedule(event_handler, path=os.path.dirname(os.path.abspath(script_to_watch)), recursive=False)

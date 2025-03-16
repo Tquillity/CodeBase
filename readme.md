@@ -1,97 +1,33 @@
-# CodeBase
+# CodeBase v2.0
 
-**CodeBase** is a simple GUI tool to scan local repository folders, view their folder structure and file contents, and copy them to your clipboard with ease. Built with Python and Tkinter, this application is designed for developers and anyone working with codebases for easier extraction and use with AI.
-
----
+**CodeBase** is a GUI tool to scan local repository folders, view their structure and contents, and copy them to your clipboard. Built with Python and Tkinter, it’s designed for developers working with codebases.
 
 ## Features
-
-- Browse and select a repository folder.
-- View file contents and folder structure in a tabbed interface.
-- Copy contents or structure to the clipboard with optional base prompt text.
-- Dark mode UI for comfortable use.
-- Save and load custom prompt templates.
-
----
+- **Must Haves**:
+  - Refresh button on main page.
+  - Close buttons and ESC key for all popups.
+  - Persistent repo settings between sessions.
+  - Select/deselect files and folders in "Folder Structure" tab for copying.
+  - Click files in "Folder Structure" to jump to content.
+  - "Copy All" button (prompt, code, structure).
+  - Dynamic "Expand/Collapse" button based on folder state.
+  - TAB key to switch between tabs.
+  - "Settings" tab for default tab and folder expansion.
+- **Nice to Haves**:
+  - Close dialogs with both Enter keys (main and NumPad).
 
 ## Dependencies
-
-Before installing CodeBase, ensure the following dependencies are installed on your system:
-
-- Python 3.7+  
-- Tkinter (for the GUI)  
-- Required Python packages (installable via `pip`):
-  - watchdog
-  - pyperclip
-  - appdirs
-
----
+- Python 3.7+
+- Tkinter
+- `watchdog`, `pyperclip`, `appdirs` (install via `pip`)
 
 ## Installation
+1. Extract `CodeBase.tar.gz`.
+2. Run `sudo ./install.sh` from the extracted directory.
+3. Launch via application menu or `CodeBase` command.
 
-1. **Download the Package**  
-   Download the `CodeBase.tar.gz` file from the [release page].
-
-2. **Extract the Archive**  
-   Extract the package to a directory of your choice:
-   tar -xzf CodeBase.tar.gz
-
-3. **Run the Installation Script**  
-   Navigate to the extracted `CodeBase` directory:
-   cd CodeBase  
-   Run the `install.sh` script to install the application:
-   sudo ./install.sh  
-   The script will:
-   - Copy the application files to `/opt/codebase/`.
-   - Create a desktop entry for the application in `/usr/share/applications/`.
-   - Ensure the application is executable and ready to use.
-
-4. **Update the Desktop Database**  
-   After installation, update your desktop database to make the application discoverable in your system's application menu:
-   sudo update-desktop-database
-
-5. **Launch the Application**  
-   - Open CodeBase from your application menu by searching for "CodeBase."
-   - Alternatively, run it from the terminal using:
-     codebase
-
----
-
-## Usage Guide
-
-### Selecting a Repository
-
-1. Click the "Select Repo Folder" button or press Ctrl+R.
-2. Choose a repository folder from the recent folders list or browse to a new location.
-3. The application will scan the repository and display its contents.
-
-### Viewing Content
-
-- The "Content Preview" tab shows the content of all text files in the repository.
-- The "Folder Structure" tab displays the repository's directory structure.
-- Double-click on folders to expand them.
-
-### Copying Content
-
-- Click "Copy Contents" or press Ctrl+C to copy all file contents to the clipboard.
-- Check "Prepend Base Prompt" to include the text from the Base Prompt tab.
-- Click "Copy Structure" or press Ctrl+S to copy the folder structure to the clipboard.
-- Toggle "Include Icons in Structure" to include or exclude folder/file icons.
-
-### Using Base Prompts
-
-- Enter your custom prompt text in the "Base Prompt" tab.
-- Save templates for reuse with "Save Template" (Ctrl+S).
-- Load existing templates with "Load Template" (Ctrl+L).
-- Delete unwanted templates with "Delete Template."
-
-### Clearing Data
-
-- Use "Clear" to reset the current tab.
-- Use "Clear All" to reset all tabs.
-
----
-
-## Acknowledgments
-
-- Built with Python and Tkinter.
+## Usage
+- Select a repo with "Select Repo Folder" (Ctrl+R).
+- Refresh with "Refresh" (Ctrl+F5).
+- Copy contents (Ctrl+C), structure (Ctrl+S), or all (Ctrl+A).
+- Configure settings in the "Settings" tab.
