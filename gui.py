@@ -1,4 +1,4 @@
-import os  # Added for os.path.basename
+import os
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 from widgets import Tooltip, FolderDialog, SettingsDialog
@@ -28,28 +28,24 @@ class RepoPromptGUI:
         self.show_unloaded_var = tk.IntVar(value=0)
         self.expand_collapse_var = tk.BooleanVar(value=True)
 
+        # Progress bar
+        self.progress = ttk.Progressbar(self.root, mode='indeterminate')
+
         self.setup_ui()
         self.bind_keys()
         self.apply_default_tab()
 
-    def setup_ui(self):
-        # Header
+    def setup_header(self):
         tk.Label(self.root, text="CodeBase", font=("Arial", 16), bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, padx=10, pady=10, sticky="w")
         tk.Label(self.root, text="v2.0", font=("Arial", 10), bg='#2b2b2b', fg=self.header_color).grid(row=0, column=1, padx=5, pady=10, sticky="w")
         self.repo_label = tk.Label(self.root, text="Current Repo Loaded: None", font=("Arial", 14), bg='#2b2b2b', fg=self.status_color)
         self.repo_label.grid(row=0, column=2, padx=50, pady=10, sticky="w")
         tk.Frame(self.root, bg='#4a4a4a', height=1).grid(row=1, column=0, columnspan=3, sticky="ew")
 
-        # Left frame
+    def setup_left_frame(self):
         self.left_frame = tk.Frame(self.root, bg='#2b2b2b')
         self.left_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ns")
         tk.Frame(self.root, bg='#4a4a4a', width=1).grid(row=2, column=1, sticky="ns", padx=5)
-        self.right_frame = tk.Frame(self.root, bg='#2b2b2b')
-        self.right_frame.grid(row=2, column=2, padx=10, pady=10, sticky="nsew")
-        self.root.grid_columnconfigure(2, weight=1)
-        self.root.grid_rowconfigure(2, weight=1)
-
-        # Left frame widgets
         self.select_button = self.add_button(self.left_frame, "Select Repo (Ctrl+R)", self.select_repo, "Choose a repository folder")
         self.refresh_button = self.add_button(self.left_frame, "Refresh (Ctrl+F5)", self.refresh_repo, "Refresh current repository", state=tk.DISABLED)
         self.settings_button = self.add_button(self.left_frame, "Repo Settings", self.open_repo_settings, "Customize file reading settings")
@@ -64,6 +60,12 @@ class RepoPromptGUI:
         self.include_icons_checkbox = tk.Checkbutton(self.left_frame, text="Include Icons in Structure", variable=self.include_icons_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.include_icons_checkbox.pack(pady=5)
         Tooltip(self.include_icons_checkbox, "Toggle icons in structure")
+
+    def setup_right_frame(self):
+        self.right_frame = tk.Frame(self.root, bg='#2b2b2b')
+        self.right_frame.grid(row=2, column=2, padx=10, pady=10, sticky="nsew")
+        self.root.grid_columnconfigure(2, weight=1)
+        self.root.grid_rowconfigure(2, weight=1)
 
         # Notebook
         self.notebook = ttk.Notebook(self.right_frame)
@@ -105,9 +107,9 @@ class RepoPromptGUI:
         self.tree.pack(fill="both", expand=True)
         style.configure("Custom.Treeview", background="#3c3c3c", foreground=self.text_color, fieldbackground="#3c3c3c")
         style.map("Custom.Treeview", background=[('selected', '#4a4a4a')], foreground=[('selected', self.text_color)])
-        scrollbar = ttk.Scrollbar(self.structure_frame, orient="vertical", command=self.tree.yview)  # Define scrollbar
+        scrollbar = ttk.Scrollbar(self.structure_frame, orient="vertical", command=self.tree.yview)
         scrollbar.pack(side="right", fill="y")
-        self.tree.configure(yscrollcommand=scrollbar.set)  # Use scrollbar
+        self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.tag_bind('folder', '<Double-1>', self.file_handler.on_double_click)
         self.tree.tag_bind('file', '<Double-1>', self.jump_to_file_content)
         self.tree.bind('<<TreeviewOpen>>', self.file_handler.on_treeview_open)
@@ -122,9 +124,15 @@ class RepoPromptGUI:
         self.notebook.add(self.settings_frame, text="Settings")
         self.setup_settings_tab()
 
-        # Status bar
+    def setup_status_bar(self):
         self.status_bar = tk.Label(self.root, text="Ready", bg='#2b2b2b', fg=self.status_color, bd=1, relief="sunken", anchor="w")
         self.status_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
+
+    def setup_ui(self):
+        self.setup_header()
+        self.setup_left_frame()
+        self.setup_right_frame()
+        self.setup_status_bar()
 
     def setup_settings_tab(self):
         tk.Label(self.settings_frame, text="Application Settings", font=("Arial", 14), bg='#2b2b2b', fg=self.text_color).pack(pady=10)
@@ -164,16 +172,24 @@ class RepoPromptGUI:
         return 'break'
 
     def select_repo(self):
+        self.progress.grid(row=3, column=0, columnspan=3, sticky="ew")
+        self.progress.start()
         folder = FolderDialog(self.root, self.file_handler.recent_folders).show()
         if folder:
             self.file_handler.load_repo(folder)
             self.repo_label.config(text=f"Current Repo Loaded: {os.path.basename(folder)}")
             self.refresh_ui()
+        self.progress.stop()
+        self.progress.grid_forget()
 
     def refresh_repo(self):
         if self.file_handler.repo_path:
+            self.progress.grid(row=3, column=0, columnspan=3, sticky="ew")
+            self.progress.start()
             self.file_handler.load_repo(self.file_handler.repo_path)
             self.refresh_ui()
+            self.progress.stop()
+            self.progress.grid_forget()
 
     def refresh_ui(self):
         self.info_label.config(text=f"Token Count: {self.file_handler.token_count:,}".replace(",", " "))

@@ -9,6 +9,7 @@ class RestartHandler(FileSystemEventHandler):
     def __init__(self, script):
         self.script = script
         self.process = None
+        self.last_restart = 0
         self.start_script()
 
     def start_script(self):
@@ -18,16 +19,22 @@ class RestartHandler(FileSystemEventHandler):
 
     def on_modified(self, event):
         if event.src_path.endswith(self.script):
+            current_time = time.time()
+            if current_time - self.last_restart < 0.5:  # Debounce: wait 0.5s
+                return
             print(f"Detected change in {self.script}. Restarting...")
             self.start_script()
+            self.last_restart = current_time
 
 if __name__ == "__main__":
-    script_to_watch = "main.py"
-    event_handler = RestartHandler(script_to_watch)
+    files_to_watch = ["main.py", "gui.py", "file_handler.py", "widgets.py", "settings.py"]
+    event_handler = RestartHandler("main.py")  # Still restarts main.py
     observer = Observer()
-    observer.schedule(event_handler, path=os.path.dirname(os.path.abspath(script_to_watch)), recursive=False)
+    for file in files_to_watch:
+        if os.path.exists(file):  # Ensure file exists to avoid errors
+            observer.schedule(event_handler, path=os.path.dirname(os.path.abspath(file)), recursive=False)
     observer.start()
-    print(f"Watching for changes in {script_to_watch}...")
+    print(f"Watching for changes in {', '.join(files_to_watch)}...")
 
     try:
         while True:

@@ -4,6 +4,7 @@ import fnmatch
 import mimetypes
 import tkinter as tk
 from tkinter import messagebox
+from threading import Thread
 
 class FileHandler:
     def __init__(self, gui):
@@ -62,9 +63,18 @@ class FileHandler:
         self.repo_path = os.path.abspath(path)
         self.update_recent_folders(self.repo_path)
         self.ignore_patterns = self.parse_gitignore(os.path.join(path, '.gitignore'))
+        self.gui.show_status_message("Loading repository...")
+        Thread(target=self._load_repo_thread, args=(path,), daemon=True).start()
+
+    def _load_repo_thread(self, path):
         self.file_contents = self.read_repo_files(path)
         self.token_count = len(self.file_contents.split())
+        self.gui.root.after(0, self._post_load)
+
+    def _post_load(self):
         self.populate_tree()
+        self.gui.refresh_ui()
+        self.gui.show_status_message("Repository loaded")
 
     def read_repo_files(self, root_dir):
         self.loaded_files.clear()
@@ -82,9 +92,9 @@ class FileHandler:
                                 file_contents.append(f"File: {file_path}\nContent:\n{content}\n")
                                 self.loaded_files.add(file_path)
                         except UnicodeDecodeError:
-                            messagebox.showwarning("File Skipped", f"Skipping {filename}: Not a UTF-8 text file")
+                            print(f"Skipping {filename}: Not a UTF-8 text file")
                         except Exception as e:
-                            messagebox.showerror("Error", f"Failed to read {filename}: {str(e)}")
+                            print(f"Skipping {filename}: {str(e)}")
         return "\n".join(file_contents)
 
     def parse_gitignore(self, gitignore_path):
