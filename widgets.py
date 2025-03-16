@@ -60,15 +60,69 @@ class FolderDialog:
         tk.Label(dialog, text="Select Repository Folder", font=("Arial", 12, "bold"), bg='#add8e6', fg='#2b2b2b').pack(pady=10)
         folder_var = tk.StringVar()
 
+        tk.Label(dialog, text="Recent Folders:", bg='#add8e6', fg='#2b2b2b').pack(pady=5)
+        list_frame = tk.Frame(dialog, bg='#2b2b2b', relief="groove", borderwidth=2)
+        list_frame.pack(pady=5, padx=20, fill="x")
+
+        def truncate_path(path, max_length=45):
+            return "…/" + path[-(max_length - 3):] if len(path) > max_length else path
+
+        selected_label = None
+        def select_folder(event, label, folder):
+            nonlocal selected_label
+            folder_var.set(folder)
+            if selected_label and selected_label != label:
+                selected_label.config(bg=selected_label.default_bg, fg='#ffffff')
+            label.config(bg='#add8e6', fg='#2b2b2b')
+            selected_label = label
+
+        def double_click_select(event, folder):
+            folder_var.set(folder)
+            confirm()
+
+        def refresh_folder_list():
+            for widget in list_frame.winfo_children():
+                widget.destroy()
+            for i, folder in enumerate(self.recent_folders[:5]):
+                truncated = truncate_path(folder)
+                bg_color = '#3c3c3c' if i % 2 == 0 else '#4a4a4a'
+                item_frame = tk.Frame(list_frame, bg=bg_color)
+                item_frame.pack(fill="x", padx=5, pady=2)
+                folder_label = tk.Label(item_frame, text=truncated, bg=bg_color, fg='#ffffff', cursor="hand2", anchor="w")
+                folder_label.default_bg = bg_color
+                folder_label.pack(side="left", fill="x", expand=True)
+                folder_label.bind("<Button-1>", lambda e, l=folder_label, f=folder: select_folder(e, l, f))
+                folder_label.bind("<Double-1>", lambda e, f=folder: double_click_select(e, f))
+                remove_btn = tk.Label(item_frame, text="✕", bg=bg_color, fg='#FF4500', cursor="hand2")
+                remove_btn.pack(side="right", padx=(5, 0))
+                remove_btn.bind("<Button-1>", lambda e, f=folder: remove_folder(f))
+                remove_btn.bind("<Enter>", lambda e, b=remove_btn: b.config(fg="#FF6347"))
+                remove_btn.bind("<Leave>", lambda e, b=remove_btn: b.config(fg="#FF4500"))
+                Tooltip(remove_btn, f"Remove {truncated} from recent folders")
+
+        def remove_folder(folder):
+            if folder in self.recent_folders:
+                self.recent_folders.remove(folder)
+                self.parent.file_handler.save_recent_folders()
+                refresh_folder_list()
+
+        refresh_folder_list()
+
         def browse_folder():
             folder = filedialog.askdirectory()
             if folder:
                 folder_var.set(folder)
 
         tk.Button(dialog, text="Browse", command=browse_folder, bg='#4a4a4a', fg='#ffffff').pack(pady=10)
+
         def confirm():
-            if folder_var.get():
-                self.selected_folder = folder_var.get()
+            selected = folder_var.get()
+            if selected:
+                for folder in self.recent_folders:
+                    if truncate_path(folder) == selected:
+                        selected = folder
+                        break
+                self.selected_folder = selected
                 dialog.destroy()
             else:
                 messagebox.showwarning("No Selection", "Please select a folder.")

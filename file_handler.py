@@ -15,6 +15,7 @@ class FileHandler:
         self.ignore_patterns = []
         self.loaded_files = set()
         self.recent_folders = self.load_recent_folders()
+        self.cache_file = os.path.join(self.gui.settings.user_data_dir, "cache.txt")
 
         # File extensions and exclusions
         self.text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx',
@@ -64,11 +65,22 @@ class FileHandler:
         self.update_recent_folders(self.repo_path)
         self.ignore_patterns = self.parse_gitignore(os.path.join(path, '.gitignore'))
         self.gui.show_status_message("Loading repository...")
+        if os.path.exists(self.cache_file):
+            with open(self.cache_file, 'r', encoding='utf-8') as f:
+                cached_path = f.readline().strip()
+                if cached_path == self.repo_path:
+                    self.file_contents = f.read()
+                    self.token_count = len(self.file_contents.split())
+                    self.gui.root.after(0, self._post_load)
+                    return
         Thread(target=self._load_repo_thread, args=(path,), daemon=True).start()
 
     def _load_repo_thread(self, path):
         self.file_contents = self.read_repo_files(path)
         self.token_count = len(self.file_contents.split())
+        with open(self.cache_file, 'w', encoding='utf-8') as f:
+            f.write(self.repo_path + '\n')
+            f.write(self.file_contents)
         self.gui.root.after(0, self._post_load)
 
     def _post_load(self):

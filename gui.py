@@ -8,7 +8,8 @@ from settings import SettingsManager
 class RepoPromptGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("CodeBase v2.0")
+        self.version = "2.0"  # Dynamic version
+        self.root.title(f"CodeBase v{self.version}")
         self.root.geometry("1200x800")
         self.root.configure(bg='#2b2b2b')
         self.settings = SettingsManager()
@@ -27,6 +28,10 @@ class RepoPromptGUI:
         self.include_icons_var = tk.IntVar(value=1)
         self.show_unloaded_var = tk.IntVar(value=0)
         self.expand_collapse_var = tk.BooleanVar(value=True)
+        self.template_dir = os.path.join(self.settings.user_data_dir, "templates")
+        os.makedirs(self.template_dir, exist_ok=True)
+        self.match_positions = {}
+        self.current_match_index = {}
 
         # Progress bar
         self.progress = ttk.Progressbar(self.root, mode='indeterminate')
@@ -37,7 +42,7 @@ class RepoPromptGUI:
 
     def setup_header(self):
         tk.Label(self.root, text="CodeBase", font=("Arial", 16), bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        tk.Label(self.root, text="v2.0", font=("Arial", 10), bg='#2b2b2b', fg=self.header_color).grid(row=0, column=1, padx=5, pady=10, sticky="w")
+        tk.Label(self.root, text=f"v{self.version}", font=("Arial", 10), bg='#2b2b2b', fg=self.header_color).grid(row=0, column=1, padx=5, pady=10, sticky="w")
         self.repo_label = tk.Label(self.root, text="Current Repo Loaded: None", font=("Arial", 14), bg='#2b2b2b', fg=self.status_color)
         self.repo_label.grid(row=0, column=2, padx=50, pady=10, sticky="w")
         tk.Frame(self.root, bg='#4a4a4a', height=1).grid(row=1, column=0, columnspan=3, sticky="ew")
@@ -60,6 +65,12 @@ class RepoPromptGUI:
         self.include_icons_checkbox = tk.Checkbutton(self.left_frame, text="Include Icons in Structure", variable=self.include_icons_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.include_icons_checkbox.pack(pady=5)
         Tooltip(self.include_icons_checkbox, "Toggle icons in structure")
+        
+        # Add clear buttons
+        clear_button_frame = tk.Frame(self.left_frame, bg='#2b2b2b')
+        clear_button_frame.pack(side='bottom', fill='x')
+        self.clear_button = self.add_button(clear_button_frame, "Clear", self.clear_current, "Clear data in current tab")
+        self.clear_all_button = self.add_button(clear_button_frame, "Clear All", self.clear_all, "Clear data in all tabs")
 
     def setup_right_frame(self):
         self.right_frame = tk.Frame(self.root, bg='#2b2b2b')
@@ -83,6 +94,7 @@ class RepoPromptGUI:
         self.search_var = tk.StringVar()
         self.search_entry = tk.Entry(search_frame, textvariable=self.search_var, bg='#3c3c3c', fg=self.text_color, insertbackground=self.text_color, width=60, font=("Arial", 12))
         self.search_entry.pack(side=tk.LEFT, padx=5, pady=2, ipady=5)
+        Tooltip(self.search_entry, "Enter text to search in current tab")
         self.search_button = self.add_button(search_frame, "Search", self.file_handler.search_tab, "Search current tab")
         self.next_button = self.add_button(search_frame, "Next", self.file_handler.next_match, "Next match")
         self.prev_button = self.add_button(search_frame, "Prev", self.file_handler.prev_match, "Previous match")
@@ -119,6 +131,11 @@ class RepoPromptGUI:
 
         self.base_prompt_text = scrolledtext.ScrolledText(self.notebook, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10))
         self.notebook.add(self.base_prompt_text, text="Base Prompt")
+        button_frame = tk.Frame(self.base_prompt_text.master, bg='#2b2b2b')
+        button_frame.pack(pady=10)
+        self.save_template_button = self.add_button(button_frame, "Save Template (Ctrl+T)", self.save_template, "Save current prompt as template")
+        self.load_template_button = self.add_button(button_frame, "Load Template (Ctrl+L)", self.load_template, "Load a saved template")
+        self.delete_template_button = self.add_button(button_frame, "Delete Template", self.delete_template, "Delete a saved template")
 
         self.settings_frame = tk.Frame(self.notebook, bg='#2b2b2b')
         self.notebook.add(self.settings_frame, text="Settings")
@@ -128,19 +145,17 @@ class RepoPromptGUI:
         self.status_bar = tk.Label(self.root, text="Ready", bg='#2b2b2b', fg=self.status_color, bd=1, relief="sunken", anchor="w")
         self.status_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
 
-    def setup_ui(self):
-        self.setup_header()
-        self.setup_left_frame()
-        self.setup_right_frame()
-        self.setup_status_bar()
-
     def setup_settings_tab(self):
         tk.Label(self.settings_frame, text="Application Settings", font=("Arial", 14), bg='#2b2b2b', fg=self.text_color).pack(pady=10)
-        tk.Label(self.settings_frame, text="Default Tab:", bg='#2b2b2b', fg=self.text_color).pack()
+        default_label = tk.Label(self.settings_frame, text="Default Tab:", bg='#2b2b2b', fg=self.text_color)
+        default_label.pack()
+        Tooltip(default_label, "Set the default tab on startup")
         self.default_tab_var = tk.StringVar(value=self.settings.get('app', 'default_tab', 'Content Preview'))
         for tab in ["Content Preview", "Folder Structure", "Base Prompt", "Settings"]:
             tk.Radiobutton(self.settings_frame, text=tab, variable=self.default_tab_var, value=tab, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor='w')
-        tk.Label(self.settings_frame, text="Folder Expansion:", bg='#2b2b2b', fg=self.text_color).pack(pady=5)
+        expansion_label = tk.Label(self.settings_frame, text="Folder Expansion:", bg='#2b2b2b', fg=self.text_color)
+        expansion_label.pack(pady=5)
+        Tooltip(expansion_label, "Control folder expansion on load")
         self.expansion_var = tk.StringVar(value=self.settings.get('app', 'expansion', 'Collapsed'))
         tk.Radiobutton(self.settings_frame, text="Fully Expanded", variable=self.expansion_var, value="Expanded", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor='w')
         tk.Radiobutton(self.settings_frame, text="Collapsed", variable=self.expansion_var, value="Collapsed", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor='w')
@@ -148,7 +163,19 @@ class RepoPromptGUI:
         self.levels_entry = tk.Entry(self.settings_frame, bg='#3c3c3c', fg=self.text_color)
         self.levels_entry.insert(0, self.settings.get('app', 'levels', '1'))
         self.levels_entry.pack(pady=5)
+        Tooltip(self.levels_entry, "Number of folder levels to expand")
         self.add_button(self.settings_frame, "Save Settings", self.save_app_settings, "Save application settings")
+
+    def setup_ui(self):
+        self.menu = tk.Menu(self.root, bg=self.button_bg, fg=self.button_fg)
+        self.root.config(menu=self.menu)
+        help_menu = tk.Menu(self.menu, bg=self.button_bg, fg=self.button_fg)
+        self.menu.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About", command=self.show_about)
+        self.setup_header()
+        self.setup_left_frame()
+        self.setup_right_frame()
+        self.setup_status_bar()
 
     def add_button(self, parent, text, command, tooltip, state=tk.NORMAL):
         btn = tk.Button(parent, text=text, command=command, bg=self.button_bg, fg=self.button_fg, state=state)
@@ -164,6 +191,8 @@ class RepoPromptGUI:
         self.root.bind('<Control-a>', lambda e: self.file_handler.copy_all())
         self.root.bind('<Control-r>', lambda e: self.select_repo())
         self.root.bind('<Control-F5>', lambda e: self.refresh_repo())
+        self.root.bind('<Control-t>', lambda e: self.save_template())
+        self.root.bind('<Control-l>', lambda e: self.load_template())
 
     def cycle_tabs(self, event):
         current_index = self.notebook.index('current')
@@ -182,15 +211,6 @@ class RepoPromptGUI:
         self.progress.stop()
         self.progress.grid_forget()
 
-    def refresh_repo(self):
-        if self.file_handler.repo_path:
-            self.progress.grid(row=3, column=0, columnspan=3, sticky="ew")
-            self.progress.start()
-            self.file_handler.load_repo(self.file_handler.repo_path)
-            self.refresh_ui()
-            self.progress.stop()
-            self.progress.grid_forget()
-
     def refresh_ui(self):
         self.info_label.config(text=f"Token Count: {self.file_handler.token_count:,}".replace(",", " "))
         self.refresh_button.config(state=tk.NORMAL)
@@ -199,9 +219,32 @@ class RepoPromptGUI:
         self.copy_structure_button.config(state=tk.NORMAL)
         self.content_text.config(state=tk.NORMAL)
         self.content_text.delete(1.0, tk.END)
-        self.content_text.insert(tk.END, self.file_handler.file_contents)
+        self.content_text.tag_configure("filename", foreground="red")
+        if self.file_handler.file_contents:
+            sections = self.file_handler.file_contents.split("\n\n")
+            for section in sections:
+                if section.startswith("File: "):
+                    filename_end = section.find("\nContent:\n")
+                    if filename_end != -1:
+                        filename = section[6:filename_end].strip()
+                        content = section[filename_end + 11:]
+                        self.content_text.insert(tk.END, f"File: {filename}\n", "filename")
+                        self.content_text.insert(tk.END, f"Content:\n{content}\n\n")
+                    else:
+                        self.content_text.insert(tk.END, section + "\n\n")
+                else:
+                    self.content_text.insert(tk.END, section + "\n\n")
         self.content_text.config(state=tk.DISABLED)
         self.file_handler.populate_tree()
+
+    def refresh_repo(self):
+        if self.file_handler.repo_path:
+            self.progress.grid(row=3, column=0, columnspan=3, sticky="ew")
+            self.progress.start()
+            self.file_handler.load_repo(self.file_handler.repo_path)
+            self.refresh_ui()
+            self.progress.stop()
+            self.progress.grid_forget()
 
     def open_repo_settings(self):
         SettingsDialog(self.root, self.file_handler, self.settings).show()
@@ -235,8 +278,68 @@ class RepoPromptGUI:
         self.status_bar.config(text=message)
         def fade_out(opacity=1.0):
             if opacity > 0:
-                self.status_bar.config(fg=f'#{int(255 * opacity):02x}{int(255 * opacity):02x}{int(0):02x}')
+                self.status_bar.config(fg=f'#{int(255 * opacity):02x}{int(69 * opacity):02x}{int(0):02x}')
                 self.root.after(100, fade_out, opacity - 0.1)
             else:
                 self.status_bar.config(text="Ready", fg=self.status_color)
         self.root.after(5000, fade_out)
+
+    def save_template(self):
+        template_name = tk.filedialog.asksaveasfilename(initialdir=self.template_dir, defaultextension=".txt", filetypes=[("Text files", "*.txt")], title="Save Template")
+        if template_name:
+            with open(template_name, 'w', encoding='utf-8') as file:
+                file.write(self.base_prompt_text.get(1.0, tk.END).strip())
+            self.show_status_message("Template saved successfully!")
+
+    def load_template(self):
+        template_file = tk.filedialog.askopenfilename(initialdir=self.template_dir, filetypes=[("Text files", "*.txt")], title="Load Template")
+        if template_file:
+            with open(template_file, 'r', encoding='utf-8') as file:
+                self.base_prompt_text.delete(1.0, tk.END)
+                self.base_prompt_text.insert(tk.END, file.read())
+            self.show_status_message("Template loaded successfully!")
+
+    def delete_template(self):
+        template_file = tk.filedialog.askopenfilename(initialdir=self.template_dir, filetypes=[("Text files", "*.txt")], title="Delete Template")
+        if template_file and messagebox.askyesno("Confirm", "Are you sure you want to delete this template?"):
+            os.remove(template_file)
+            self.show_status_message("Template deleted successfully!")
+
+    def clear_current(self):
+        current_index = self.notebook.index('current')
+        if current_index == 0:
+            self.content_text.config(state=tk.NORMAL)
+            self.content_text.delete(1.0, tk.END)
+            self.content_text.config(state=tk.DISABLED)
+            self.file_handler.file_contents = ""
+            self.file_handler.token_count = 0
+            self.file_handler.loaded_files.clear()
+            self.info_label.config(text="Token Count: 0")
+            self.copy_button.config(state=tk.DISABLED)
+            self.file_handler.update_tree_strikethrough()
+        elif current_index == 1:
+            self.tree.delete(*self.tree.get_children())
+            self.copy_structure_button.config(state=tk.DISABLED)
+        elif current_index == 2:
+            self.base_prompt_text.delete(1.0, tk.END)
+        self.show_status_message("Current tab cleared")
+
+    def clear_all(self):
+        self.content_text.config(state=tk.NORMAL)
+        self.content_text.delete(1.0, tk.END)
+        self.content_text.config(state=tk.DISABLED)
+        self.file_handler.file_contents = ""
+        self.file_handler.token_count = 0
+        self.file_handler.loaded_files.clear()
+        self.info_label.config(text="Token Count: 0")
+        self.copy_button.config(state=tk.DISABLED)
+        self.copy_all_button.config(state=tk.DISABLED)
+        self.copy_structure_button.config(state=tk.DISABLED)
+        self.tree.delete(*self.tree.get_children())
+        self.base_prompt_text.delete(1.0, tk.END)
+        self.repo_label.config(text="Current Repo Loaded: None")
+        self.file_handler.update_tree_strikethrough()
+        self.show_status_message("All tabs cleared")
+
+    def show_about(self):
+        messagebox.showinfo("About", f"CodeBase v{self.version}\nA tool to scan repositories and copy contents.\n\nTo be released under\nMIT License Soon\n©2025 Mikael Sundh")
