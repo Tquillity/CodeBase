@@ -28,6 +28,7 @@ class RepoPromptGUI:
         self.include_icons_var = tk.IntVar(value=1)
         self.show_unloaded_var = tk.IntVar(value=0)
         self.expand_collapse_var = tk.BooleanVar(value=True)
+        self.content_expand_collapse_var = tk.BooleanVar(value=True)
         self.user_data_dir = appdirs.user_data_dir("CodeBase")
         self.template_dir = os.path.join(self.user_data_dir, "templates")
         self.recent_folders_file = os.path.join(self.user_data_dir, "recent_folders.txt")
@@ -125,14 +126,20 @@ class RepoPromptGUI:
         self.search_entry.bind("<Down>", lambda e: self.file_handler.next_match())
         self.search_entry.bind("<Up>", lambda e: self.file_handler.prev_match())
 
-        self.content_text = scrolledtext.ScrolledText(self.notebook, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10), state=tk.NORMAL)
+        # Content Preview tab with Expand/Collapse button
+        self.content_frame = tk.Frame(self.notebook, bg='#2b2b2b')
+        self.notebook.add(self.content_frame, text="Content Preview")
+        content_button_frame = tk.Frame(self.content_frame, bg='#2b2b2b')
+        content_button_frame.pack(side=tk.TOP, fill='x', pady=5)
+        self.content_expand_collapse_button = self.add_button(content_button_frame, "Expand All", self.toggle_content_all, "Expand/collapse all file contents")
+        self.content_text = scrolledtext.ScrolledText(self.content_frame, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10), state=tk.NORMAL)
         self.content_text.pack(fill="both", expand=True)
         self.content_text.tag_configure("filename", foreground="red")
         self.content_text.tag_configure("toggle", foreground="#00FF00", underline=True)
         self.content_text.bind("<Motion>", self.on_mouse_move)
         self.content_text.bind("<Leave>", lambda event: self.content_text.config(cursor=""))
-        self.notebook.add(self.content_text, text="Content Preview")
 
+        # Folder Structure tab with corrected Treeview configuration
         self.structure_frame = tk.Frame(self.notebook, bg='#2b2b2b')
         self.notebook.add(self.structure_frame, text="Folder Structure")
         structure_button_frame = tk.Frame(self.structure_frame, bg='#2b2b2b')
@@ -142,9 +149,9 @@ class RepoPromptGUI:
         self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=5)
         Tooltip(self.show_unloaded_checkbox, "Toggle strikethrough on unloaded files")
         self.tree = ttk.Treeview(self.structure_frame, columns=("path", "checkbox"), show=["tree", "headings"], style="Custom.Treeview")
-        self.tree.column("#0", width=300)
-        self.tree.column("path", width=0, stretch=tk.NO)
-        self.tree.column("checkbox", width=30, anchor="center")
+        self.tree.column("#0", width=300)  # Tree column (Name)
+        self.tree.column("path", width=0, stretch=tk.NO)  # Hidden path column
+        self.tree.column("checkbox", width=30, anchor="center")  # Checkbox column
         self.tree.heading("#0", text="Name")
         self.tree.heading("checkbox", text="Select/Deselect")
         self.tree.pack(fill="both", expand=True)
@@ -262,7 +269,7 @@ class RepoPromptGUI:
         self.tree.delete(*self.tree.get_children())
         root_basename = os.path.basename(root_dir)
         root_icon = "📁" if os.path.isdir(root_dir) else "📄"
-        root_id = self.tree.insert("", "end", text=f"{root_icon} {root_basename}", open=True, tags=('folder',), values=(root_dir,))
+        root_id = self.tree.insert("", "end", text=f"{root_icon} {root_basename}", open=True, tags=('folder', 'selected'), values=(root_dir, "☑"))
         self.build_tree(root_dir, root_id)
         self.tree.tag_configure('folder', foreground=self.folder_color)
         self.tree.tag_configure('file', foreground=self.text_color)
@@ -277,8 +284,8 @@ class RepoPromptGUI:
                 item_path = os.path.join(path, item)
                 icon = "📁" if os.path.isdir(item_path) else "📄"
                 tag = 'folder' if os.path.isdir(item_path) else 'file'
-                tags = [tag]
-                item_id = self.tree.insert(parent_id, "end", text=f"{icon} {item}", values=(item_path,), open=False, tags=tags)
+                tags = [tag, 'selected']  # Initially selected
+                item_id = self.tree.insert(parent_id, "end", text=f"{icon} {item}", values=(item_path, "☑"), open=False, tags=tags)
                 if os.path.isdir(item_path):
                     self.tree.insert(item_id, "end", text="Loading...", tags=('dummy',))
         except Exception as e:
@@ -307,6 +314,7 @@ class RepoPromptGUI:
                         self.content_text.insert(tk.END, f"Content:\n{content}\n\n", content_tag)
                         self.content_text.tag_bind(toggle_tag, "<Button-1>", lambda event, fid=file_id: self.toggle_content(fid))
         self.content_text.config(state=tk.DISABLED)
+        self.update_content_expand_collapse_button()
 
     def toggle_content(self, file_id):
         self.content_text.config(state=tk.NORMAL)
@@ -326,6 +334,33 @@ class RepoPromptGUI:
 
         self.content_text.tag_configure(content_tag, elide=not new_state)
         self.content_text.config(state=tk.DISABLED)
+        self.update_content_expand_collapse_button()
+
+    def toggle_content_all(self):
+        if not self.file_states:
+            return
+        new_state = not self.content_expand_collapse_var.get()
+        self.content_expand_collapse_var.set(new_state)
+        self.content_text.config(state=tk.NORMAL)
+        for file_id in self.file_states:
+            self.file_states[file_id] = new_state
+            toggle_tag = f"toggle_{file_id}"
+            content_tag = f"content_{file_id}"
+            ranges = self.content_text.tag_ranges(toggle_tag)
+            if ranges and len(ranges) == 2:
+                start, end = ranges[0], ranges[1]
+                self.content_text.delete(start, end)
+                new_text = "[-]" if new_state else "[+]"
+                self.content_text.insert(start, new_text, ("toggle", toggle_tag))
+            self.content_text.tag_configure(content_tag, elide=not new_state)
+        self.content_text.config(state=tk.DISABLED)
+        self.content_expand_collapse_button.config(text="Collapse All" if new_state else "Expand All")
+        self.show_status_message("Content sections " + ("expanded" if new_state else "collapsed"))
+
+    def update_content_expand_collapse_button(self):
+        all_expanded = all(self.file_states.values()) if self.file_states else True
+        self.content_expand_collapse_var.set(all_expanded)
+        self.content_expand_collapse_button.config(text="Collapse All" if all_expanded else "Expand All")
 
     def search_tab(self):
         query = self.search_var.get()
