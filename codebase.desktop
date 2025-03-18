@@ -1,8 +1,8 @@
 [Desktop Entry]
-Version=1.5
+Version=2.0
 Name=CodeBase
 Comment=A tool to scan repositories and copy contents
-Exec=@EXEC_PATH@
+Exec=@EXEC_PATH@  # Replace with path to Python script or executable
 Icon=@ICON_PATH@
 Terminal=false
 Type=Application

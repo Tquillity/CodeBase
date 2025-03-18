@@ -1,12 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
-    ['code_base_gui.py'],
-    pathex=[],
+    ['main.py'],  # Entry point
+    pathex=['/home/digislinger/Founder/CodeBase'],  # Absolute path to your project directory
     binaries=[],
-    datas=[('icon.png', '.')],
-    hiddenimports=[],
+    datas=[('icon.png', '.')],  # Include icon.png if it exists
+    hiddenimports=['pyperclip', 'appdirs'],  # External libraries not auto-detected
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -22,18 +21,18 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='CodeBase',
+    name='CodeBase',  # Output executable name
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=True,  # Compress with UPX if available
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=False,  # No console (GUI mode)
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icon.png'],
+    icon=['icon.png'],  # Set app icon (optional, ensure icon.png exists)
 )

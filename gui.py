@@ -145,7 +145,7 @@ class RepoPromptGUI:
         structure_button_frame = tk.Frame(self.structure_frame, bg='#2b2b2b')
         structure_button_frame.pack(side=tk.TOP, fill='x', pady=5)
         self.expand_collapse_button = self.add_button(structure_button_frame, "Expand All", self.file_handler.toggle_expand_collapse, "Expand/collapse folders")
-        self.show_unloaded_checkbox = tk.Checkbutton(structure_button_frame, text="Show Unloaded Files", variable=self.show_unloaded_var, command=self.file_handler.update_tree_strikethrough, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
+        self.show_unloaded_checkbox = tk.Checkbutton(structure_button_frame, text="Strike Through Unloaded Files", variable=self.show_unloaded_var, command=self.file_handler.update_tree_strikethrough, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=5)
         Tooltip(self.show_unloaded_checkbox, "Toggle strikethrough on unloaded files")
         self.tree = ttk.Treeview(self.structure_frame, columns=("path", "checkbox"), show=["tree", "headings"], style="Custom.Treeview")
