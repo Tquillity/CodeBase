@@ -79,6 +79,9 @@ class FileHandler:
                 return True
         if '.git' in rel_path.split(os.sep):
             return True
+        # Check if node_modules should be excluded
+        if self.gui.settings.get('app', 'exclude_node_modules', 1) and 'node_modules' in rel_path.split(os.sep):
+            return True
         return False
 
     def is_text_file(self, file_path):
@@ -158,11 +161,25 @@ class FileHandler:
                 return
         else:
             item_id = item_id_or_path
+        
+        # Get folder details
         item_path = self.gui.tree.item(item_id, "values")[0]
+        original_text = self.gui.tree.item(item_id, "text")
         selected = 'selected' in self.gui.tree.item(item_id, "tags")
+        
+        # Indicate loading
+        self.gui.tree.item(item_id, text=f"{original_text} (Loading...)")
+        self.gui.root.update_idletasks()  # Force UI update
+        
+        # Clear existing children (including "Loading..." dummy)
         for child in self.gui.tree.get_children(item_id):
             self.gui.tree.delete(child)
+        
+        # Build the tree contents immediately
         self.build_tree(item_path, item_id, selected)
+        
+        # Restore original text and update UI
+        self.gui.tree.item(item_id, text=original_text)
         self.update_tree_strikethrough()
         self.file_contents = self.generate_file_contents()
         self.token_count = len(self.file_contents.split())

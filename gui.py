@@ -78,16 +78,22 @@ class RepoPromptGUI:
         self.left_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ns")
         tk.Frame(self.root, bg='#4a4a4a', width=1).grid(row=2, column=1, sticky="ns", padx=5)
         self.select_button = self.add_button(self.left_frame, "Select Repo (Ctrl+R)", self.select_repo, "Choose a repository folder")
+        self.select_button.pack(pady=5)  # Explicitly pack here
         self.refresh_button = self.add_button(self.left_frame, "Refresh (Ctrl+F5)", self.refresh_repo, "Refresh current repository", state=tk.DISABLED)
+        self.refresh_button.pack(pady=5)
         self.settings_button = self.add_button(self.left_frame, "Repo Settings", self.open_repo_settings, "Customize file reading settings")
+        self.settings_button.pack(pady=5)
         self.info_label = tk.Label(self.left_frame, text="Token Count: 0", bg='#2b2b2b', fg=self.text_color)
         self.info_label.pack(pady=5)
         self.copy_button = self.add_button(self.left_frame, "Copy Contents (Ctrl+C)", self.file_handler.copy_contents, "Copy selected contents", state=tk.DISABLED)
+        self.copy_button.pack(pady=5)
         self.copy_all_button = self.add_button(self.left_frame, "Copy All (Ctrl+A)", self.file_handler.copy_all, "Copy prompt, contents, structure", state=tk.DISABLED)
+        self.copy_all_button.pack(pady=5)
         self.prepend_checkbox = tk.Checkbutton(self.left_frame, text="Prepend Base Prompt", variable=self.prepend_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.prepend_checkbox.pack(pady=5)
         Tooltip(self.prepend_checkbox, "Include Base Prompt in copied content")
         self.copy_structure_button = self.add_button(self.left_frame, "Copy Structure (Ctrl+S)", self.file_handler.copy_structure, "Copy folder structure", state=tk.DISABLED)
+        self.copy_structure_button.pack(pady=5)
         self.include_icons_checkbox = tk.Checkbutton(self.left_frame, text="Include Icons in Structure", variable=self.include_icons_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.include_icons_checkbox.pack(pady=5)
         Tooltip(self.include_icons_checkbox, "Toggle icons in structure")
@@ -95,7 +101,9 @@ class RepoPromptGUI:
         clear_button_frame = tk.Frame(self.left_frame, bg='#2b2b2b')
         clear_button_frame.pack(side='bottom', fill='x')
         self.clear_button = self.add_button(clear_button_frame, "Clear", self.clear_current, "Clear data in current tab")
+        self.clear_button.pack(pady=5)
         self.clear_all_button = self.add_button(clear_button_frame, "Clear All", self.clear_all, "Clear data in all tabs")
+        self.clear_all_button.pack(pady=5)
 
     def setup_right_frame(self):
         self.right_frame = tk.Frame(self.root, bg='#2b2b2b')
@@ -119,8 +127,11 @@ class RepoPromptGUI:
         self.search_entry.pack(side=tk.LEFT, padx=5, pady=2, ipady=5)
         Tooltip(self.search_entry, "Enter text to search in current tab")
         self.search_button = self.add_button(search_frame, "Search", self.file_handler.search_tab, "Search current tab")
+        self.search_button.pack(side=tk.LEFT, padx=5)
         self.next_button = self.add_button(search_frame, "Next", self.file_handler.next_match, "Next match")
+        self.next_button.pack(side=tk.LEFT, padx=5)
         self.prev_button = self.add_button(search_frame, "Prev", self.file_handler.prev_match, "Previous match")
+        self.prev_button.pack(side=tk.LEFT, padx=5)
         self.search_entry.bind("<Return>", lambda e: self.file_handler.search_tab())
         self.search_entry.bind("<KP_Enter>", lambda e: self.file_handler.search_tab())
         self.search_entry.bind("<Down>", lambda e: self.file_handler.next_match())
@@ -132,6 +143,7 @@ class RepoPromptGUI:
         content_button_frame = tk.Frame(self.content_frame, bg='#2b2b2b')
         content_button_frame.pack(side=tk.TOP, fill='x', pady=5)
         self.content_expand_collapse_button = self.add_button(content_button_frame, "Expand All", self.toggle_content_all, "Expand/collapse all file contents")
+        self.content_expand_collapse_button.pack(pady=5)
         self.content_text = scrolledtext.ScrolledText(self.content_frame, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10), state=tk.NORMAL)
         self.content_text.pack(fill="both", expand=True)
         self.content_text.tag_configure("filename", foreground="red")
@@ -145,6 +157,7 @@ class RepoPromptGUI:
         structure_button_frame = tk.Frame(self.structure_frame, bg='#2b2b2b')
         structure_button_frame.pack(side=tk.TOP, fill='x', pady=5)
         self.expand_collapse_button = self.add_button(structure_button_frame, "Expand All", self.file_handler.toggle_expand_collapse, "Expand/collapse folders")
+        self.expand_collapse_button.pack(side=tk.LEFT, padx=5)
         self.show_unloaded_checkbox = tk.Checkbutton(structure_button_frame, text="Strike Through Unloaded Files", variable=self.show_unloaded_var, command=self.file_handler.update_tree_strikethrough, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=5)
         Tooltip(self.show_unloaded_checkbox, "Toggle strikethrough on unloaded files")
@@ -172,8 +185,11 @@ class RepoPromptGUI:
         button_frame = tk.Frame(self.base_prompt_text.master, bg='#2b2b2b')
         button_frame.pack(pady=10)
         self.save_template_button = self.add_button(button_frame, "Save Template (Ctrl+T)", self.save_template, "Save current prompt as template")
+        self.save_template_button.pack(side=tk.LEFT, padx=5)
         self.load_template_button = self.add_button(button_frame, "Load Template (Ctrl+L)", self.load_template, "Load a saved template")
+        self.load_template_button.pack(side=tk.LEFT, padx=5)
         self.delete_template_button = self.add_button(button_frame, "Delete Template", self.delete_template, "Delete a saved template")
+        self.delete_template_button.pack(side=tk.LEFT, padx=5)
 
         self.settings_frame = tk.Frame(self.notebook, bg='#2b2b2b')
         self.notebook.add(self.settings_frame, text="Settings")
@@ -184,25 +200,48 @@ class RepoPromptGUI:
         self.status_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
 
     def setup_settings_tab(self):
-        tk.Label(self.settings_frame, text="Application Settings", font=("Arial", 14), bg='#2b2b2b', fg=self.text_color).pack(pady=10)
-        default_label = tk.Label(self.settings_frame, text="Default Tab:", bg='#2b2b2b', fg=self.text_color)
-        default_label.pack()
-        Tooltip(default_label, "Set the default tab on startup")
+        # Clear existing widgets if any (for re-initialization purposes)
+        for widget in self.settings_frame.winfo_children():
+            widget.destroy()
+
+        # Main frame with padding
+        main_frame = tk.Frame(self.settings_frame, bg='#2b2b2b')
+        main_frame.pack(pady=10, padx=10, fill="both", expand=True)
+
+        # Title
+        tk.Label(main_frame, text="Application Settings", font=("Arial", 14), bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
+
+        # Default Tab Section
+        default_frame = tk.LabelFrame(main_frame, text="Default Tab", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
+        default_frame.grid(row=1, column=0, sticky="ew", pady=5)
+        Tooltip(default_frame, "Set the default tab on startup")
         self.default_tab_var = tk.StringVar(value=self.settings.get('app', 'default_tab', 'Content Preview'))
-        for tab in ["Content Preview", "Folder Structure", "Base Prompt", "Settings"]:
-            tk.Radiobutton(self.settings_frame, text=tab, variable=self.default_tab_var, value=tab, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor='w')
-        expansion_label = tk.Label(self.settings_frame, text="Folder Expansion:", bg='#2b2b2b', fg=self.text_color)
-        expansion_label.pack(pady=5)
-        Tooltip(expansion_label, "Control folder expansion on load")
+        for i, tab in enumerate(["Content Preview", "Folder Structure", "Base Prompt", "Settings"]):
+            tk.Radiobutton(default_frame, text=tab, variable=self.default_tab_var, value=tab, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=i, column=0, sticky="w", padx=5)
+
+        # Folder Expansion Section
+        expansion_frame = tk.LabelFrame(main_frame, text="Folder Expansion", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
+        expansion_frame.grid(row=2, column=0, sticky="ew", pady=5)
+        Tooltip(expansion_frame, "Control folder expansion on load")
         self.expansion_var = tk.StringVar(value=self.settings.get('app', 'expansion', 'Collapsed'))
-        tk.Radiobutton(self.settings_frame, text="Fully Expanded", variable=self.expansion_var, value="Expanded", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor='w')
-        tk.Radiobutton(self.settings_frame, text="Collapsed", variable=self.expansion_var, value="Collapsed", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor='w')
-        tk.Radiobutton(self.settings_frame, text="Load X levels", variable=self.expansion_var, value="Levels", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor='w')
-        self.levels_entry = tk.Entry(self.settings_frame, bg='#3c3c3c', fg=self.text_color)
+        tk.Radiobutton(expansion_frame, text="Fully Expanded", variable=self.expansion_var, value="Expanded", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=0, column=0, sticky="w", padx=5)
+        tk.Radiobutton(expansion_frame, text="Collapsed", variable=self.expansion_var, value="Collapsed", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=1, column=0, sticky="w", padx=5)
+        tk.Radiobutton(expansion_frame, text="Load X levels", variable=self.expansion_var, value="Levels", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=2, column=0, sticky="w", padx=5)
+        self.levels_entry = tk.Entry(expansion_frame, bg='#3c3c3c', fg=self.text_color, width=5)
         self.levels_entry.insert(0, self.settings.get('app', 'levels', '1'))
-        self.levels_entry.pack(pady=5)
+        self.levels_entry.grid(row=2, column=1, padx=5, sticky="w")
         Tooltip(self.levels_entry, "Number of folder levels to expand")
-        self.add_button(self.settings_frame, "Save Settings", self.save_app_settings, "Save application settings")
+
+        # New Exclude Options Section
+        exclude_frame = tk.LabelFrame(main_frame, text="Exclude Options", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
+        exclude_frame.grid(row=3, column=0, sticky="ew", pady=5)
+        self.exclude_node_modules_var = tk.IntVar(value=self.settings.get('app', 'exclude_node_modules', 1))  # Default to enabled
+        tk.Checkbutton(exclude_frame, text="Always exclude 'node_modules' folders", variable=self.exclude_node_modules_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=0, column=0, sticky="w", padx=5)
+        Tooltip(exclude_frame, "Permanently exclude all 'node_modules' folders and their contents")
+
+        # Save Button
+        save_button = self.add_button(main_frame, "Save Settings", self.save_app_settings, "Save application settings")
+        save_button.grid(row=4, column=0, pady=10)
 
     def setup_ui(self):
         self.menu = tk.Menu(self.root, bg=self.button_bg, fg=self.button_fg)
@@ -217,11 +256,10 @@ class RepoPromptGUI:
 
     def add_button(self, parent, text, command, tooltip, state=tk.NORMAL):
         btn = tk.Button(parent, text=text, command=command, bg=self.button_bg, fg=self.button_fg, state=state)
-        btn.pack(pady=5)
         btn.bind("<Enter>", lambda e: btn.config(bg="#5a5a5a"))
         btn.bind("<Leave>", lambda e: btn.config(bg=self.button_bg))
         Tooltip(btn, tooltip)
-        return btn
+        return btn  # Return the button without packing it
 
     def bind_keys(self):
         self.root.bind('<Control-c>', lambda e: self.file_handler.copy_contents())
@@ -441,6 +479,7 @@ class RepoPromptGUI:
         self.settings.set('app', 'default_tab', self.default_tab_var.get())
         self.settings.set('app', 'expansion', self.expansion_var.get())
         self.settings.set('app', 'levels', self.levels_entry.get())
+        self.settings.set('app', 'exclude_node_modules', self.exclude_node_modules_var.get())
         self.settings.save()
         self.show_status_message("Settings saved")
         self.apply_default_tab()
