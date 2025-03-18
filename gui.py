@@ -236,8 +236,13 @@ class RepoPromptGUI:
         exclude_frame = tk.LabelFrame(main_frame, text="Exclude Options", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
         exclude_frame.grid(row=3, column=0, sticky="ew", pady=5)
         self.exclude_node_modules_var = tk.IntVar(value=self.settings.get('app', 'exclude_node_modules', 1))  # Default to enabled
+        self.exclude_dist_var = tk.IntVar(value=self.settings.get('app', 'exclude_dist', 1))
         tk.Checkbutton(exclude_frame, text="Always exclude 'node_modules' folders", variable=self.exclude_node_modules_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=0, column=0, sticky="w", padx=5)
         Tooltip(exclude_frame, "Permanently exclude all 'node_modules' folders and their contents")
+
+        # Add this new checkbutton
+        tk.Checkbutton(exclude_frame, text="Always exclude 'dist' folders", variable=self.exclude_dist_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=1, column=0, sticky="w", padx=5)
+        Tooltip(exclude_frame, "Permanently exclude all 'dist' folders and their contents")
 
         # Save Button
         save_button = self.add_button(main_frame, "Save Settings", self.save_app_settings, "Save application settings")
@@ -480,6 +485,7 @@ class RepoPromptGUI:
         self.settings.set('app', 'expansion', self.expansion_var.get())
         self.settings.set('app', 'levels', self.levels_entry.get())
         self.settings.set('app', 'exclude_node_modules', self.exclude_node_modules_var.get())
+        self.settings.set('app', 'exclude_dist', self.exclude_dist_var.get())
         self.settings.save()
         self.show_status_message("Settings saved")
         self.apply_default_tab()
