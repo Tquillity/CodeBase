@@ -127,6 +127,8 @@ class RepoPromptGUI:
         self.find_all_button.pack(side=tk.LEFT, padx=5)
         self.case_sensitive_var = tk.IntVar()
         tk.Checkbutton(search_frame, text="Case Sensitive", variable=self.case_sensitive_var, bg='#2b2b2b', fg=self.text_color).pack(side=tk.LEFT)
+        self.whole_word_var = tk.IntVar()
+        tk.Checkbutton(search_frame, text="Whole Word", variable=self.whole_word_var, bg='#2b2b2b', fg=self.text_color).pack(side=tk.LEFT)
         self.search_entry.bind("<Return>", lambda e: self.file_handler.search_tab())
         self.search_entry.bind("<KP_Enter>", lambda e: self.file_handler.search_tab())
         self.search_entry.bind("<Down>", lambda e: self.file_handler.next_match())
@@ -204,37 +206,31 @@ class RepoPromptGUI:
         main_frame = tk.Frame(self.settings_frame, bg='#2b2b2b')
         main_frame.pack(pady=10, padx=10, fill="both", expand=True)
 
-        # Configure grid rows and columns
-        main_frame.grid_columnconfigure(0, weight=1)  # Left frame expands
-        main_frame.grid_columnconfigure(1, weight=0)  # Separator column stays fixed
-        main_frame.grid_columnconfigure(2, weight=1)  # Right frame expands
-        main_frame.grid_rowconfigure(1, weight=1)     # Row 1 expands vertically
+        main_frame.grid_columnconfigure(0, weight=1)
+        main_frame.grid_columnconfigure(1, weight=0)
+        main_frame.grid_columnconfigure(2, weight=1)
+        main_frame.grid_rowconfigure(1, weight=1)
 
-        # Settings label spanning all three columns
         tk.Label(main_frame, text="Application Settings", font=("Arial", 14), bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, columnspan=3, pady=(0, 10), sticky="w")
 
-        # Left frame for general settings
         left_frame = tk.Frame(main_frame, bg='#2b2b2b')
         left_frame.grid(row=1, column=0, sticky="n")
 
-        # Separator frame (vertical line with padding)
         separator_frame = tk.Frame(main_frame, width=2, bg="#444444")
-        separator_frame.grid(row=1, column=1, sticky="ns", padx=10)
+        separator_frame.grid(row=1, column=1, sticky="ns", padx=20)
 
-        # Right frame for file extensions
         right_frame = tk.Frame(main_frame, bg='#2b2b2b')
         right_frame.grid(row=1, column=2, sticky="n")
 
-        # Populate left_frame (unchanged from original)
         default_frame = tk.LabelFrame(left_frame, text="Default Tab", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
-        default_frame.pack(pady=5, fill="x")
+        default_frame.pack(pady=10, fill="x")
         Tooltip(default_frame, "Set the default tab on startup")
         self.default_tab_var = tk.StringVar(value=self.settings.get('app', 'default_tab', 'Content Preview'))
         for i, tab in enumerate(["Content Preview", "Folder Structure", "Base Prompt", "Settings"]):
             tk.Radiobutton(default_frame, text=tab, variable=self.default_tab_var, value=tab, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
 
         expansion_frame = tk.LabelFrame(left_frame, text="Folder Expansion", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
-        expansion_frame.pack(pady=5, fill="x")
+        expansion_frame.pack(pady=10, fill="x")
         Tooltip(expansion_frame, "Control folder expansion on load")
         self.expansion_var = tk.StringVar(value=self.settings.get('app', 'expansion', 'Collapsed'))
         tk.Radiobutton(expansion_frame, text="Fully Expanded", variable=self.expansion_var, value="Expanded", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
@@ -246,7 +242,7 @@ class RepoPromptGUI:
         Tooltip(self.levels_entry, "Number of folder levels to expand")
 
         exclude_frame = tk.LabelFrame(left_frame, text="Exclude Options", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
-        exclude_frame.pack(pady=5, fill="x")
+        exclude_frame.pack(pady=10, fill="x")
         self.exclude_node_modules_var = tk.IntVar(value=self.settings.get('app', 'exclude_node_modules', 1))
         tk.Checkbutton(exclude_frame, text="Always exclude 'node_modules' folders", variable=self.exclude_node_modules_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
         self.exclude_dist_var = tk.IntVar(value=self.settings.get('app', 'exclude_dist', 1))
@@ -260,11 +256,13 @@ class RepoPromptGUI:
             self.exclude_file_vars[file] = var
 
         misc_frame = tk.LabelFrame(left_frame, text="Miscellaneous", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
-        misc_frame.pack(pady=5, fill="x")
+        misc_frame.pack(pady=10, fill="x")
         self.include_icons_var = tk.IntVar(value=self.settings.get('app', 'include_icons', 1))
         tk.Checkbutton(misc_frame, text="Include Icons in Structure", variable=self.include_icons_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
+        self.high_contrast_var = tk.IntVar(value=self.settings.get('app', 'high_contrast', 0))
+        tk.Checkbutton(misc_frame, text="High Contrast Mode", variable=self.high_contrast_var, 
+                       command=self.toggle_high_contrast, bg='#2b2b2b', fg=self.text_color).pack(anchor="w", padx=5)
 
-        # Populate right_frame (unchanged from original)
         tk.Label(right_frame, text="File Extensions", font=("Arial", 12), bg='#2b2b2b', fg=self.text_color).pack(pady=(0, 5))
         search_frame = tk.Frame(right_frame, bg='#2b2b2b')
         search_frame.pack(fill="x")
@@ -295,12 +293,39 @@ class RepoPromptGUI:
                 self.extension_checkboxes[ext] = (cb, var, group_label)
                 row += 1
 
-        # Save button spanning all three columns
         save_button = self.create_button(main_frame, "Save Settings", self.save_app_settings, "Save application settings")
         save_button.grid(row=2, column=0, columnspan=3, pady=10)
 
+    def toggle_high_contrast(self):
+        if self.high_contrast_var.get():
+            self.text_color = '#000000'
+            self.button_bg = '#FFFFFF'
+            self.button_fg = '#000000'
+            self.header_color = '#0000FF'
+            self.status_color = '#FF0000'
+            self.folder_color = '#FFA500'
+            self.root.configure(bg='#FFFFFF')
+            self.left_frame.configure(bg='#FFFFFF')
+            self.right_frame.configure(bg='#FFFFFF')
+            self.content_frame.configure(bg='#FFFFFF')
+            self.structure_frame.configure(bg='#FFFFFF')
+            self.settings_frame.configure(bg='#FFFFFF')
+        else:
+            self.text_color = '#ffffff'
+            self.button_bg = '#4a4a4a'
+            self.button_fg = '#ffffff'
+            self.header_color = '#add8e6'
+            self.status_color = '#FF4500'
+            self.folder_color = '#FFD700'
+            self.root.configure(bg='#2b2b2b')
+            self.left_frame.configure(bg='#2b2b2b')
+            self.right_frame.configure(bg='#2b2b2b')
+            self.content_frame.configure(bg='#2b2b2b')
+            self.structure_frame.configure(bg='#2b2b2b')
+            self.settings_frame.configure(bg='#2b2b2b')
+        self.setup_ui()
+
     def filter_extensions(self, event):
-        """Filter displayed extensions based on search term."""
         search_term = self.search_extensions_entry.get().lower()
         for ext, (cb, var, group_label) in self.extension_checkboxes.items():
             group = group_label.cget("text")
@@ -312,7 +337,6 @@ class RepoPromptGUI:
                 cb.grid()
             else:
                 cb.grid_remove()
-                # Hide group if no extensions match
                 group_extensions = [e for e in self.file_handler.get_extension_groups()[group] if search_term in e.lower()]
                 if not group_extensions:
                     group_label.grid_remove()
@@ -330,7 +354,7 @@ class RepoPromptGUI:
 
     def create_button(self, parent, text, command, tooltip, state=tk.NORMAL):
         btn = tk.Button(parent, text=text, command=command, bg=self.button_bg, fg=self.button_fg, state=state)
-        btn.bind("<Enter>", lambda e: btn.config(bg="#5a5a5a"))
+        btn.bind("<Enter>", lambda e: btn.config(bg="#5a5a5a" if not self.high_contrast_var.get() else "#D3D3D3"))
         btn.bind("<Leave>", lambda e: btn.config(bg=self.button_bg))
         Tooltip(btn, tooltip)
         btn.config(takefocus=True)
@@ -485,6 +509,7 @@ class RepoPromptGUI:
         self.settings.set('app', 'exclude_files', {file: var.get() for file, var in self.exclude_file_vars.items()})
         self.settings.set('app', 'text_extensions', {ext: var.get() for ext, (cb, var, _) in self.extension_checkboxes.items()})
         self.settings.set('app', 'include_icons', self.include_icons_var.get())
+        self.settings.set('app', 'high_contrast', self.high_contrast_var.get())
         self.settings.save()
         self.show_status_message("Settings saved")
         self.apply_default_tab()
@@ -520,8 +545,12 @@ class RepoPromptGUI:
         template_file = tk.filedialog.askopenfilename(initialdir=self.template_dir, filetypes=[("Text files", "*.txt")], title="Load Template")
         if template_file:
             with open(template_file, 'r', encoding='utf-8') as file:
+                content = file.read()
+                if any(c in content for c in ['<script>', '<?php', 'eval(']):
+                    messagebox.showerror("Security Error", "Invalid template content detected.")
+                    return
                 self.base_prompt_text.delete(1.0, tk.END)
-                self.base_prompt_text.insert(tk.END, file.read())
+                self.base_prompt_text.insert(tk.END, content)
             self.show_status_message("Template loaded successfully!")
 
     def delete_template(self):

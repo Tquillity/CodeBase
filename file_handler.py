@@ -8,7 +8,6 @@ import threading
 import logging
 
 class FileHandler:
-    # Define text_extensions_default as a class attribute
     text_extensions_default = {
         '.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx', '.jsx',
         '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg', '.gitignore',
@@ -38,7 +37,6 @@ class FileHandler:
 
     @classmethod
     def get_extension_groups(cls):
-        """Returns a dictionary of file extensions organized into logical groups."""
         groups = {
             "Programming Languages": [
                 '.py', '.java', '.cpp', '.c', '.h', '.js', '.ts', '.tsx', '.jsx',
@@ -71,7 +69,6 @@ class FileHandler:
                 '.lock', '.srt', '.vtt', '.po', '.pot'
             ]
         }
-        # Add any remaining extensions to "Other"
         all_grouped = set(sum(groups.values(), []))
         other_extensions = cls.text_extensions_default - all_grouped
         if other_extensions:
@@ -79,7 +76,11 @@ class FileHandler:
         return groups
 
     def load_repo(self, folder):
-        self.repo_path = os.path.abspath(folder)
+        abs_path = os.path.abspath(folder)
+        if not os.path.commonpath([abs_path, os.path.expanduser("~")]).startswith(os.path.expanduser("~")):
+            messagebox.showerror("Security Error", "Access outside user directory is not allowed.")
+            return
+        self.repo_path = abs_path
         self.gui.update_recent_folders(self.repo_path)
         self.ignore_patterns = self.parse_gitignore(os.path.join(self.repo_path, '.gitignore'))
         
@@ -136,37 +137,36 @@ class FileHandler:
         ) and not excluded
 
     def generate_file_contents(self):
-        file_contents = []
-        for file_path in sorted(self.loaded_files):
-            if file_path not in self.content_cache:
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as file:
-                        self.content_cache[file_path] = file.read()
-                except Exception as e:
-                    logging.error(f"Error reading {file_path}: {str(e)}")
-                    messagebox.showerror("File Read Error", f"Failed to read {file_path}: {str(e)}")
-                    continue
-            file_contents.append(f"File: {file_path}\nContent:\n{self.content_cache[file_path]}\n===FILE_SEPARATOR===\n")
-        return ''.join(file_contents)
+        def content_generator():
+            for file_path in sorted(self.loaded_files):
+                if file_path not in self.content_cache:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as file:
+                            self.content_cache[file_path] = file.read()
+                    except FileNotFoundError:
+                        logging.error(f"File not found: {file_path}")
+                        messagebox.showerror("Error", f"File not found: {file_path}")
+                        continue
+                    except PermissionError:
+                        logging.error(f"Permission denied: {file_path}")
+                        messagebox.showerror("Error", f"Permission denied: {file_path}")
+                        continue
+                    except UnicodeDecodeError:
+                        logging.error(f"Cannot decode file: {file_path}")
+                        messagebox.showerror("Error", f"Cannot decode {file_path}: Not a text file")
+                        continue
+                    except Exception as e:
+                        logging.error(f"Error reading {file_path}: {str(e)}")
+                        messagebox.showerror("Error", f"Error reading {file_path}: {str(e)}")
+                        continue
+                yield f"File: {file_path}\nContent:\n{self.content_cache[file_path]}\n===FILE_SEPARATOR===\n"
+        return ''.join(content_generator())
 
     def populate_tree(self, root_dir):
         self.gui.tree.delete(*self.gui.tree.get_children())
         root_id = self.gui.tree.insert("", "end", text=f"📁 {os.path.basename(root_dir)}", 
-                                      values=(root_dir, "☑"), open=True, 
-                                      tags=('folder'))
-        self.build_tree(root_dir, root_id, selected=True)
-        expansion = self.gui.settings.get('app', 'expansion', 'Collapsed')
-        if expansion == 'Expanded':
-            self.expand_all()
-        elif expansion == 'Levels':
-            try:
-                levels = int(self.gui.settings.get('app', 'levels', '1'))
-                self.expand_levels(root_id, levels)
-            except ValueError:
-                self.collapse_all()
-        else:
-            self.collapse_all()
-        self.update_expand_collapse_button()
+                                      values=(root_dir, "☑"), open=False, tags=('folder'))
+        # Lazy loading: only expand when user opens the folder
 
     def build_tree(self, path, parent_id, selected=True):
         if self.is_ignored(path):
@@ -464,7 +464,9 @@ class FileHandler:
             text_widget.tag_remove("focused_highlight", "1.0", tk.END)
             start_pos = "1.0"
             while True:
-                pos = text_widget.search(query, start_pos, stopindex=tk.END, nocase=0)
+                pos = text_widget.search(query, start_pos, stopindex=tk.END, 
+                                        nocase=not self.gui.case_sensitive_var.get(), 
+                                        regexp=self.gui.whole_word_var.get())
                 if not pos:
                     break
                 end_pos = f"{pos}+{len(query)}c"

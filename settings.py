@@ -25,6 +25,8 @@ class SettingsManager:
             }
         if 'include_icons' not in settings['app']:
             settings['app']['include_icons'] = 1
+        if 'high_contrast' not in settings['app']:
+            settings['app']['high_contrast'] = 0
         return settings
 
     def save(self):
