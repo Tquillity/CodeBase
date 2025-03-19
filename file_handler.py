@@ -28,15 +28,6 @@ class FileHandler:
                                         '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm',
                                         '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', '.bib',
                                         '.sty', '.cls', '.cs', '.fs', '.fsx'}
-        self.text_extensions_enabled = {ext: tk.IntVar(value=1) for ext in self.text_extensions_default}
-        self.exclude_files_default = {
-            'package-lock.json': tk.IntVar(value=0),
-            'yarn.lock': tk.IntVar(value=0),
-            'composer.lock': tk.IntVar(value=0),
-            'Gemfile.lock': tk.IntVar(value=0),
-            'poetry.lock': tk.IntVar(value=0)
-        }
-        self.exclude_files = self.exclude_files_default.copy()
 
     def load_repo(self, folder):
         self.repo_path = os.path.abspath(folder)
@@ -87,10 +78,12 @@ class FileHandler:
         mime_type, _ = mimetypes.guess_type(file_path)
         ext = os.path.splitext(file_path)[1].lower()
         filename = os.path.basename(file_path)
-        excluded = filename in self.exclude_files and self.exclude_files[filename].get() == 1
+        exclude_files = self.gui.settings.get('app', 'exclude_files', {})
+        text_extensions = self.gui.settings.get('app', 'text_extensions', {ext: 1 for ext in self.text_extensions_default})
+        excluded = filename in exclude_files and exclude_files[filename] == 1
         return (
             (mime_type and mime_type.startswith('text')) or
-            (ext in self.text_extensions_default and self.text_extensions_enabled[ext].get() == 1)
+            (ext in self.text_extensions_default and text_extensions.get(ext, 1) == 1)
         ) and not excluded
 
     def generate_file_contents(self):
@@ -249,16 +242,14 @@ class FileHandler:
         content_changed = False
         item_path = self.gui.tree.item(item_id, "values")[0]
 
-        # Helper function to update loaded_files by traversing the file system
         def update_loaded_files(path, select):
             nonlocal content_changed
             for root, dirs, files in os.walk(path):
-                # Skip ignored directories if you have an is_ignored method
                 if hasattr(self, 'is_ignored') and self.is_ignored(root):
                     continue
                 for file in files:
                     file_path = os.path.normcase(os.path.join(root, file))
-                    if self.is_text_file(file_path):  # Check if it’s a text file
+                    if self.is_text_file(file_path):
                         if select:
                             if file_path not in self.loaded_files:
                                 self.loaded_files.add(file_path)
@@ -268,10 +259,8 @@ class FileHandler:
                                 self.loaded_files.discard(file_path)
                                 content_changed = True
 
-        # Update loaded_files for all files in the folder and its subfolders
         update_loaded_files(item_path, selected)
 
-        # Update the tree view for items that are already loaded
         for child in self.gui.tree.get_children(item_id):
             values = self.gui.tree.item(child, "values") or ()
             if not values:
@@ -289,7 +278,7 @@ class FileHandler:
                 if self.gui.tree.get_children(child):
                     self.update_folder_selection(child, selected)
 
-        self.update_tree_strikethrough()  # Update visual tags in the tree
+        self.update_tree_strikethrough()
         return content_changed
 
     def update_tree_strikethrough(self):
@@ -331,7 +320,7 @@ class FileHandler:
         def traverse(item_id, prefix="", indent=""):
             lines = []
             item_text = self.gui.tree.item(item_id, "text")
-            if self.gui.include_icons_var.get() == 0:
+            if self.gui.settings.get('app', 'include_icons', 1) == 0:
                 item_text = item_text[2:]
             lines.append(f"{indent}{prefix}{item_text}")
             children = self.gui.tree.get_children(item_id)

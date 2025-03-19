@@ -1,7 +1,6 @@
 import os
 import json
 import appdirs
-import tkinter as tk
 
 class SettingsManager:
     def __init__(self):
@@ -13,8 +12,20 @@ class SettingsManager:
     def load_settings(self):
         if os.path.exists(self.settings_file):
             with open(self.settings_file, 'r') as f:
-                return json.load(f)
-        return {"app": {}, "repo": {"extensions": {}, "exclude": {}}}
+                settings = json.load(f)
+        else:
+            settings = {"app": {}, "repo": {}}
+        if 'exclude_files' not in settings['app']:
+            settings['app']['exclude_files'] = {
+                'package-lock.json': 1,
+                'yarn.lock': 1,
+                'composer.lock': 1,
+                'Gemfile.lock': 1,
+                'poetry.lock': 1
+            }
+        if 'include_icons' not in settings['app']:
+            settings['app']['include_icons'] = 1
+        return settings
 
     def save(self):
         with open(self.settings_file, 'w') as f:
@@ -27,17 +38,3 @@ class SettingsManager:
         if section not in self.settings:
             self.settings[section] = {}
         self.settings[section][key] = value
-
-    def load_repo_settings(self, text_extensions_enabled, exclude_files):
-        repo_settings = self.settings.get("repo", {})
-        for ext in text_extensions_enabled:
-            text_extensions_enabled[ext].set(repo_settings.get("extensions", {}).get(ext, 1))
-        for file in exclude_files:
-            exclude_files[file].set(repo_settings.get("exclude", {}).get(file, 0))
-
-    def save_repo_settings(self, text_extensions_enabled, exclude_files):
-        self.settings["repo"] = {
-            "extensions": {ext: text_extensions_enabled[ext].get() for ext in text_extensions_enabled},
-            "exclude": {file: exclude_files[file].get() for file in exclude_files}
-        }
-        self.save()

@@ -1,7 +1,7 @@
 import os
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
-from widgets import Tooltip, FolderDialog, SettingsDialog
+from widgets import Tooltip, FolderDialog
 from file_handler import FileHandler
 from settings import SettingsManager
 import appdirs
@@ -15,7 +15,6 @@ class RepoPromptGUI:
         self.root.configure(bg='#2b2b2b')
         self.settings = SettingsManager()
         
-        # Colors
         self.text_color = '#ffffff'
         self.button_bg = '#4a4a4a'
         self.button_fg = '#ffffff'
@@ -23,9 +22,7 @@ class RepoPromptGUI:
         self.status_color = '#FF4500'
         self.folder_color = '#FFD700'
 
-        # Variables
         self.prepend_var = tk.IntVar()
-        self.include_icons_var = tk.IntVar(value=1)
         self.show_unloaded_var = tk.IntVar(value=0)
         self.expand_collapse_var = tk.BooleanVar(value=True)
         self.content_expand_collapse_var = tk.BooleanVar(value=True)
@@ -38,7 +35,6 @@ class RepoPromptGUI:
         self.file_states = {}
         self.recent_folders = self.load_recent_folders()
 
-        # Progress bar
         self.progress = ttk.Progressbar(self.root, mode='indeterminate')
 
         self.file_handler = FileHandler(self)
@@ -81,8 +77,6 @@ class RepoPromptGUI:
         self.select_button.pack(pady=5)
         self.refresh_button = self.add_button(self.left_frame, "Refresh (Ctrl+F5)", self.refresh_repo, "Refresh current repository", state=tk.DISABLED)
         self.refresh_button.pack(pady=5)
-        self.settings_button = self.add_button(self.left_frame, "Repo Settings", self.open_repo_settings, "Customize file reading settings")
-        self.settings_button.pack(pady=5)
         self.info_label = tk.Label(self.left_frame, text="Token Count: 0", bg='#2b2b2b', fg=self.text_color)
         self.info_label.pack(pady=5)
         self.copy_button = self.add_button(self.left_frame, "Copy Contents (Ctrl+C)", self.file_handler.copy_contents, "Copy selected contents", state=tk.DISABLED)
@@ -94,9 +88,6 @@ class RepoPromptGUI:
         Tooltip(self.prepend_checkbox, "Include Base Prompt in copied content")
         self.copy_structure_button = self.add_button(self.left_frame, "Copy Structure (Ctrl+S)", self.file_handler.copy_structure, "Copy folder structure", state=tk.DISABLED)
         self.copy_structure_button.pack(pady=5)
-        self.include_icons_checkbox = tk.Checkbutton(self.left_frame, text="Include Icons in Structure", variable=self.include_icons_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
-        self.include_icons_checkbox.pack(pady=5)
-        Tooltip(self.include_icons_checkbox, "Toggle icons ON and OFF in structure copy + paste")
         
         clear_button_frame = tk.Frame(self.left_frame, bg='#2b2b2b')
         clear_button_frame.pack(side='bottom', fill='x')
@@ -137,7 +128,6 @@ class RepoPromptGUI:
         self.search_entry.bind("<Down>", lambda e: self.file_handler.next_match())
         self.search_entry.bind("<Up>", lambda e: self.file_handler.prev_match())
 
-        # Content Preview tab with Expand/Collapse button
         self.content_frame = tk.Frame(self.notebook, bg='#2b2b2b')
         self.notebook.add(self.content_frame, text="Content Preview")
         content_button_frame = tk.Frame(self.content_frame, bg='#2b2b2b')
@@ -151,7 +141,6 @@ class RepoPromptGUI:
         self.content_text.bind("<Motion>", self.on_mouse_move)
         self.content_text.bind("<Leave>", lambda event: self.content_text.config(cursor=""))
 
-        # Folder Structure tab with corrected Treeview configuration
         self.structure_frame = tk.Frame(self.notebook, bg='#2b2b2b')
         self.notebook.add(self.structure_frame, text="Folder Structure")
         structure_button_frame = tk.Frame(self.structure_frame, bg='#2b2b2b')
@@ -162,20 +151,19 @@ class RepoPromptGUI:
         self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=5)
         Tooltip(self.show_unloaded_checkbox, "Highlights files that are not loaded in the Content Preview and its Ctrl+C")
         self.tree = ttk.Treeview(self.structure_frame, columns=("path", "checkbox"), show=["tree", "headings"], style="Custom.Treeview")
-        self.tree.column("#0", width=300)  # Tree column (Name)
-        self.tree.column("path", width=0, stretch=tk.NO)  # Hidden path column
-        self.tree.column("checkbox", width=30, anchor="center")  # Checkbox column
+        self.tree.column("#0", width=300)
+        self.tree.column("path", width=0, stretch=tk.NO)
+        self.tree.column("checkbox", width=30, anchor="center")
         self.tree.heading("#0", text="Name")
         self.tree.heading("checkbox", text="Select/Deselect")
         self.tree.pack(fill="both", expand=True)
         style.configure("Custom.Treeview", background="#3c3c3c", foreground=self.text_color, fieldbackground="#3c3c3c")
         style.map("Custom.Treeview", background=[('selected', '#4a4a4a')])
-        # Define state-specific tags
-        self.tree.tag_configure('folder', foreground=self.folder_color)  # Yellow for folders
-        self.tree.tag_configure('file_selected', foreground='#00FF00')  # Green for selected text files
-        self.tree.tag_configure('file_unloaded', foreground='red', font=(None, -10, 'overstrike'))  # Red with strikethrough for unloaded text files
-        self.tree.tag_configure('file_default', foreground=self.text_color)  # White for deselected text files
-        self.tree.tag_configure('file_nontext', foreground='gray')  # Gray for non-text files
+        self.tree.tag_configure('folder', foreground=self.folder_color)
+        self.tree.tag_configure('file_selected', foreground='#00FF00')
+        self.tree.tag_configure('file_unloaded', foreground='red', font=(None, -10, 'overstrike'))
+        self.tree.tag_configure('file_default', foreground=self.text_color)
+        self.tree.tag_configure('file_nontext', foreground='gray')
         scrollbar = ttk.Scrollbar(self.structure_frame, orient="vertical", command=self.tree.yview)
         scrollbar.pack(side="right", fill="y")
         self.tree.configure(yscrollcommand=scrollbar.set)
@@ -214,36 +202,72 @@ class RepoPromptGUI:
 
         tk.Label(main_frame, text="Application Settings", font=("Arial", 14), bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
 
-        default_frame = tk.LabelFrame(main_frame, text="Default Tab", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
-        default_frame.grid(row=1, column=0, sticky="ew", pady=5)
+        left_frame = tk.Frame(main_frame, bg='#2b2b2b')
+        left_frame.grid(row=1, column=0, sticky="n")
+
+        right_frame = tk.Frame(main_frame, bg='#2b2b2b')
+        right_frame.grid(row=1, column=1, sticky="n")
+
+        default_frame = tk.LabelFrame(left_frame, text="Default Tab", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
+        default_frame.pack(pady=5, fill="x")
         Tooltip(default_frame, "Set the default tab on startup")
         self.default_tab_var = tk.StringVar(value=self.settings.get('app', 'default_tab', 'Content Preview'))
         for i, tab in enumerate(["Content Preview", "Folder Structure", "Base Prompt", "Settings"]):
-            tk.Radiobutton(default_frame, text=tab, variable=self.default_tab_var, value=tab, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=i, column=0, sticky="w", padx=5)
+            tk.Radiobutton(default_frame, text=tab, variable=self.default_tab_var, value=tab, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
 
-        expansion_frame = tk.LabelFrame(main_frame, text="Folder Expansion", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
-        expansion_frame.grid(row=2, column=0, sticky="ew", pady=5)
+        expansion_frame = tk.LabelFrame(left_frame, text="Folder Expansion", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
+        expansion_frame.pack(pady=5, fill="x")
         Tooltip(expansion_frame, "Control folder expansion on load")
         self.expansion_var = tk.StringVar(value=self.settings.get('app', 'expansion', 'Collapsed'))
-        tk.Radiobutton(expansion_frame, text="Fully Expanded", variable=self.expansion_var, value="Expanded", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=0, column=0, sticky="w", padx=5)
-        tk.Radiobutton(expansion_frame, text="Collapsed", variable=self.expansion_var, value="Collapsed", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=1, column=0, sticky="w", padx=5)
-        tk.Radiobutton(expansion_frame, text="Load X levels", variable=self.expansion_var, value="Levels", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=2, column=0, sticky="w", padx=5)
+        tk.Radiobutton(expansion_frame, text="Fully Expanded", variable=self.expansion_var, value="Expanded", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
+        tk.Radiobutton(expansion_frame, text="Collapsed", variable=self.expansion_var, value="Collapsed", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
+        tk.Radiobutton(expansion_frame, text="Load X levels", variable=self.expansion_var, value="Levels", bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
         self.levels_entry = tk.Entry(expansion_frame, bg='#3c3c3c', fg=self.text_color, width=5)
         self.levels_entry.insert(0, self.settings.get('app', 'levels', '1'))
-        self.levels_entry.grid(row=2, column=1, padx=5, sticky="w")
+        self.levels_entry.pack(side="left", padx=5)
         Tooltip(self.levels_entry, "Number of folder levels to expand")
 
-        exclude_frame = tk.LabelFrame(main_frame, text="Exclude Options", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
-        exclude_frame.grid(row=3, column=0, sticky="ew", pady=5)
+        exclude_frame = tk.LabelFrame(left_frame, text="Exclude Options", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
+        exclude_frame.pack(pady=5, fill="x")
         self.exclude_node_modules_var = tk.IntVar(value=self.settings.get('app', 'exclude_node_modules', 1))
+        tk.Checkbutton(exclude_frame, text="Always exclude 'node_modules' folders", variable=self.exclude_node_modules_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
         self.exclude_dist_var = tk.IntVar(value=self.settings.get('app', 'exclude_dist', 1))
-        tk.Checkbutton(exclude_frame, text="Always exclude 'node_modules' folders", variable=self.exclude_node_modules_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=0, column=0, sticky="w", padx=5)
-        Tooltip(exclude_frame, "Permanently exclude all 'node_modules' folders and their contents")
-        tk.Checkbutton(exclude_frame, text="Always exclude 'dist' folders", variable=self.exclude_dist_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=1, column=0, sticky="w", padx=5)
-        Tooltip(exclude_frame, "Permanently exclude all 'dist' folders and their contents")
+        tk.Checkbutton(exclude_frame, text="Always exclude 'dist' folders", variable=self.exclude_dist_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
+        self.exclude_file_vars = {}
+        exclude_files = self.settings.get('app', 'exclude_files', {'package-lock.json': 1, 'yarn.lock': 1, 'composer.lock': 1, 'Gemfile.lock': 1, 'poetry.lock': 1})
+        for file in sorted(exclude_files.keys()):
+            var = tk.IntVar(value=exclude_files[file])
+            cb = tk.Checkbutton(exclude_frame, text=f"Exclude {file}", variable=var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
+            cb.pack(anchor="w", padx=5)
+            self.exclude_file_vars[file] = var
+
+        misc_frame = tk.LabelFrame(left_frame, text="Miscellaneous", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
+        misc_frame.pack(pady=5, fill="x")
+        self.include_icons_var = tk.IntVar(value=self.settings.get('app', 'include_icons', 1))
+        tk.Checkbutton(misc_frame, text="Include Icons in Structure", variable=self.include_icons_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
+
+        tk.Label(right_frame, text="File Extensions", font=("Arial", 12), bg='#2b2b2b', fg=self.text_color).pack(pady=(0, 5))
+        ext_canvas = tk.Canvas(right_frame, bg='#2b2b2b', width=400, height=400)
+        ext_scrollbar = ttk.Scrollbar(right_frame, orient="vertical", command=ext_canvas.yview)
+        ext_scrollable_frame = tk.Frame(ext_canvas, bg='#2b2b2b')
+        ext_scrollable_frame.bind("<Configure>", lambda e: ext_canvas.configure(scrollregion=ext_canvas.bbox("all")))
+        ext_canvas.create_window((0, 0), window=ext_scrollable_frame, anchor="nw")
+        ext_canvas.configure(yscrollcommand=ext_scrollbar.set)
+        ext_canvas.pack(side="left", fill="both", expand=True)
+        ext_scrollbar.pack(side="right", fill="y")
+
+        num_columns = 4  # Defines 4 columns for file extension checkboxes
+        self.text_extension_vars = {}
+        text_extensions_default = self.file_handler.text_extensions_default
+        saved_extensions = self.settings.get('app', 'text_extensions', {ext: 1 for ext in text_extensions_default})
+        for i, ext in enumerate(sorted(text_extensions_default)):
+            var = tk.IntVar(value=saved_extensions.get(ext, 1))
+            cb = tk.Checkbutton(ext_scrollable_frame, text=ext, variable=var, bg='#2b2b2b', fg='#ffffff', selectcolor='#4a4a4a')
+            cb.grid(row=i // num_columns, column=i % num_columns, sticky="w", padx=5, pady=2)
+            self.text_extension_vars[ext] = var
 
         save_button = self.add_button(main_frame, "Save Settings", self.save_app_settings, "Save application settings")
-        save_button.grid(row=4, column=0, pady=10)
+        save_button.grid(row=2, column=0, columnspan=2, pady=10)
 
     def setup_ui(self):
         self.menu = tk.Menu(self.root, bg=self.button_bg, fg=self.button_fg)
@@ -446,9 +470,6 @@ class RepoPromptGUI:
             self.progress.stop()
             self.progress.grid_forget()
 
-    def open_repo_settings(self):
-        SettingsDialog(self.root, self.file_handler, self.settings).show()
-
     def jump_to_file_content(self, event):
         item_id = self.tree.identify_row(event.y)
         if 'file_selected' in self.tree.item(item_id, "tags") or 'file_default' in self.tree.item(item_id, "tags") or 'file_unloaded' in self.tree.item(item_id, "tags"):
@@ -465,9 +486,15 @@ class RepoPromptGUI:
         self.settings.set('app', 'levels', self.levels_entry.get())
         self.settings.set('app', 'exclude_node_modules', self.exclude_node_modules_var.get())
         self.settings.set('app', 'exclude_dist', self.exclude_dist_var.get())
+        self.settings.set('app', 'exclude_files', {file: var.get() for file, var in self.exclude_file_vars.items()})
+        self.settings.set('app', 'text_extensions', {ext: var.get() for ext, var in self.text_extension_vars.items()})
+        self.settings.set('app', 'include_icons', self.include_icons_var.get())
         self.settings.save()
         self.show_status_message("Settings saved")
         self.apply_default_tab()
+        if self.file_handler.repo_path:
+            self.file_handler.load_repo(self.file_handler.repo_path)
+            self.refresh_ui()
 
     def apply_default_tab(self):
         default_tab = self.settings.get('app', 'default_tab', 'Content Preview')
