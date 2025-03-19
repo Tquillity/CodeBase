@@ -256,7 +256,7 @@ class RepoPromptGUI:
         ext_canvas.pack(side="left", fill="both", expand=True)
         ext_scrollbar.pack(side="right", fill="y")
 
-        num_columns = 4  # Defines 4 columns for file extension checkboxes
+        num_columns = 4
         self.text_extension_vars = {}
         text_extensions_default = self.file_handler.text_extensions_default
         saved_extensions = self.settings.get('app', 'text_extensions', {ext: 1 for ext in text_extensions_default})
