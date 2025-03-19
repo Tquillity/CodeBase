@@ -96,7 +96,7 @@ class RepoPromptGUI:
         self.copy_structure_button.pack(pady=5)
         self.include_icons_checkbox = tk.Checkbutton(self.left_frame, text="Include Icons in Structure", variable=self.include_icons_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.include_icons_checkbox.pack(pady=5)
-        Tooltip(self.include_icons_checkbox, "Toggle icons ON and OFF  in structure")
+        Tooltip(self.include_icons_checkbox, "Toggle icons ON and OFF in structure copy + paste")
         
         clear_button_frame = tk.Frame(self.left_frame, bg='#2b2b2b')
         clear_button_frame.pack(side='bottom', fill='x')
