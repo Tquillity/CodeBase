@@ -4,7 +4,8 @@ import fnmatch
 import mimetypes
 import tkinter as tk
 from tkinter import messagebox
-from threading import Thread
+import threading
+import logging
 
 class FileHandler:
     def __init__(self, gui):
@@ -15,6 +16,8 @@ class FileHandler:
         self.loaded_files = set()
         self.ignore_patterns = []
         self.recent_folders = gui.file_handler.recent_folders if hasattr(gui, 'file_handler') else gui.load_recent_folders()
+        self.content_cache = {}
+        self.lock = threading.Lock()
         
         self.text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx',
                                         '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg',
@@ -89,12 +92,15 @@ class FileHandler:
     def generate_file_contents(self):
         file_contents = []
         for file_path in sorted(self.loaded_files):
-            try:
-                with open(file_path, 'r', encoding='utf-8') as file:
-                    content = file.read()
-                    file_contents.append(f"File: {file_path}\nContent:\n{content}\n===FILE_SEPARATOR===\n")
-            except Exception as e:
-                print(f"Error reading {file_path}: {str(e)}")
+            if file_path not in self.content_cache:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as file:
+                        self.content_cache[file_path] = file.read()
+                except Exception as e:
+                    logging.error(f"Error reading {file_path}: {str(e)}")
+                    messagebox.showerror("File Read Error", f"Failed to read {file_path}: {str(e)}")
+                    continue
+            file_contents.append(f"File: {file_path}\nContent:\n{self.content_cache[file_path]}\n===FILE_SEPARATOR===\n")
         return ''.join(file_contents)
 
     def populate_tree(self, root_dir):
@@ -203,40 +209,41 @@ class FileHandler:
         self.gui.info_label.config(text=f"Token Count: {self.token_count:,}".replace(",", " "))
 
     def toggle_selection(self, event):
-        region = self.gui.tree.identify_region(event.x, event.y)
-        if region == "cell":
-            column = self.gui.tree.identify_column(event.x)
-            if column == "#2":
-                item_id = self.gui.tree.identify_row(event.y)
-                values = self.gui.tree.item(item_id, "values")
-                current_state = values[1]
-                new_state = "☐" if current_state == "☑" else "☑"
-                item_path = values[0]
-                content_changed = False
+        with self.lock:
+            region = self.gui.tree.identify_region(event.x, event.y)
+            if region == "cell":
+                column = self.gui.tree.identify_column(event.x)
+                if column == "#2":
+                    item_id = self.gui.tree.identify_row(event.y)
+                    values = self.gui.tree.item(item_id, "values")
+                    current_state = values[1]
+                    new_state = "☐" if current_state == "☑" else "☑"
+                    item_path = values[0]
+                    content_changed = False
 
-                if os.path.isfile(item_path) and self.is_text_file(item_path):
-                    if new_state == "☑":
-                        self.loaded_files.add(item_path)
-                        tags = ['file_selected']
+                    if os.path.isfile(item_path) and self.is_text_file(item_path):
+                        if new_state == "☑":
+                            self.loaded_files.add(item_path)
+                            tags = ['file_selected']
+                        else:
+                            self.loaded_files.discard(item_path)
+                            tags = ['file_default']
+                        self.gui.tree.item(item_id, values=(values[0], new_state), tags=tags)
+                        content_changed = True
+                    elif os.path.isdir(item_path):
+                        self.gui.tree.item(item_id, values=(values[0], new_state))
+                        content_changed = self.update_folder_selection(item_id, new_state == "☑")
                     else:
-                        self.loaded_files.discard(item_path)
-                        tags = ['file_default']
-                    self.gui.tree.item(item_id, values=(values[0], new_state), tags=tags)
-                    content_changed = True
-                elif os.path.isdir(item_path):
-                    self.gui.tree.item(item_id, values=(values[0], new_state))
-                    content_changed = self.update_folder_selection(item_id, new_state == "☑")
-                else:
-                    messagebox.showinfo("Info", "Only text files can be selected.")
-                    return
+                        messagebox.showinfo("Info", "Only text files can be selected.")
+                        return
 
-                self.update_tree_strikethrough()
+                    self.update_tree_strikethrough()
 
-                if content_changed:
-                    self.file_contents = self.generate_file_contents()
-                    self.token_count = len(self.file_contents.split())
-                    self.gui.update_content_preview()
-                    self.gui.info_label.config(text=f"Token Count: {self.token_count:,}".replace(",", " "))
+                    if content_changed:
+                        self.file_contents = self.generate_file_contents()
+                        self.token_count = len(self.file_contents.split())
+                        self.gui.root.after(0, self.gui.update_content_preview)
+                        self.gui.root.after(0, lambda: self.gui.info_label.config(text=f"Token Count: {self.token_count:,}".replace(",", " ")))
 
     def update_folder_selection(self, item_id, selected):
         content_changed = False
@@ -532,3 +539,51 @@ class FileHandler:
                 self.gui.tree.see(item)
                 self.gui.tree.selection_set(item)
             self.gui.current_match_index[current_tab] = index
+
+    def find_all(self):
+        query = self.gui.search_var.get()
+        if not query:
+            return
+        current_tab = self.gui.notebook.index(self.gui.notebook.select())
+        if current_tab == 3:
+            return
+        matches = []
+        if current_tab in [0, 2]:
+            text_widget = self.gui.content_text if current_tab == 0 else self.gui.base_prompt_text
+            if current_tab == 0:
+                text_widget.config(state=tk.NORMAL)
+            text_widget.tag_remove("highlight", "1.0", tk.END)
+            text_widget.tag_remove("focused_highlight", "1.0", tk.END)
+            start_pos = "1.0"
+            while True:
+                pos = text_widget.search(query, start_pos, stopindex=tk.END, nocase=not self.gui.case_sensitive_var.get())
+                if not pos:
+                    break
+                end_pos = f"{pos}+{len(query)}c"
+                matches.append((pos, end_pos))
+                start_pos = end_pos
+            text_widget.tag_config("highlight", background="#FFFF00", foreground="#000000")
+            for match in matches:
+                text_widget.tag_add("highlight", match[0], match[1])
+            if current_tab == 0:
+                text_widget.config(state=tk.DISABLED)
+        elif current_tab == 1:
+            self.gui.tree.tag_configure("highlight", background="#FFFF00", foreground="#000000")
+            def collect_matches(item):
+                item_text = self.gui.tree.item(item, "text")
+                if query.lower() in item_text.lower() if not self.gui.case_sensitive_var.get() else query in item_text:
+                    matches.append(item)
+                for child in self.gui.tree.get_children(item):
+                    collect_matches(child)
+            if self.gui.tree.get_children():
+                collect_matches(self.gui.tree.get_children()[0])
+            for match in matches:
+                tags = [t for t in self.gui.tree.item(match, "tags") if t not in ("highlight", "focused_highlight")]
+                tags.append("highlight")
+                self.gui.tree.item(match, tags=tags)
+        self.gui.match_positions[current_tab] = matches
+        self.gui.current_match_index[current_tab] = -1
+        if matches:
+            self.gui.show_status_message("All matches highlighted")
+        else:
+            self.gui.show_status_message("No matches found")

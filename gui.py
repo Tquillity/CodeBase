@@ -73,27 +73,27 @@ class RepoPromptGUI:
         self.left_frame = tk.Frame(self.root, bg='#2b2b2b')
         self.left_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ns")
         tk.Frame(self.root, bg='#4a4a4a', width=1).grid(row=2, column=1, sticky="ns", padx=5)
-        self.select_button = self.add_button(self.left_frame, "Select Repo (Ctrl+R)", self.select_repo, "Choose a repository folder")
+        self.select_button = self.create_button(self.left_frame, "Select Repo (Ctrl+R)", self.select_repo, "Choose a repository folder")
         self.select_button.pack(pady=5)
-        self.refresh_button = self.add_button(self.left_frame, "Refresh (Ctrl+F5)", self.refresh_repo, "Refresh current repository", state=tk.DISABLED)
+        self.refresh_button = self.create_button(self.left_frame, "Refresh (Ctrl+F5)", self.refresh_repo, "Refresh current repository", state=tk.DISABLED)
         self.refresh_button.pack(pady=5)
         self.info_label = tk.Label(self.left_frame, text="Token Count: 0", bg='#2b2b2b', fg=self.text_color)
         self.info_label.pack(pady=5)
-        self.copy_button = self.add_button(self.left_frame, "Copy Contents (Ctrl+C)", self.file_handler.copy_contents, "Copy selected contents", state=tk.DISABLED)
+        self.copy_button = self.create_button(self.left_frame, "Copy Contents (Ctrl+C)", self.file_handler.copy_contents, "Copy selected contents", state=tk.DISABLED)
         self.copy_button.pack(pady=5)
-        self.copy_all_button = self.add_button(self.left_frame, "Copy All (Ctrl+A)", self.file_handler.copy_all, "Copy prompt, contents, structure", state=tk.DISABLED)
+        self.copy_all_button = self.create_button(self.left_frame, "Copy All (Ctrl+A)", self.file_handler.copy_all, "Copy prompt, contents, structure", state=tk.DISABLED)
         self.copy_all_button.pack(pady=5)
         self.prepend_checkbox = tk.Checkbutton(self.left_frame, text="Prepend Base Prompt", variable=self.prepend_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.prepend_checkbox.pack(pady=5)
         Tooltip(self.prepend_checkbox, "Include Base Prompt in copied content")
-        self.copy_structure_button = self.add_button(self.left_frame, "Copy Structure (Ctrl+S)", self.file_handler.copy_structure, "Copy folder structure", state=tk.DISABLED)
+        self.copy_structure_button = self.create_button(self.left_frame, "Copy Structure (Ctrl+S)", self.file_handler.copy_structure, "Copy folder structure", state=tk.DISABLED)
         self.copy_structure_button.pack(pady=5)
         
         clear_button_frame = tk.Frame(self.left_frame, bg='#2b2b2b')
         clear_button_frame.pack(side='bottom', fill='x')
-        self.clear_button = self.add_button(clear_button_frame, "Clear", self.clear_current, "Clear data in current tab")
+        self.clear_button = self.create_button(clear_button_frame, "Clear", self.clear_current, "Clear data in current tab")
         self.clear_button.pack(pady=5)
-        self.clear_all_button = self.add_button(clear_button_frame, "Clear All", self.clear_all, "Clear data in all tabs")
+        self.clear_all_button = self.create_button(clear_button_frame, "Clear All", self.clear_all, "Clear data in all tabs")
         self.clear_all_button.pack(pady=5)
 
     def setup_right_frame(self):
@@ -117,12 +117,16 @@ class RepoPromptGUI:
         self.search_entry = tk.Entry(search_frame, textvariable=self.search_var, bg='#3c3c3c', fg=self.text_color, insertbackground=self.text_color, width=60, font=("Arial", 12))
         self.search_entry.pack(side=tk.LEFT, padx=5, pady=2, ipady=5)
         Tooltip(self.search_entry, "Enter text to search in current tab")
-        self.search_button = self.add_button(search_frame, "Search", self.file_handler.search_tab, "Search current tab")
+        self.search_button = self.create_button(search_frame, "Search", self.file_handler.search_tab, "Search current tab")
         self.search_button.pack(side=tk.LEFT, padx=5)
-        self.next_button = self.add_button(search_frame, "Next", self.file_handler.next_match, "Next match")
+        self.next_button = self.create_button(search_frame, "Next", self.file_handler.next_match, "Next match")
         self.next_button.pack(side=tk.LEFT, padx=5)
-        self.prev_button = self.add_button(search_frame, "Prev", self.file_handler.prev_match, "Previous match")
+        self.prev_button = self.create_button(search_frame, "Prev", self.file_handler.prev_match, "Previous match")
         self.prev_button.pack(side=tk.LEFT, padx=5)
+        self.find_all_button = self.create_button(search_frame, "Find All", self.file_handler.find_all, "Highlight all matches")
+        self.find_all_button.pack(side=tk.LEFT, padx=5)
+        self.case_sensitive_var = tk.IntVar()
+        tk.Checkbutton(search_frame, text="Case Sensitive", variable=self.case_sensitive_var, bg='#2b2b2b', fg=self.text_color).pack(side=tk.LEFT)
         self.search_entry.bind("<Return>", lambda e: self.file_handler.search_tab())
         self.search_entry.bind("<KP_Enter>", lambda e: self.file_handler.search_tab())
         self.search_entry.bind("<Down>", lambda e: self.file_handler.next_match())
@@ -132,7 +136,7 @@ class RepoPromptGUI:
         self.notebook.add(self.content_frame, text="Content Preview")
         content_button_frame = tk.Frame(self.content_frame, bg='#2b2b2b')
         content_button_frame.pack(side=tk.TOP, fill='x', pady=5)
-        self.content_expand_collapse_button = self.add_button(content_button_frame, "Expand All", self.toggle_content_all, "Expand/collapse all file contents")
+        self.content_expand_collapse_button = self.create_button(content_button_frame, "Expand All", self.toggle_content_all, "Expand/collapse all file contents")
         self.content_expand_collapse_button.pack(pady=5)
         self.content_text = scrolledtext.ScrolledText(self.content_frame, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10), state=tk.NORMAL)
         self.content_text.pack(fill="both", expand=True)
@@ -145,7 +149,7 @@ class RepoPromptGUI:
         self.notebook.add(self.structure_frame, text="Folder Structure")
         structure_button_frame = tk.Frame(self.structure_frame, bg='#2b2b2b')
         structure_button_frame.pack(side=tk.TOP, fill='x', pady=5)
-        self.expand_collapse_button = self.add_button(structure_button_frame, "Expand All", self.file_handler.toggle_expand_collapse, "Expand/collapse folders")
+        self.expand_collapse_button = self.create_button(structure_button_frame, "Expand All", self.file_handler.toggle_expand_collapse, "Expand/collapse folders")
         self.expand_collapse_button.pack(side=tk.LEFT, padx=5)
         self.show_unloaded_checkbox = tk.Checkbutton(structure_button_frame, text="Strike Through Unloaded Files", variable=self.show_unloaded_var, command=self.file_handler.update_tree_strikethrough, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=5)
@@ -178,11 +182,11 @@ class RepoPromptGUI:
         self.notebook.add(self.base_prompt_text, text="Base Prompt")
         button_frame = tk.Frame(self.base_prompt_text.master, bg='#2b2b2b')
         button_frame.pack(pady=10)
-        self.save_template_button = self.add_button(button_frame, "Save Template (Ctrl+T)", self.save_template, "Save current prompt as template")
+        self.save_template_button = self.create_button(button_frame, "Save Template (Ctrl+T)", self.save_template, "Save current prompt as template")
         self.save_template_button.pack(side=tk.LEFT, padx=5)
-        self.load_template_button = self.add_button(button_frame, "Load Template (Ctrl+L)", self.load_template, "Load a saved template")
+        self.load_template_button = self.create_button(button_frame, "Load Template (Ctrl+L)", self.load_template, "Load a saved template")
         self.load_template_button.pack(side=tk.LEFT, padx=5)
-        self.delete_template_button = self.add_button(button_frame, "Delete Template", self.delete_template, "Delete a saved template")
+        self.delete_template_button = self.create_button(button_frame, "Delete Template", self.delete_template, "Delete a saved template")
         self.delete_template_button.pack(side=tk.LEFT, padx=5)
 
         self.settings_frame = tk.Frame(self.notebook, bg='#2b2b2b')
@@ -247,26 +251,15 @@ class RepoPromptGUI:
         tk.Checkbutton(misc_frame, text="Include Icons in Structure", variable=self.include_icons_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
 
         tk.Label(right_frame, text="File Extensions", font=("Arial", 12), bg='#2b2b2b', fg=self.text_color).pack(pady=(0, 5))
-        ext_canvas = tk.Canvas(right_frame, bg='#2b2b2b', width=400, height=400)
-        ext_scrollbar = ttk.Scrollbar(right_frame, orient="vertical", command=ext_canvas.yview)
-        ext_scrollable_frame = tk.Frame(ext_canvas, bg='#2b2b2b')
-        ext_scrollable_frame.bind("<Configure>", lambda e: ext_canvas.configure(scrollregion=ext_canvas.bbox("all")))
-        ext_canvas.create_window((0, 0), window=ext_scrollable_frame, anchor="nw")
-        ext_canvas.configure(yscrollcommand=ext_scrollbar.set)
-        ext_canvas.pack(side="left", fill="both", expand=True)
-        ext_scrollbar.pack(side="right", fill="y")
+        ext_listbox = tk.Listbox(right_frame, bg='#3c3c3c', fg=self.text_color, height=15)
+        ext_listbox.pack(fill="both", expand=True)
+        scrollbar = ttk.Scrollbar(right_frame, orient="vertical", command=ext_listbox.yview)
+        ext_listbox.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        for ext in sorted(self.file_handler.text_extensions_default):
+            ext_listbox.insert(tk.END, ext)
 
-        num_columns = 4
-        self.text_extension_vars = {}
-        text_extensions_default = self.file_handler.text_extensions_default
-        saved_extensions = self.settings.get('app', 'text_extensions', {ext: 1 for ext in text_extensions_default})
-        for i, ext in enumerate(sorted(text_extensions_default)):
-            var = tk.IntVar(value=saved_extensions.get(ext, 1))
-            cb = tk.Checkbutton(ext_scrollable_frame, text=ext, variable=var, bg='#2b2b2b', fg='#ffffff', selectcolor='#4a4a4a')
-            cb.grid(row=i // num_columns, column=i % num_columns, sticky="w", padx=5, pady=2)
-            self.text_extension_vars[ext] = var
-
-        save_button = self.add_button(main_frame, "Save Settings", self.save_app_settings, "Save application settings")
+        save_button = self.create_button(main_frame, "Save Settings", self.save_app_settings, "Save application settings")
         save_button.grid(row=2, column=0, columnspan=2, pady=10)
 
     def setup_ui(self):
@@ -280,11 +273,12 @@ class RepoPromptGUI:
         self.setup_right_frame()
         self.setup_status_bar()
 
-    def add_button(self, parent, text, command, tooltip, state=tk.NORMAL):
+    def create_button(self, parent, text, command, tooltip, state=tk.NORMAL):
         btn = tk.Button(parent, text=text, command=command, bg=self.button_bg, fg=self.button_fg, state=state)
         btn.bind("<Enter>", lambda e: btn.config(bg="#5a5a5a"))
         btn.bind("<Leave>", lambda e: btn.config(bg=self.button_bg))
         Tooltip(btn, tooltip)
+        btn.config(takefocus=True)
         return btn
 
     def bind_keys(self):
@@ -408,59 +402,6 @@ class RepoPromptGUI:
         self.content_expand_collapse_var.set(all_expanded)
         self.content_expand_collapse_button.config(text="Collapse All" if all_expanded else "Expand All")
 
-    def search_tab(self):
-        query = self.search_var.get()
-        if not query:
-            return
-        current_tab = self.notebook.index(self.notebook.select())
-        if current_tab == 3:
-            return
-        matches = []
-        if current_tab in [0, 2]:
-            text_widget = self.content_text if current_tab == 0 else self.base_prompt_text
-            text_widget.tag_remove("highlight", "1.0", tk.END)
-            text_widget.tag_remove("focused_highlight", "1.0", tk.END)
-            start_pos = "1.0"
-            while True:
-                pos = text_widget.search(query, start_pos, stopindex=tk.END, nocase=0)
-                if not pos:
-                    break
-                end_pos = f"{pos}+{len(query)}c"
-                matches.append((pos, end_pos))
-                start_pos = end_pos
-            text_widget.tag_config("highlight", background="#FFFF00", foreground="#000000")
-            text_widget.tag_config("focused_highlight", background="#add8e6", foreground="#000000")
-        elif current_tab == 1:
-            self.tree.tag_configure("highlight", background="#FFFF00", foreground="#000000")
-            self.tree.tag_configure("focused_highlight", background="#add8e6", foreground="#000000")
-            def collect_matches(item):
-                item_text = self.tree.item(item, "text")
-                if query in item_text:
-                    matches.append(item)
-                for child in self.tree.get_children(item):
-                    collect_matches(child)
-            if self.tree.get_children():
-                collect_matches(self.tree.get_children()[0])
-
-        self.match_positions[current_tab] = matches
-        self.current_match_index[current_tab] = 0 if matches else -1
-        for i, match in enumerate(matches):
-            if current_tab in [0, 2]:
-                text_widget.tag_add("focused_highlight" if i == 0 else "highlight", match[0], match[1])
-            elif current_tab == 1:
-                tags = [t for t in self.tree.item(match, "tags") if t not in ("highlight", "focused_highlight")]
-                tags.append("focused_highlight" if i == 0 else "highlight")
-                self.tree.item(match, tags=tags)
-                if i == 0:
-                    self.tree.see(match)
-                    self.tree.selection_set(match)
-        if matches:
-            if current_tab in [0, 2]:
-                self.file_handler.center_match(text_widget, matches[0][0])
-            self.show_status_message("Search Successful")
-        else:
-            self.show_status_message("Search Found Nothing")
-
     def refresh_repo(self):
         if self.file_handler.repo_path:
             self.progress.grid(row=3, column=0, columnspan=3, sticky="ew")
@@ -487,7 +428,7 @@ class RepoPromptGUI:
         self.settings.set('app', 'exclude_node_modules', self.exclude_node_modules_var.get())
         self.settings.set('app', 'exclude_dist', self.exclude_dist_var.get())
         self.settings.set('app', 'exclude_files', {file: var.get() for file, var in self.exclude_file_vars.items()})
-        self.settings.set('app', 'text_extensions', {ext: var.get() for ext, var in self.text_extension_vars.items()})
+        self.settings.set('app', 'text_extensions', {ext: 1 for ext in self.file_handler.text_extensions_default})
         self.settings.set('app', 'include_icons', self.include_icons_var.get())
         self.settings.save()
         self.show_status_message("Settings saved")
