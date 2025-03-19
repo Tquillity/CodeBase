@@ -78,7 +78,7 @@ class RepoPromptGUI:
         self.left_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ns")
         tk.Frame(self.root, bg='#4a4a4a', width=1).grid(row=2, column=1, sticky="ns", padx=5)
         self.select_button = self.add_button(self.left_frame, "Select Repo (Ctrl+R)", self.select_repo, "Choose a repository folder")
-        self.select_button.pack(pady=5)  # Explicitly pack here
+        self.select_button.pack(pady=5)
         self.refresh_button = self.add_button(self.left_frame, "Refresh (Ctrl+F5)", self.refresh_repo, "Refresh current repository", state=tk.DISABLED)
         self.refresh_button.pack(pady=5)
         self.settings_button = self.add_button(self.left_frame, "Repo Settings", self.open_repo_settings, "Customize file reading settings")
@@ -96,7 +96,7 @@ class RepoPromptGUI:
         self.copy_structure_button.pack(pady=5)
         self.include_icons_checkbox = tk.Checkbutton(self.left_frame, text="Include Icons in Structure", variable=self.include_icons_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.include_icons_checkbox.pack(pady=5)
-        Tooltip(self.include_icons_checkbox, "Toggle icons in structure")
+        Tooltip(self.include_icons_checkbox, "Toggle icons ON and OFF  in structure")
         
         clear_button_frame = tk.Frame(self.left_frame, bg='#2b2b2b')
         clear_button_frame.pack(side='bottom', fill='x')
@@ -160,7 +160,7 @@ class RepoPromptGUI:
         self.expand_collapse_button.pack(side=tk.LEFT, padx=5)
         self.show_unloaded_checkbox = tk.Checkbutton(structure_button_frame, text="Strike Through Unloaded Files", variable=self.show_unloaded_var, command=self.file_handler.update_tree_strikethrough, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
         self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=5)
-        Tooltip(self.show_unloaded_checkbox, "Toggle strikethrough on unloaded files")
+        Tooltip(self.show_unloaded_checkbox, "Highlights files that are not loaded in the Content Preview and its Ctrl+C")
         self.tree = ttk.Treeview(self.structure_frame, columns=("path", "checkbox"), show=["tree", "headings"], style="Custom.Treeview")
         self.tree.column("#0", width=300)  # Tree column (Name)
         self.tree.column("path", width=0, stretch=tk.NO)  # Hidden path column
@@ -169,16 +169,22 @@ class RepoPromptGUI:
         self.tree.heading("checkbox", text="Select/Deselect")
         self.tree.pack(fill="both", expand=True)
         style.configure("Custom.Treeview", background="#3c3c3c", foreground=self.text_color, fieldbackground="#3c3c3c")
-        style.map("Custom.Treeview", background=[('selected', '#4a4a4a')], foreground=[('selected', self.text_color)])
+        style.map("Custom.Treeview", background=[('selected', '#4a4a4a')])
+        # Define state-specific tags
+        self.tree.tag_configure('folder', foreground=self.folder_color)  # Yellow for folders
+        self.tree.tag_configure('file_selected', foreground='#00FF00')  # Green for selected text files
+        self.tree.tag_configure('file_unloaded', foreground='red', font=(None, -10, 'overstrike'))  # Red with strikethrough for unloaded text files
+        self.tree.tag_configure('file_default', foreground=self.text_color)  # White for deselected text files
+        self.tree.tag_configure('file_nontext', foreground='gray')  # Gray for non-text files
         scrollbar = ttk.Scrollbar(self.structure_frame, orient="vertical", command=self.tree.yview)
         scrollbar.pack(side="right", fill="y")
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.tag_bind('folder', '<Double-1>', self.file_handler.on_double_click)
-        self.tree.tag_bind('file', '<Double-1>', self.jump_to_file_content)
+        self.tree.tag_bind('file_selected', '<Double-1>', self.jump_to_file_content)
+        self.tree.tag_bind('file_default', '<Double-1>', self.jump_to_file_content)
+        self.tree.tag_bind('file_unloaded', '<Double-1>', self.jump_to_file_content)
         self.tree.bind('<<TreeviewOpen>>', self.file_handler.on_treeview_open)
         self.tree.bind('<Button-1>', self.file_handler.toggle_selection)
-        self.tree.tag_configure('unloaded', font=(None, -10, 'overstrike'))
-        self.tree.tag_configure('selected', foreground='#00FF00')
 
         self.base_prompt_text = scrolledtext.ScrolledText(self.notebook, wrap=tk.WORD, bg='#3c3c3c', fg=self.text_color, font=("Arial", 10))
         self.notebook.add(self.base_prompt_text, text="Base Prompt")
@@ -200,18 +206,14 @@ class RepoPromptGUI:
         self.status_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
 
     def setup_settings_tab(self):
-        # Clear existing widgets if any (for re-initialization purposes)
         for widget in self.settings_frame.winfo_children():
             widget.destroy()
 
-        # Main frame with padding
         main_frame = tk.Frame(self.settings_frame, bg='#2b2b2b')
         main_frame.pack(pady=10, padx=10, fill="both", expand=True)
 
-        # Title
         tk.Label(main_frame, text="Application Settings", font=("Arial", 14), bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
 
-        # Default Tab Section
         default_frame = tk.LabelFrame(main_frame, text="Default Tab", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
         default_frame.grid(row=1, column=0, sticky="ew", pady=5)
         Tooltip(default_frame, "Set the default tab on startup")
@@ -219,7 +221,6 @@ class RepoPromptGUI:
         for i, tab in enumerate(["Content Preview", "Folder Structure", "Base Prompt", "Settings"]):
             tk.Radiobutton(default_frame, text=tab, variable=self.default_tab_var, value=tab, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=i, column=0, sticky="w", padx=5)
 
-        # Folder Expansion Section
         expansion_frame = tk.LabelFrame(main_frame, text="Folder Expansion", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
         expansion_frame.grid(row=2, column=0, sticky="ew", pady=5)
         Tooltip(expansion_frame, "Control folder expansion on load")
@@ -232,19 +233,15 @@ class RepoPromptGUI:
         self.levels_entry.grid(row=2, column=1, padx=5, sticky="w")
         Tooltip(self.levels_entry, "Number of folder levels to expand")
 
-        # New Exclude Options Section
         exclude_frame = tk.LabelFrame(main_frame, text="Exclude Options", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
         exclude_frame.grid(row=3, column=0, sticky="ew", pady=5)
-        self.exclude_node_modules_var = tk.IntVar(value=self.settings.get('app', 'exclude_node_modules', 1))  # Default to enabled
+        self.exclude_node_modules_var = tk.IntVar(value=self.settings.get('app', 'exclude_node_modules', 1))
         self.exclude_dist_var = tk.IntVar(value=self.settings.get('app', 'exclude_dist', 1))
         tk.Checkbutton(exclude_frame, text="Always exclude 'node_modules' folders", variable=self.exclude_node_modules_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=0, column=0, sticky="w", padx=5)
         Tooltip(exclude_frame, "Permanently exclude all 'node_modules' folders and their contents")
-
-        # Add this new checkbutton
         tk.Checkbutton(exclude_frame, text="Always exclude 'dist' folders", variable=self.exclude_dist_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').grid(row=1, column=0, sticky="w", padx=5)
         Tooltip(exclude_frame, "Permanently exclude all 'dist' folders and their contents")
 
-        # Save Button
         save_button = self.add_button(main_frame, "Save Settings", self.save_app_settings, "Save application settings")
         save_button.grid(row=4, column=0, pady=10)
 
@@ -264,7 +261,7 @@ class RepoPromptGUI:
         btn.bind("<Enter>", lambda e: btn.config(bg="#5a5a5a"))
         btn.bind("<Leave>", lambda e: btn.config(bg=self.button_bg))
         Tooltip(btn, tooltip)
-        return btn  # Return the button without packing it
+        return btn
 
     def bind_keys(self):
         self.root.bind('<Control-c>', lambda e: self.file_handler.copy_contents())
@@ -312,27 +309,9 @@ class RepoPromptGUI:
         self.tree.delete(*self.tree.get_children())
         root_basename = os.path.basename(root_dir)
         root_icon = "📁" if os.path.isdir(root_dir) else "📄"
-        root_id = self.tree.insert("", "end", text=f"{root_icon} {root_basename}", open=True, tags=('folder', 'selected'), values=(root_dir, "☑"))
-        self.build_tree(root_dir, root_id)
-        self.tree.tag_configure('folder', foreground=self.folder_color)
-        self.tree.tag_configure('file', foreground=self.text_color)
+        root_id = self.tree.insert("", "end", text=f"{root_icon} {root_basename}", open=True, tags=('folder'), values=(root_dir, "☑"))
+        self.file_handler.build_tree(root_dir, root_id)
         self.file_handler.update_tree_strikethrough()
-
-    def build_tree(self, path, parent_id):
-        if self.file_handler.is_ignored(path):
-            return
-        try:
-            items = [item for item in sorted(os.listdir(path)) if not self.file_handler.is_ignored(os.path.join(path, item))]
-            for item in items:
-                item_path = os.path.join(path, item)
-                icon = "📁" if os.path.isdir(item_path) else "📄"
-                tag = 'folder' if os.path.isdir(item_path) else 'file'
-                tags = [tag, 'selected']  # Initially selected
-                item_id = self.tree.insert(parent_id, "end", text=f"{icon} {item}", values=(item_path, "☑"), open=False, tags=tags)
-                if os.path.isdir(item_path):
-                    self.tree.insert(item_id, "end", text="Loading...", tags=('dummy',))
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to list directory {path}: {str(e)}")
 
     def update_content_preview(self):
         self.content_text.config(state=tk.NORMAL)
@@ -472,7 +451,7 @@ class RepoPromptGUI:
 
     def jump_to_file_content(self, event):
         item_id = self.tree.identify_row(event.y)
-        if 'file' in self.tree.item(item_id, "tags"):
+        if 'file_selected' in self.tree.item(item_id, "tags") or 'file_default' in self.tree.item(item_id, "tags") or 'file_unloaded' in self.tree.item(item_id, "tags"):
             file_path = self.tree.item(item_id, "values")[0]
             self.notebook.select(0)
             pos = self.content_text.search(f"File: {file_path}", "1.0", tk.END)
