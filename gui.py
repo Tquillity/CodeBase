@@ -204,14 +204,28 @@ class RepoPromptGUI:
         main_frame = tk.Frame(self.settings_frame, bg='#2b2b2b')
         main_frame.pack(pady=10, padx=10, fill="both", expand=True)
 
-        tk.Label(main_frame, text="Application Settings", font=("Arial", 14), bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
+        # Configure grid rows and columns
+        main_frame.grid_columnconfigure(0, weight=1)  # Left frame expands
+        main_frame.grid_columnconfigure(1, weight=0)  # Separator column stays fixed
+        main_frame.grid_columnconfigure(2, weight=1)  # Right frame expands
+        main_frame.grid_rowconfigure(1, weight=1)     # Row 1 expands vertically
 
+        # Settings label spanning all three columns
+        tk.Label(main_frame, text="Application Settings", font=("Arial", 14), bg='#2b2b2b', fg=self.text_color).grid(row=0, column=0, columnspan=3, pady=(0, 10), sticky="w")
+
+        # Left frame for general settings
         left_frame = tk.Frame(main_frame, bg='#2b2b2b')
         left_frame.grid(row=1, column=0, sticky="n")
 
-        right_frame = tk.Frame(main_frame, bg='#2b2b2b')
-        right_frame.grid(row=1, column=1, sticky="n")
+        # Separator frame (vertical line with padding)
+        separator_frame = tk.Frame(main_frame, width=2, bg="#444444")
+        separator_frame.grid(row=1, column=1, sticky="ns", padx=10)
 
+        # Right frame for file extensions
+        right_frame = tk.Frame(main_frame, bg='#2b2b2b')
+        right_frame.grid(row=1, column=2, sticky="n")
+
+        # Populate left_frame (unchanged from original)
         default_frame = tk.LabelFrame(left_frame, text="Default Tab", bg='#2b2b2b', fg=self.text_color, font=("Arial", 10), padx=5, pady=5)
         default_frame.pack(pady=5, fill="x")
         Tooltip(default_frame, "Set the default tab on startup")
@@ -250,17 +264,58 @@ class RepoPromptGUI:
         self.include_icons_var = tk.IntVar(value=self.settings.get('app', 'include_icons', 1))
         tk.Checkbutton(misc_frame, text="Include Icons in Structure", variable=self.include_icons_var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a').pack(anchor="w", padx=5)
 
+        # Populate right_frame (unchanged from original)
         tk.Label(right_frame, text="File Extensions", font=("Arial", 12), bg='#2b2b2b', fg=self.text_color).pack(pady=(0, 5))
-        ext_listbox = tk.Listbox(right_frame, bg='#3c3c3c', fg=self.text_color, height=15)
-        ext_listbox.pack(fill="both", expand=True)
-        scrollbar = ttk.Scrollbar(right_frame, orient="vertical", command=ext_listbox.yview)
-        ext_listbox.configure(yscrollcommand=scrollbar.set)
+        search_frame = tk.Frame(right_frame, bg='#2b2b2b')
+        search_frame.pack(fill="x")
+        tk.Label(search_frame, text="Search:", bg='#2b2b2b', fg=self.text_color).pack(side="left")
+        self.search_extensions_entry = tk.Entry(search_frame, bg='#3c3c3c', fg=self.text_color)
+        self.search_extensions_entry.pack(side="left", fill="x", expand=True)
+        self.search_extensions_entry.bind("<KeyRelease>", self.filter_extensions)
+        canvas = tk.Canvas(right_frame, bg='#2b2b2b')
+        scrollbar = ttk.Scrollbar(right_frame, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = tk.Frame(canvas, bg='#2b2b2b')
+        self.scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        for ext in sorted(self.file_handler.text_extensions_default):
-            ext_listbox.insert(tk.END, ext)
+        self.extension_checkboxes = {}
+        extension_groups = self.file_handler.get_extension_groups()
+        saved_extensions = self.settings.get('app', 'text_extensions', {ext: 1 for ext in self.file_handler.text_extensions_default})
+        row = 0
+        for group, extensions in extension_groups.items():
+            group_label = tk.Label(self.scrollable_frame, text=group, font=("Arial", 10, "bold"), bg='#2b2b2b', fg=self.text_color)
+            group_label.grid(row=row, column=0, sticky="w")
+            row += 1
+            for ext in sorted(extensions):
+                var = tk.IntVar(value=saved_extensions.get(ext, 1))
+                cb = tk.Checkbutton(self.scrollable_frame, text=ext, variable=var, bg='#2b2b2b', fg=self.text_color, selectcolor='#4a4a4a')
+                cb.grid(row=row, column=0, sticky="w", padx=10)
+                self.extension_checkboxes[ext] = (cb, var, group_label)
+                row += 1
 
+        # Save button spanning all three columns
         save_button = self.create_button(main_frame, "Save Settings", self.save_app_settings, "Save application settings")
-        save_button.grid(row=2, column=0, columnspan=2, pady=10)
+        save_button.grid(row=2, column=0, columnspan=3, pady=10)
+
+    def filter_extensions(self, event):
+        """Filter displayed extensions based on search term."""
+        search_term = self.search_extensions_entry.get().lower()
+        for ext, (cb, var, group_label) in self.extension_checkboxes.items():
+            group = group_label.cget("text")
+            if search_term == "":
+                group_label.grid()
+                cb.grid()
+            elif search_term in ext.lower():
+                group_label.grid()
+                cb.grid()
+            else:
+                cb.grid_remove()
+                # Hide group if no extensions match
+                group_extensions = [e for e in self.file_handler.get_extension_groups()[group] if search_term in e.lower()]
+                if not group_extensions:
+                    group_label.grid_remove()
 
     def setup_ui(self):
         self.menu = tk.Menu(self.root, bg=self.button_bg, fg=self.button_fg)
@@ -428,7 +483,7 @@ class RepoPromptGUI:
         self.settings.set('app', 'exclude_node_modules', self.exclude_node_modules_var.get())
         self.settings.set('app', 'exclude_dist', self.exclude_dist_var.get())
         self.settings.set('app', 'exclude_files', {file: var.get() for file, var in self.exclude_file_vars.items()})
-        self.settings.set('app', 'text_extensions', {ext: 1 for ext in self.file_handler.text_extensions_default})
+        self.settings.set('app', 'text_extensions', {ext: var.get() for ext, (cb, var, _) in self.extension_checkboxes.items()})
         self.settings.set('app', 'include_icons', self.include_icons_var.get())
         self.settings.save()
         self.show_status_message("Settings saved")

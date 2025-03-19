@@ -8,6 +8,23 @@ import threading
 import logging
 
 class FileHandler:
+    # Define text_extensions_default as a class attribute
+    text_extensions_default = {
+        '.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx', '.jsx',
+        '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg', '.gitignore',
+        '.yml', '.yaml', '.toml', '.ini', '.properties', '.csv', '.tsv', '.log',
+        '.sql', '.sh', '.bash', '.zsh', '.fish', '.awk', '.sed', '.bat', '.cmd',
+        '.ps1', '.php', '.rb', '.erb', '.haml', '.slim', '.pl', '.lua', '.r',
+        '.m', '.mm', '.asm', '.v', '.vhdl', '.verilog', '.s', '.swift', '.kt',
+        '.kts', '.go', '.rs', '.dart', '.vue', '.pug', '.coffee', '.proto',
+        '.dockerfile', '.make', '.tf', '.hcl', '.sol', '.gradle', '.groovy',
+        '.scala', '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs',
+        '.elm', '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', '.bib',
+        '.sty', '.cls', '.cs', '.fs', '.fsx',
+        '.mdx', '.rst', '.adoc', '.org', '.texinfo', '.w', '.man', '.conf', '.cfg',
+        '.env', '.ipynb', '.rmd', '.qmd', '.lock', '.srt', '.vtt', '.po', '.pot'
+    }
+
     def __init__(self, gui):
         self.gui = gui
         self.repo_path = None
@@ -18,19 +35,48 @@ class FileHandler:
         self.recent_folders = gui.file_handler.recent_folders if hasattr(gui, 'file_handler') else gui.load_recent_folders()
         self.content_cache = {}
         self.lock = threading.Lock()
-        
-        self.text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx',
-                                        '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg',
-                                        '.gitignore', '.yml', '.yaml', '.toml', '.ini', '.properties',
-                                        '.csv', '.tsv', '.log', '.sql', '.sh', '.bash', '.zsh', '.fish',
-                                        '.awk', '.sed', '.bat', '.cmd', '.ps1', '.php', '.rb', '.erb',
-                                        '.haml', '.slim', '.pl', '.lua', '.r', '.m', '.mm', '.asm', '.v',
-                                        '.vhdl', '.verilog', '.s', '.swift', '.kt', '.kts', '.go', '.rs',
-                                        '.dart', '.vue', '.pug', '.coffee', '.proto', '.dockerfile',
-                                        '.make', '.tf', '.hcl', '.sol', '.gradle', '.groovy', '.scala',
-                                        '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm',
-                                        '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', '.bib',
-                                        '.sty', '.cls', '.cs', '.fs', '.fsx'}
+
+    @classmethod
+    def get_extension_groups(cls):
+        """Returns a dictionary of file extensions organized into logical groups."""
+        groups = {
+            "Programming Languages": [
+                '.py', '.java', '.cpp', '.c', '.h', '.js', '.ts', '.tsx', '.jsx',
+                '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.kts', '.dart',
+                '.groovy', '.scala', '.cs', '.fs', '.fsx', '.lua', '.pl', '.r',
+                '.m', '.mm', '.asm', '.v', '.vhdl', '.verilog', '.s', '.clj',
+                '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm', '.hs',
+                '.lhs', '.agda', '.idr'
+            ],
+            "Markup": [
+                '.html', '.xml', '.md', '.mdx', '.rst', '.adoc', '.org', '.texinfo'
+            ],
+            "Configuration": [
+                '.json', '.yml', '.yaml', '.toml', '.ini', '.properties', '.gitignore',
+                '.dockerfile', '.make', '.conf', '.cfg', '.env', '.hcl', '.tf', '.nix',
+                '.dhall'
+            ],
+            "Scripts": [
+                '.sh', '.bash', '.zsh', '.fish', '.awk', '.sed', '.bat', '.cmd', '.ps1'
+            ],
+            "Data": [
+                '.csv', '.tsv', '.log', '.sql', '.ipynb', '.rmd', '.qmd'
+            ],
+            "Styles": [
+                '.css', '.scss'
+            ],
+            "Other": [
+                '.txt', '.svg', '.proto', '.sol', '.gradle', '.coffee', '.pug', '.vue',
+                '.erb', '.haml', '.slim', '.tex', '.bib', '.sty', '.cls', '.w', '.man',
+                '.lock', '.srt', '.vtt', '.po', '.pot'
+            ]
+        }
+        # Add any remaining extensions to "Other"
+        all_grouped = set(sum(groups.values(), []))
+        other_extensions = cls.text_extensions_default - all_grouped
+        if other_extensions:
+            groups["Other"].extend(sorted(other_extensions))
+        return groups
 
     def load_repo(self, folder):
         self.repo_path = os.path.abspath(folder)
