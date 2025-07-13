@@ -1,0 +1,113 @@
+import pyperclip
+import logging
+import tkinter as tk
+from tkinter import messagebox
+from content_manager import generate_content
+
+class CopyHandler:
+    def __init__(self, gui):
+        self.gui = gui
+
+    def copy_contents(self):
+        if self.gui.is_loading: self.gui.show_status_message("Loading...", error=True); return
+        with self.gui.file_handler.lock:
+             if not self.gui.file_handler.loaded_files:
+                  self.gui.show_status_message("No files selected to copy.", error=True); return
+
+        self.gui.show_loading_state("Preparing content for clipboard...")
+        prompt = self.gui.base_prompt_tab.base_prompt_text.get("1.0", tk.END).strip() if self.gui.prepend_var.get() else ""
+        with self.gui.file_handler.lock:
+            files_to_copy = set(self.gui.file_handler.loaded_files)
+
+        completion_lambda = lambda content, token_count, errors: self._handle_copy_completion_final(
+            prompt=prompt,
+            content=content,
+            structure=None,
+            errors=errors,
+            status_message="Copied selected file contents" if not errors else "Copy failed with errors"
+        )
+
+        generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors)
+
+    def copy_structure(self):
+        if self.gui.is_loading: self.gui.show_status_message("Loading...", error=True); return
+        if not self.gui.structure_tab.tree.get_children():
+             self.gui.show_status_message("No structure to copy.", error=True); return
+
+        try:
+            structure_text = self.gui.structure_tab.generate_folder_structure_text()
+            if not structure_text:
+                 self.gui.show_status_message("Generated structure is empty.", error=True)
+                 return
+            pyperclip.copy(structure_text)
+            self.gui.show_status_message("Folder structure copied to clipboard.")
+        except Exception as e:
+            logging.error(f"Error generating/copying structure: {e}", exc_info=True)
+            self.gui.show_status_message("Error copying structure!", error=True)
+            messagebox.showerror("Copy Error", f"Could not copy structure:\n{e}")
+
+    def copy_all(self):
+        if self.gui.is_loading: self.gui.show_status_message("Loading...", error=True); return
+        with self.gui.file_handler.lock:
+             no_files = not self.gui.file_handler.loaded_files
+        no_structure = not self.gui.structure_tab.tree.get_children()
+        no_prompt = not self.gui.base_prompt_tab.base_prompt_text.get("1.0", tk.END).strip()
+
+        if no_files and no_structure and no_prompt:
+             self.gui.show_status_message("Nothing to copy.", error=True); return
+
+        self.gui.show_loading_state("Preparing combined content for clipboard...")
+
+        prompt = self.gui.base_prompt_tab.base_prompt_text.get("1.0", tk.END).strip()
+        structure = self.gui.structure_tab.generate_folder_structure_text() if not no_structure else ""
+        with self.gui.file_handler.lock:
+             files_to_copy = set(self.gui.file_handler.loaded_files) if not no_files else set()
+
+        completion_lambda = lambda content, token_count, errors: self._handle_copy_completion_final(
+            prompt=prompt,
+            content=content,
+            structure=structure,
+            errors=errors,
+            status_message="Copied All (Prompt, Content, Structure)" if not errors else "Copy All failed with errors"
+        )
+
+        if files_to_copy:
+            generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors)
+        else:
+            self._handle_copy_completion_final(prompt=prompt, content="", structure=structure, errors=[], status_message="Copied All (Prompt, Structure)")
+
+    def _handle_copy_completion_final(self, prompt, content, structure, errors, status_message):
+         self.gui.hide_loading_state()
+
+         if errors:
+             error_msg = "Errors occurred during content preparation for copy."
+             if errors: error_msg += f" Files: {'; '.join(errors[:3])}"
+             self.gui.show_status_message(error_msg, error=True, duration=10000)
+             messagebox.showwarning("Copy Error", error_msg)
+
+         final_parts = []
+         if prompt:
+             final_parts.append(prompt)
+
+         if content:
+             if final_parts: final_parts.append("\n\n---\n\n")
+             final_parts.append(content.rstrip())
+
+         if structure:
+             if final_parts: final_parts.append("\n\n---\n\n")
+             final_parts.append("Folder Structure:\n")
+             final_parts.append(structure)
+
+         final_string = "".join(final_parts)
+
+         if not final_string and not errors:
+              self.gui.show_status_message("Nothing generated to copy.", error=True)
+              return
+
+         try:
+             pyperclip.copy(final_string)
+             self.gui.show_status_message(status_message)
+         except Exception as e:
+             logging.error(f"Error copying to clipboard: {e}", exc_info=True)
+             self.gui.show_status_message("Error copying to clipboard!", error=True)
+             messagebox.showerror("Clipboard Error", f"Could not copy combined content to clipboard:\n{e}")
