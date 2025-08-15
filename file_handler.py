@@ -12,7 +12,7 @@ from file_scanner import scan_repo, parse_gitignore, is_ignored_path, is_text_fi
 from content_manager import get_file_content, generate_content
 
 class FileHandler:
-    text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx', '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg', '.gitignore', '.yml', '.yaml', '.toml', '.ini', '.properties', '.csv', '.tsv', '.log', '.sql', '.sh', '.bash', '.zsh', '.fish', '.awk', '.sed', '.bat', '.cmd', '.ps1', '.php', '.rb', '.erb', '.haml', '.slim', '.pl', '.lua', '.r', '.m', '.mm', '.asm', '.v', '.vhdl', '.verilog', '.s', '.swift', '.kt', '.kts', '.go', '.rs', '.dart', '.vue', '.pug', '.coffee', '.proto', '.dockerfile', '.make', '.tf', '.hcl', '.sol', '.gradle', '.groovy', '.scala', '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm', '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', '.bib', '.sty', '.cls', '.cs', '.fs', '.fsx', '.mdx', '.rst', '.adoc', '.org', '.texinfo', '.w', '.man', '.conf', '.cfg', '.env', '.ipynb', '.rmd', '.qmd', '.lock', '.srt', '.vtt', '.po', '.pot'}
+    text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx', '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg', '.gitignore', '.yml', '.yaml', '.toml', '.ini', '.properties', '.csv', '.tsv', '.log', '.sql', '.sh', '.bash', '.zsh', '.fish', '.awk', '.sed', '.bat', '.cmd', '.ps1', '.php', '.rb', '.erb', '.haml', '.slim', '.pl', '.lua', '.r', '.m', '.mm', '.asm', '.v', '.vhdl', '.verilog', '.s', '.swift', '.kt', '.kts', '.go', '.rs', '.dart', '.vue', '.pug', '.coffee', '.proto', '.dockerfile', '.make', '.tf', '.hcl', '.sol', '.gradle', '.groovy', '.scala', '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm', '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', '.bib', '.sty', '.cls', '.cs', '.fs', '.fsx', '.mdx', '.rst', '.adoc', '.org', '.texinfo', '.w', '.man', '.conf', '.cfg', '.env', '.ipynb', '.rmd', '.qmd', '.lock', '.srt', '.vtt', '.po', '.pot', '.mts'}
     FILE_SEPARATOR = "===FILE_SEPARATOR===\n"
 
     def __init__(self, gui):
@@ -31,7 +31,7 @@ class FileHandler:
         groups = {
             "Programming Languages": [ '.py', '.java', '.cpp', '.c', '.h', '.js', '.ts', '.tsx', '.jsx', '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.kts', '.dart', '.groovy', '.scala', '.cs', '.fs', '.fsx', '.lua', '.pl', '.r', '.m', '.mm', '.asm', '.v', '.vhdl', '.verilog', '.s', '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm', '.hs', '.lhs', '.agda', '.idr' ],
             "Markup": [ '.html', '.xml', '.md', '.mdx', '.rst', '.adoc', '.org', '.texinfo' ],
-            "Configuration": [ '.json', '.yml', '.yaml', '.toml', '.ini', '.properties', '.gitignore', '.dockerfile', '.make', '.conf', '.cfg', '.env', '.hcl', '.tf', '.nix', '.dhall' ],
+            "Configuration": [ '.json', '.yml', '.yaml', '.toml', '.ini', '.properties', '.gitignore', '.dockerfile', '.make', '.conf', '.cfg', '.env', '.hcl', '.tf', '.nix', '.dhall', '.mts' ],
             "Scripts": [ '.sh', '.bash', '.zsh', '.fish', '.awk', '.sed', '.bat', '.cmd', '.ps1' ],
             "Data": [ '.csv', '.tsv', '.log', '.sql', '.ipynb', '.rmd', '.qmd' ],
             "Styles": [ '.css', '.scss' ],
