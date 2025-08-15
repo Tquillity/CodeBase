@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=CodeBaseV3
+Exec=~/.local/bin/CodeBase
+Icon=CodeBase
+Type=Application
+Categories=Development;

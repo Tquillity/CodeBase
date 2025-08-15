@@ -22,53 +22,58 @@ from handlers.copy_handler import CopyHandler
 from handlers.repo_handler import RepoHandler
 from handlers.theme_manager import ThemeManager
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
+import queue  # FIX: Added for thread-safe Tkinter callbacks
 
 # NEW_LOG: Set level to DEBUG to see all messages
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', filename='codebase_debug.log', filemode='w')
-
 class RepoPromptGUI:
     def __init__(self, root):
         self.root = root
         self.version = "3.0"
         self.settings = SettingsManager()
         self.high_contrast_mode = BooleanVar(value=self.settings.get('app', 'high_contrast', 0))
-
         self.theme_manager = ThemeManager(self)
         self.theme_manager.apply_theme()
-
         self.root.title(f"CodeBase v{self.version}")
         self.root.geometry(self.settings.get('app', 'window_geometry', "1920x1080"))
         self.root.configure(bg=self.colors['bg'])
-
         self.prepend_var = IntVar(value=self.settings.get('app', 'prepend_prompt', 1))
         self.show_unloaded_var = IntVar(value=self.settings.get('app', 'show_unloaded', 0))
-
         self.user_data_dir = appdirs.user_data_dir("CodeBase")
         self.template_dir = os.path.join(self.user_data_dir, "templates")
         self.recent_folders_file = os.path.join(self.user_data_dir, "recent_folders.txt")
         os.makedirs(self.template_dir, exist_ok=True)
-
         self.match_positions = {}
         self.current_match_index = {}
         self.recent_folders = self.load_recent_folders()
         self.current_repo_path = None
         self.is_loading = False
         self.current_token_count = 0
-
         self.file_handler = FileHandler(self)
-
         self.search_handler = SearchHandler(self)
         self.copy_handler = CopyHandler(self)
         self.repo_handler = RepoHandler(self)
-
         self.setup_ui()
         self.bind_keys()
         self.apply_default_tab()
-
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-
         self.list_selected_files = set()
         self.list_read_errors = []
+        # FIX: Added queue for thread-safe Tkinter callbacks from background threads
+        self.task_queue = queue.Queue()
+        self._poll_queue()
+
+    # FIX: Polling method to process queued tasks in the main thread
+    def _poll_queue(self):
+        try:
+            while not self.task_queue.empty():
+                task = self.task_queue.get_nowait()
+                if isinstance(task, tuple) and len(task) == 2:
+                    func, args = task
+                    func(*args)
+        except queue.Empty:
+            pass
+        self.root.after(100, self._poll_queue)  # Poll every 100ms
 
     def trigger_preview_update(self):
         """Triggers the generation of the content preview tab."""
@@ -127,30 +132,22 @@ class RepoPromptGUI:
         file_menu.add_command(label="Refresh Repo", accelerator="Ctrl+F5", command=self.repo_handler.refresh_repo)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.on_close)
-
         edit_menu = tk.Menu(self.menu, bg=self.colors['btn_bg'], fg=self.colors['btn_fg'], tearoff=0)
         self.menu.add_cascade(label="Edit", menu=edit_menu)
         edit_menu.add_command(label="Copy Contents", accelerator="Ctrl+C", command=self.copy_handler.copy_contents)
         edit_menu.add_command(label="Copy Structure", accelerator="Ctrl+S", command=self.copy_handler.copy_structure)
         edit_menu.add_command(label="Copy All", accelerator="Ctrl+A", command=self.copy_handler.copy_all)
-
         help_menu = tk.Menu(self.menu, bg=self.colors['btn_bg'], fg=self.colors['btn_fg'], tearoff=0)
         self.menu.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About", command=self.show_about)
-
         self.root.grid_rowconfigure(2, weight=1)
         self.root.grid_columnconfigure(2, weight=1)
-
         self.header_frame = HeaderFrame(self.root, self.colors, title="CodeBase", version=self.version)
-
         self.left_frame = LeftPanel(self.root, self.colors, self)
         self.left_separator = tk.Frame(self.root, bg=self.colors['btn_bg'], width=2)
         self.left_separator.grid(row=2, column=1, padx=5, pady=10, sticky="ns")
-
         self.right_frame = RightPanel(self.root, self.colors, self)
-
         self.setup_status_bar()
-
         self.progress = ttk.Progressbar(self.root, mode='indeterminate')
 
     def create_button(self, parent, text, command, tooltip_text=None, state=tk.NORMAL):
@@ -186,13 +183,10 @@ class RepoPromptGUI:
         if self.status_timer_id:
             self.root.after_cancel(self.status_timer_id)
             self.status_timer_id = None
-
         status_color = self.colors['status']
         if error:
              status_color = '#FF0000'
-
         self.status_bar.config(text=f" {message}", fg=status_color)
-
         self.status_timer_id = self.root.after(duration, self.reset_status_bar)
 
     def reset_status_bar(self):
@@ -201,10 +195,8 @@ class RepoPromptGUI:
 
     def clear_current(self):
         if self.is_loading: self.show_status_message("Loading...", error=True); return
-
         current_index = self.notebook.index('current')
         cleared = False
-
         if current_index == 0:
             self.content_tab.clear()
             cleared = True
@@ -223,13 +215,11 @@ class RepoPromptGUI:
         elif current_index == 4:
             self.file_list_tab.clear()
             cleared = True
-
         if cleared:
              self.show_status_message("Current tab content cleared.")
 
     def clear_all(self):
         if self.is_loading: self.show_status_message("Loading...", error=True); return
-
         if messagebox.askyesno("Confirm Clear All", "This will clear all loaded data, selections, and the current repository view. Are you sure?"):
             self.repo_handler._clear_internal_state(clear_recent=False)
             self.content_tab.clear()
@@ -257,20 +247,16 @@ class RepoPromptGUI:
             self.settings.set('app', 'search_whole_word', self.whole_word_var.get())
             self.settings.set('app', 'include_icons', self.settings_tab.include_icons_var.get())
             self.settings.set('app', 'high_contrast', self.high_contrast_mode.get())
-
             ext_settings = {ext: var.get() for ext, (cb, var, *_) in self.settings_tab.extension_checkboxes.items()}
             self.settings.set('app', 'text_extensions', ext_settings)
-
             self.settings.save()
             self.show_status_message("Settings saved successfully.")
-
             self.theme_manager.apply_theme()
             self.theme_manager.reconfigure_ui_colors()
             self.apply_default_tab()
             if self.current_repo_path:
                  self.show_status_message("Settings saved. Refreshing repository view...")
                  self.root.after(100, self.repo_handler.refresh_repo)
-
         except Exception as e:
             logging.error(f"Error saving settings: {e}", exc_info=True)
             messagebox.showerror("Settings Error", f"Could not save settings:\n{e}")
@@ -308,7 +294,6 @@ class RepoPromptGUI:
         self.root.bind('<Control-a>', lambda e: self.copy_handler.copy_all())
         self.root.bind('<Control-t>', lambda e: self.base_prompt_tab.save_template())
         self.root.bind('<Control-l>', lambda e: self.base_prompt_tab.load_template())
-
 if __name__ == "__main__":
     root = tk.Tk()
     app = RepoPromptGUI(root)
