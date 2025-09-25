@@ -44,11 +44,11 @@ class LeftPanel(tk.Frame):
         self.gui.refresh_button = self.gui.create_button(self, "Refresh (Ctrl+F5)", self.gui.repo_handler.refresh_repo, "Refresh current repository", state=tk.DISABLED)
         self.gui.refresh_button.pack(pady=button_pady, padx=10, fill='x')
 
-        self.gui.info_label = tk.Label(self, text="Token Count: 0", bg=self.colors['bg'], fg=self.colors['fg'])
-        self.gui.info_label.pack(pady=5)
+        self.gui.info_label = tk.Label(self, text="Token Count: 0", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10))
+        self.gui.info_label.pack(pady=8)
         
-        self.gui.cache_info_label = tk.Label(self, text="Cache: 0 items (0 MB)", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 8))
-        self.gui.cache_info_label.pack(pady=2)
+        self.gui.cache_info_label = tk.Label(self, text="Cache: 0 items (0 MB)", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 9))
+        self.gui.cache_info_label.pack(pady=5)
 
         self.gui.copy_button = self.gui.create_button(self, "Copy Contents (Ctrl+C)", self.gui.copy_handler.copy_contents, "Copy selected file contents", state=tk.DISABLED)
         self.gui.copy_button.pack(pady=button_pady, padx=10, fill='x')

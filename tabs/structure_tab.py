@@ -21,16 +21,16 @@ class StructureTab(tk.Frame):
 
     def setup_ui(self):
         self.structure_button_frame = tk.Frame(self, bg=self.colors['bg'])
-        self.structure_button_frame.pack(side=tk.TOP, fill='x', pady=5)
+        self.structure_button_frame.pack(side=tk.TOP, fill='x', pady=(10, 5))
 
         self.expand_collapse_button = self.gui.create_button(self.structure_button_frame, "Expand All", self.toggle_expand_collapse, "Expand/collapse all folders in the tree")
-        self.expand_collapse_button.pack(side=tk.LEFT, padx=10)
+        self.expand_collapse_button.pack(side=tk.LEFT, padx=(10, 5), pady=8)
 
         self.show_unloaded_checkbox = tk.Checkbutton(self.structure_button_frame, text="Mark Unselected Files", variable=self.show_unloaded_var,
                                                      command=self.update_tree_strikethrough, bg=self.colors['bg'], fg=self.colors['fg'],
                                                      selectcolor=self.colors['bg_accent'], anchor='w',
                                                      activebackground=self.colors['bg'], activeforeground=self.colors['fg'])
-        self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=5)
+        self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=(5, 10), pady=8)
         Tooltip(self.show_unloaded_checkbox, "Apply visual marker (strikethrough) to text files currently not selected for inclusion")
 
         style = ttk.Style()

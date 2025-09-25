@@ -21,15 +21,34 @@ class FileListTab(tk.Frame):
         self.file_list_text = scrolledtext.ScrolledText(self, wrap=tk.NONE,
                                                       bg=self.colors['bg_accent'], fg=self.colors['fg'],
                                                       font=("Arial", 10), relief=tk.FLAT, borderwidth=0, height=10)
-        self.file_list_text.pack(fill="both", expand=True, padx=5, pady=5)
-        self.load_list_button = self.gui.create_button(self, "Load List", self.load_file_list, "Load pasted file list for selection")
-        self.load_list_button.pack(side=tk.LEFT, padx=10, pady=5)
-        self.copy_list_button = self.gui.create_button(self, "Copy from List", self.copy_from_list, "Copy content from listed files", state=tk.DISABLED)
-        self.copy_list_button.pack(side=tk.LEFT, padx=10, pady=5)
-        self.clear_list_button = self.gui.create_button(self, "Clear List", self.clear_file_list, "Clear the file list text area")
-        self.clear_list_button.pack(side=tk.LEFT, padx=10, pady=5)
-        self.error_label = tk.Label(self, text="", bg=self.colors['bg'], fg=self.colors['status'], anchor="w")
-        self.error_label.pack(fill="x", pady=5)
+        self.file_list_text.pack(fill="both", expand=True, padx=5, pady=(5, 10))
+        
+        # Ensure the text widget is always editable for pasting
+        self.file_list_text.config(state=tk.NORMAL)
+        
+        # Enable keyboard shortcuts for text editing
+        self.file_list_text.bind("<Control-v>", self._paste_text)
+        self.file_list_text.bind("<Control-V>", self._paste_text)
+        self.file_list_text.bind("<Control-c>", self._copy_text)
+        self.file_list_text.bind("<Control-C>", self._copy_text)
+        self.file_list_text.bind("<Control-x>", self._cut_text)
+        self.file_list_text.bind("<Control-X>", self._cut_text)
+        self.file_list_text.bind("<Control-a>", self._select_all)
+        self.file_list_text.bind("<Control-A>", self._select_all)
+        self.file_list_text.bind("<Button-3>", self._show_context_menu)  # Right-click context menu
+        
+        # Button frame for better organization
+        button_frame = tk.Frame(self, bg=self.colors['bg'])
+        button_frame.pack(side=tk.BOTTOM, fill='x', pady=(0, 5))
+        
+        self.load_list_button = self.gui.create_button(button_frame, "Load List", self.load_file_list, "Load pasted file list for selection")
+        self.load_list_button.pack(side=tk.LEFT, padx=(10, 5), pady=8)
+        self.copy_list_button = self.gui.create_button(button_frame, "Copy from List", self.copy_from_list, "Copy content from listed files", state=tk.DISABLED)
+        self.copy_list_button.pack(side=tk.LEFT, padx=5, pady=8)
+        self.clear_list_button = self.gui.create_button(button_frame, "Clear List", self.clear_file_list, "Clear the file list text area")
+        self.clear_list_button.pack(side=tk.LEFT, padx=5, pady=8)
+        self.error_label = tk.Label(self, text="", bg=self.colors['bg'], fg=self.colors['status'], anchor="w", font=("Arial", 10))
+        self.error_label.pack(fill="x", pady=(0, 10))
 
     def reconfigure_colors(self, colors):
         self.colors = colors
@@ -174,6 +193,71 @@ class FileListTab(tk.Frame):
         
         # Ensure text area remains editable after loading
         self.file_list_text.config(state=tk.NORMAL)
+
+    def _paste_text(self, event=None):
+        """Handle paste operation for the text widget."""
+        try:
+            # Ensure the widget is in normal state for editing
+            self.file_list_text.config(state=tk.NORMAL)
+            
+            # Get clipboard content
+            clipboard_content = self.file_list_text.clipboard_get()
+            
+            # Insert at cursor position
+            self.file_list_text.insert(tk.INSERT, clipboard_content)
+            
+            # Keep widget editable
+            self.file_list_text.config(state=tk.NORMAL)
+            
+        except tk.TclError:
+            # Clipboard might be empty or contain non-text data
+            pass
+        except Exception as e:
+            logging.warning(f"Error pasting text: {e}")
+
+    def _show_context_menu(self, event):
+        """Show right-click context menu for text editing."""
+        try:
+            context_menu = tk.Menu(self, tearoff=0, bg=self.colors['bg'], fg=self.colors['fg'])
+            context_menu.add_command(label="Cut", command=self._cut_text)
+            context_menu.add_command(label="Copy", command=self._copy_text)
+            context_menu.add_command(label="Paste", command=self._paste_text)
+            context_menu.add_separator()
+            context_menu.add_command(label="Select All", command=self._select_all)
+            context_menu.add_command(label="Clear", command=self._clear_text)
+            
+            # Show context menu at cursor position
+            context_menu.tk_popup(event.x_root, event.y_root)
+        except Exception as e:
+            logging.warning(f"Error showing context menu: {e}")
+
+    def _cut_text(self):
+        """Cut selected text to clipboard."""
+        try:
+            if self.file_list_text.selection_get():
+                self._copy_text()
+                self.file_list_text.delete(tk.SEL_FIRST, tk.SEL_LAST)
+        except tk.TclError:
+            pass  # No text selected
+
+    def _copy_text(self):
+        """Copy selected text to clipboard."""
+        try:
+            if self.file_list_text.selection_get():
+                self.file_list_text.clipboard_clear()
+                self.file_list_text.clipboard_append(self.file_list_text.selection_get())
+        except tk.TclError:
+            pass  # No text selected
+
+    def _select_all(self):
+        """Select all text in the widget."""
+        self.file_list_text.tag_add(tk.SEL, "1.0", tk.END)
+        self.file_list_text.mark_set(tk.INSERT, "1.0")
+        self.file_list_text.see(tk.INSERT)
+
+    def _clear_text(self):
+        """Clear all text in the widget."""
+        self.file_list_text.delete("1.0", tk.END)
 
     def copy_from_list(self):
         if self.gui.is_loading:

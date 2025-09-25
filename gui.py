@@ -217,7 +217,7 @@ class RepoPromptGUI:
         self.header_frame = HeaderFrame(self.root, self.colors, title="CodeBase", version=self.version)
         self.left_frame = LeftPanel(self.root, self.colors, self)
         self.left_separator = tk.Frame(self.root, bg=self.colors['btn_bg'], width=2)
-        self.left_separator.grid(row=2, column=1, padx=5, pady=10, sticky="ns")
+        self.left_separator.grid(row=2, column=1, padx=8, pady=15, sticky="ns")
         self.right_frame = RightPanel(self.root, self.colors, self)
         self.setup_status_bar()
         # Create large file counter display instead of progress bar
@@ -248,7 +248,7 @@ class RepoPromptGUI:
         
         # Show file counter in center of screen
         print("DEBUG: Showing file counter")
-        self.file_counter.grid(row=2, column=0, columnspan=3, padx=20, pady=20)
+        self.file_counter.grid(row=2, column=0, columnspan=3, padx=30, pady=30)
         
         # Initialize file counter (don't show "0" initially)
         print("DEBUG: Initializing file counter")

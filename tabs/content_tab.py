@@ -16,15 +16,15 @@ class ContentTab(tk.Frame):
 
     def setup_ui(self):
         self.content_button_frame = tk.Frame(self, bg=self.colors['bg'])
-        self.content_button_frame.pack(side=tk.TOP, fill='x', pady=5)
+        self.content_button_frame.pack(side=tk.TOP, fill='x', pady=(10, 5))
         self.content_expand_collapse_button = self.gui.create_button(self.content_button_frame, "Expand All", self.toggle_content_all, "Expand/collapse all file content sections")
-        self.content_expand_collapse_button.pack(pady=0, padx=10)
+        self.content_expand_collapse_button.pack(pady=8, padx=10)
 
         self.content_text = scrolledtext.ScrolledText(self, wrap=tk.WORD,
                                                       bg=self.colors['bg_accent'], fg=self.colors['fg'],
                                                       font=("Arial", 10), state=tk.DISABLED,
                                                       relief=tk.FLAT, borderwidth=0)
-        self.content_text.pack(fill="both", expand=True, padx=5, pady=(0,5))
+        self.content_text.pack(fill="both", expand=True, padx=5, pady=(0, 10))
 
         self.content_text.tag_configure("filename", foreground=self.colors['status'], font=('Arial', 10, 'bold'))
         self.content_text.tag_configure("toggle", foreground=self.colors['file_selected'], underline=True)

@@ -18,17 +18,17 @@ class BasePromptTab(tk.Frame):
         self.base_prompt_text = scrolledtext.ScrolledText(self, wrap=tk.WORD,
                                                           bg=self.colors['bg_accent'], fg=self.colors['fg'],
                                                           font=("Arial", 10), relief=tk.FLAT, borderwidth=0)
-        self.base_prompt_text.pack(fill="both", expand=True, padx=5, pady=5)
+        self.base_prompt_text.pack(fill="both", expand=True, padx=5, pady=(5, 10))
 
         self.base_prompt_button_frame = tk.Frame(self, bg=self.colors['bg'])
-        self.base_prompt_button_frame.pack(side=tk.BOTTOM, fill='x', pady=10)
+        self.base_prompt_button_frame.pack(side=tk.BOTTOM, fill='x', pady=(0, 10))
 
         self.save_template_button = self.gui.create_button(self.base_prompt_button_frame, "Save Template (Ctrl+T)", self.save_template, "Save current prompt text as a template")
-        self.save_template_button.pack(side=tk.LEFT, padx=(10, 5))
+        self.save_template_button.pack(side=tk.LEFT, padx=(10, 5), pady=8)
         self.load_template_button = self.gui.create_button(self.base_prompt_button_frame, "Load Template (Ctrl+L)", self.load_template, "Load a saved prompt template")
-        self.load_template_button.pack(side=tk.LEFT, padx=5)
+        self.load_template_button.pack(side=tk.LEFT, padx=5, pady=8)
         self.delete_template_button = self.gui.create_button(self.base_prompt_button_frame, "Delete Template", self.delete_template, "Delete a saved prompt template")
-        self.delete_template_button.pack(side=tk.LEFT, padx=5)
+        self.delete_template_button.pack(side=tk.LEFT, padx=5, pady=8)
         default_prompt = self.gui.settings.get('app', 'default_base_prompt', '')
         if default_prompt:
              self.base_prompt_text.insert('1.0', default_prompt)
