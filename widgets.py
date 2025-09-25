@@ -74,11 +74,12 @@ class Tooltip:
 
 class FolderDialog:
     """ Custom dialog for selecting folders, showing recent folders with a delete option. """
-    def __init__(self, parent, recent_folders, colors, on_delete_callback=None):
+    def __init__(self, parent, recent_folders, colors, on_delete_callback=None, default_start_folder=None):
         self.parent = parent
         self.recent_folders = recent_folders
         self.colors = colors
         self.on_delete_callback = on_delete_callback
+        self.default_start_folder = default_start_folder or os.path.expanduser("~")
         self.selected_folder = None
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Select Repository Folder")
@@ -115,6 +116,7 @@ class FolderDialog:
 
         self.list_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind('<MouseWheel>', self._on_mousewheel)
+        self.list_frame.bind('<MouseWheel>', self._on_mousewheel)
 
         self.populate_recent_list()
 
@@ -223,7 +225,7 @@ class FolderDialog:
     def browse_folder(self):
         initial_dir = self.folder_var.get()
         if not os.path.isdir(initial_dir):
-            initial_dir = os.path.expanduser("~")
+            initial_dir = self.default_start_folder
         folder = filedialog.askdirectory(parent=self.dialog, title="Select Repository Directory", initialdir=initial_dir)
         if folder:
             self.folder_var.set(folder)

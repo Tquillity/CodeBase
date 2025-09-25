@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
+import os
 from file_handler import FileHandler
 
 class SettingsTab(tk.Frame):
@@ -34,7 +35,12 @@ class SettingsTab(tk.Frame):
         def _on_configure(event):
             canvas.configure(scrollregion=canvas.bbox("all"))
 
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
         inner_frame.bind("<Configure>", _on_configure)
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+        inner_frame.bind("<MouseWheel>", _on_mousewheel)
 
         default_tab_label = tk.Label(inner_frame, text="Default Tab:", bg=self.colors['bg'], fg=self.colors['fg'])
         default_tab_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
@@ -153,6 +159,27 @@ class SettingsTab(tk.Frame):
         log_to_console_checkbox.grid(row=row, column=0, columnspan=2, padx=10, pady=5, sticky="w")
         row += 1
 
+        # Folder Selection Settings Section
+        folder_selection_label = tk.Label(inner_frame, text="Folder Selection Settings", bg=self.colors['bg'], fg=self.colors['header'], font=("Arial", 12, "bold"))
+        folder_selection_label.grid(row=row, column=0, columnspan=2, padx=10, pady=(20, 5), sticky="w")
+        row += 1
+
+        # Default start folder
+        self.default_start_folder_var = tk.StringVar(value=self.settings.get('app', 'default_start_folder', os.path.expanduser("~")))
+        default_folder_label = tk.Label(inner_frame, text="Default Start Folder:", bg=self.colors['bg'], fg=self.colors['fg'])
+        default_folder_label.grid(row=row, column=0, padx=10, pady=5, sticky="w")
+        
+        default_folder_frame = tk.Frame(inner_frame, bg=self.colors['bg'])
+        default_folder_frame.grid(row=row, column=1, padx=10, pady=5, sticky="ew")
+        
+        self.default_folder_entry = tk.Entry(default_folder_frame, textvariable=self.default_start_folder_var, width=40, bg=self.colors['bg_accent'], fg=self.colors['fg'])
+        self.default_folder_entry.pack(side=tk.LEFT, fill="x", expand=True)
+        
+        browse_folder_button = tk.Button(default_folder_frame, text="Browse...", command=self._browse_default_folder,
+                                        bg=self.colors['btn_bg'], fg=self.colors['btn_fg'], width=10)
+        browse_folder_button.pack(side=tk.RIGHT, padx=(5, 0))
+        row += 1
+
         extensions_label = tk.Label(inner_frame, text="Text File Extensions:", bg=self.colors['bg'], fg=self.colors['fg'])
         extensions_label.grid(row=row, column=0, padx=10, pady=10, sticky="w")
         row += 1
@@ -184,6 +211,20 @@ class SettingsTab(tk.Frame):
                                                 command=self.gui.theme_manager.toggle_high_contrast,
                                                 bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'])
         high_contrast_checkbox.grid(row=row + 1, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+
+    def _browse_default_folder(self):
+        """Open folder selection dialog for default start folder."""
+        current_folder = self.default_start_folder_var.get()
+        if not os.path.exists(current_folder):
+            current_folder = os.path.expanduser("~")
+        
+        folder = filedialog.askdirectory(
+            title="Select Default Start Folder",
+            initialdir=current_folder
+        )
+        
+        if folder:
+            self.default_start_folder_var.set(folder)
 
     def reconfigure_colors(self, colors):
         self.colors = colors

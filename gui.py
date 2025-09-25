@@ -235,6 +235,10 @@ class RepoPromptGUI:
                                    bg=self.colors['bg'], fg=self.colors['status'], padx=5)
         self.status_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=(5, 10))
         self.status_timer_id = None
+        
+        # Add right-click context menu to status bar
+        self.status_bar.bind("<Button-3>", self._show_status_context_menu)
+        self.status_bar.bind("<Button-2>", self._show_status_context_menu)  # Middle click for Linux
 
     def show_loading_state(self, message: str, show_cancel: bool = False) -> None:
         self.progress.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
@@ -291,6 +295,61 @@ class RepoPromptGUI:
     def reset_status_bar(self):
         self.status_bar.config(text=" Ready", fg=self.colors['status'])
         self.status_timer_id = None
+
+    def _show_status_context_menu(self, event):
+        """Show right-click context menu for status bar."""
+        try:
+            # Create context menu
+            context_menu = tk.Menu(self.root, tearoff=0, bg=self.colors['btn_bg'], fg=self.colors['btn_fg'])
+            context_menu.add_command(label="Copy", command=self._copy_status_bar)
+            context_menu.add_command(label="Paste", command=self._paste_to_status_bar)
+            context_menu.add_separator()
+            context_menu.add_command(label="Clear", command=self._clear_status_bar)
+            
+            # Show context menu at cursor position
+            context_menu.tk_popup(event.x_root, event.y_root)
+        except Exception as e:
+            logging.error(f"Error showing status context menu: {e}")
+
+    def _paste_to_status_bar(self):
+        """Paste clipboard content to status bar."""
+        try:
+            import pyperclip
+            clipboard_content = pyperclip.paste()
+            if clipboard_content:
+                # Clear any existing timer
+                if self.status_timer_id:
+                    self.root.after_cancel(self.status_timer_id)
+                    self.status_timer_id = None
+                
+                # Show pasted content in status bar
+                self.status_bar.config(text=f" {clipboard_content}", fg=self.colors['status'])
+                logging.info(f"Pasted to status bar: {clipboard_content[:50]}...")
+            else:
+                self.show_status_message("Clipboard is empty", error=True)
+        except Exception as e:
+            logging.error(f"Error pasting to status bar: {e}")
+            self.show_status_message("Error pasting from clipboard", error=True)
+
+    def _copy_status_bar(self):
+        """Copy status bar content to clipboard."""
+        try:
+            import pyperclip
+            # Get the current status bar text (remove leading space if present)
+            status_text = self.status_bar.cget("text").strip()
+            if status_text and status_text != "Ready":
+                pyperclip.copy(status_text)
+                self.show_status_message(f"Copied: {status_text[:30]}...", duration=2000)
+                logging.info(f"Copied status bar content: {status_text}")
+            else:
+                self.show_status_message("Nothing to copy", error=True)
+        except Exception as e:
+            logging.error(f"Error copying status bar: {e}")
+            self.show_status_message("Error copying to clipboard", error=True)
+
+    def _clear_status_bar(self):
+        """Clear the status bar."""
+        self.reset_status_bar()
 
     def update_cache_info(self):
         """Update the cache information display."""
@@ -391,6 +450,9 @@ class RepoPromptGUI:
             self.settings.set('app', 'log_level', self.settings_tab.log_level_var.get())
             self.settings.set('app', 'log_to_file', self.settings_tab.log_to_file_var.get())
             self.settings.set('app', 'log_to_console', self.settings_tab.log_to_console_var.get())
+            
+            # Folder selection settings
+            self.settings.set('app', 'default_start_folder', self.settings_tab.default_start_folder_var.get())
             
             self.settings.save()
             self.show_status_message("Settings saved successfully.")

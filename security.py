@@ -19,7 +19,11 @@ class SecurityValidator:
     MAX_TEMPLATE_SIZE = 1024 * 1024   # 1MB max template size
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max content length
     DANGEROUS_PATTERNS = [
-        r'<script[^>]*>.*?</script>',  # JavaScript
+        # Only block dangerous script patterns, not all scripts
+        r'<script[^>]*>.*?eval\s*\(.*?</script>',  # Scripts with eval
+        r'<script[^>]*>.*?exec\s*\(.*?</script>',   # Scripts with exec
+        r'<script[^>]*>.*?__import__.*?</script>',  # Scripts with __import__
+        r'<script[^>]*>.*?subprocess.*?</script>',  # Scripts with subprocess
         r'<?php.*?>',                   # PHP
         r'eval\s*\(',                  # eval() calls
         r'subprocess\s*\.',             # subprocess calls
@@ -133,22 +137,35 @@ class SecurityValidator:
             if len(content) > max_length:
                 return False, f"Content too long: {len(content)} characters (max: {max_length})"
             
-            # Check for dangerous patterns
+            # Check for dangerous patterns (only for non-HTML files or specific dangerous patterns)
             for pattern in self.DANGEROUS_PATTERNS:
                 if re.search(pattern, content, re.IGNORECASE | re.DOTALL):
                     return False, f"Dangerous pattern detected: {pattern}"
             
-            # Check for suspicious imports
-            suspicious_imports = ['subprocess', 'os.system', 'eval', 'exec', 'compile', '__import__']
-            for suspicious in suspicious_imports:
-                if suspicious in content:
-                    return False, f"Suspicious import/function detected: {suspicious}"
-            
-            # Check for file system operations
-            fs_operations = ['open(', 'file(', 'with open(']
-            for operation in fs_operations:
-                if operation in content:
-                    return False, f"File system operation detected: {operation}"
+            # For HTML files, be more lenient - only check for truly dangerous patterns
+            if content.strip().startswith('<!DOCTYPE') or content.strip().startswith('<html'):
+                # For HTML files, only check for the most dangerous patterns
+                dangerous_html_patterns = [
+                    r'<script[^>]*>.*?eval\s*\(.*?</script>',
+                    r'<script[^>]*>.*?exec\s*\(.*?</script>',
+                    r'<script[^>]*>.*?__import__.*?</script>',
+                    r'<script[^>]*>.*?subprocess.*?</script>',
+                ]
+                for pattern in dangerous_html_patterns:
+                    if re.search(pattern, content, re.IGNORECASE | re.DOTALL):
+                        return False, f"Dangerous HTML pattern detected: {pattern}"
+            else:
+                # For non-HTML files, check for suspicious imports and operations
+                suspicious_imports = ['subprocess', 'os.system', 'eval', 'exec', 'compile', '__import__']
+                for suspicious in suspicious_imports:
+                    if suspicious in content:
+                        return False, f"Suspicious import/function detected: {suspicious}"
+                
+                # Check for file system operations
+                fs_operations = ['open(', 'file(', 'with open(']
+                for operation in fs_operations:
+                    if operation in content:
+                        return False, f"File system operation detected: {operation}"
             
             return True, ""
             

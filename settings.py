@@ -54,7 +54,9 @@ class SettingsManager:
                 "error_recovery_attempts": 3,
                 # Path normalization settings
                 "path_normalization_enabled": 1,
-                "cross_platform_paths": 1
+                "cross_platform_paths": 1,
+                # Folder selection settings
+                "default_start_folder": os.path.expanduser("~")
                 # Add default for text_extensions if needed, though FileHandler provides it
             },
             "repo": {} # For future repo-specific settings if needed

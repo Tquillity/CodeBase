@@ -34,7 +34,8 @@ class RepoHandler:
         if self.gui.is_loading:
             self.gui.show_status_message("Loading...", error=True)
             return
-        dialog = FolderDialog(self.gui.root, self.gui.recent_folders, self.gui.colors, on_delete_callback=self.gui.delete_recent_folder)
+        default_start_folder = self.gui.settings.get('app', 'default_start_folder', os.path.expanduser("~"))
+        dialog = FolderDialog(self.gui.root, self.gui.recent_folders, self.gui.colors, on_delete_callback=self.gui.delete_recent_folder, default_start_folder=default_start_folder)
         folder = dialog.show()
         if folder:
             self.gui.update_recent_folders(folder)
