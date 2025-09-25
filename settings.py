@@ -2,15 +2,16 @@ import os
 import json
 import appdirs
 import logging
+from typing import Dict, Any, Optional
 
 class SettingsManager:
-    def __init__(self):
-        self.user_data_dir = appdirs.user_data_dir("CodeBase")
-        self.settings_file = os.path.join(self.user_data_dir, "settings.json")
+    def __init__(self) -> None:
+        self.user_data_dir: str = appdirs.user_data_dir("CodeBase")
+        self.settings_file: str = os.path.join(self.user_data_dir, "settings.json")
         os.makedirs(self.user_data_dir, exist_ok=True)
-        self.settings = self.load_settings()
+        self.settings: Dict[str, Any] = self.load_settings()
 
-    def load_settings(self):
+    def load_settings(self) -> Dict[str, Any]:
         """Loads settings from JSON file, applying defaults for missing keys."""
         default_settings = {
             "app": {
@@ -83,7 +84,7 @@ class SettingsManager:
         return settings
 
 
-    def save(self):
+    def save(self) -> None:
         """Saves the current settings to the JSON file."""
         try:
             with open(self.settings_file, 'w', encoding='utf-8') as f:
@@ -94,12 +95,12 @@ class SettingsManager:
              logging.error(f"Error serializing settings (possible non-serializable data): {e}")
 
 
-    def get(self, section, key, default=None):
+    def get(self, section: str, key: str, default: Any = None) -> Any:
         """Gets a setting value, returning default if not found."""
         # Use the loaded self.settings which includes defaults
         return self.settings.get(section, {}).get(key, default)
 
-    def set(self, section, key, value):
+    def set(self, section: str, key: str, value: Any) -> None:
         """Sets a setting value."""
         if section not in self.settings:
             self.settings[section] = {}

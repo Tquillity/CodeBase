@@ -7,6 +7,7 @@ from tkinter import messagebox
 import threading
 import logging
 import time
+from typing import Set, List, Optional, Any, Dict
 
 from file_scanner import scan_repo, parse_gitignore, is_ignored_path, is_text_file
 from content_manager import get_file_content, generate_content
@@ -20,16 +21,16 @@ class FileHandler:
     text_extensions_default = TEXT_EXTENSIONS_DEFAULT
     FILE_SEPARATOR = FILE_SEPARATOR
 
-    def __init__(self, gui):
+    def __init__(self, gui: Any) -> None:
         self.gui = gui
-        self.repo_path = None
-        self.loaded_files = set()
-        self.scanned_text_files = set()
-        self.ignore_patterns = []
-        self.recent_folders = gui.load_recent_folders()
-        self.content_cache = ThreadSafeLRUCache(CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB)
-        self.lock = threading.Lock()
-        self.read_errors = []
+        self.repo_path: Optional[str] = None
+        self.loaded_files: Set[str] = set()
+        self.scanned_text_files: Set[str] = set()
+        self.ignore_patterns: List[str] = []
+        self.recent_folders: List[str] = gui.load_recent_folders()
+        self.content_cache: ThreadSafeLRUCache = ThreadSafeLRUCache(CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB)
+        self.lock: threading.Lock = threading.Lock()
+        self.read_errors: List[str] = []
 
     @classmethod
     def get_extension_groups(cls):
@@ -269,7 +270,7 @@ class FileHandler:
         thread = threading.Thread(target=generate_content, args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui), daemon=True)
         thread.start()
 
-    def expand_all(self, item=""):
+    def expand_all(self, item: str = "") -> None:
         """Iterative expand_all implementation to prevent stack overflow and improve performance."""
         tree = self.gui.structure_tab.tree
         
@@ -302,7 +303,7 @@ class FileHandler:
         if processed_count >= TREE_SAFETY_LIMIT:
             logging.warning(f"expand_all: Processed {processed_count} items, stopped at safety limit")
 
-    def collapse_all(self, item=""):
+    def collapse_all(self, item: str = "") -> None:
         """Iterative collapse_all implementation to prevent stack overflow and improve performance."""
         tree = self.gui.structure_tab.tree
         
@@ -394,7 +395,7 @@ class FileHandler:
         
         return True
 
-    def expand_levels(self, levels, item="", current_level=0):
+    def expand_levels(self, levels: int, item: str = "", current_level: int = 0) -> None:
         """Iterative expand_levels implementation to prevent stack overflow and improve performance."""
         tree = self.gui.structure_tab.tree
         

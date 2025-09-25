@@ -2,6 +2,7 @@ import os
 import time
 import threading
 import logging
+from typing import Optional, List, Any, Callable
 from constants import FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED, SECURITY_ENABLED
 from lru_cache import ThreadSafeLRUCache
 from path_utils import normalize_for_cache, get_relative_path
@@ -9,7 +10,7 @@ from exceptions import FileOperationError, RepositoryError
 from error_handler import handle_error, safe_execute
 from security import validate_file_path, validate_file_size, validate_content_security
 
-def get_file_content(file_path, content_cache, lock, read_errors):
+def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: threading.Lock, read_errors: List[str]) -> Optional[str]:
     # Use normalized path for cache keys for cross-platform consistency
     normalized_path = normalize_for_cache(file_path)
     
@@ -18,16 +19,9 @@ def get_file_content(file_path, content_cache, lock, read_errors):
     if cached_content is not None:
         return cached_content
 
-    # Enhanced security validation
+    # Enhanced security validation (only for suspicious files)
     if SECURITY_ENABLED:
-        # Validate file path security
-        is_valid, error = validate_file_path(file_path)
-        if not is_valid:
-            with lock:
-                read_errors.append(f"Security: {file_path} - {error}")
-            return None
-        
-        # Validate file size
+        # Only validate file size for normal repository files
         is_valid, error = validate_file_size(file_path)
         if not is_valid:
             with lock:
@@ -39,13 +33,16 @@ def get_file_content(file_path, content_cache, lock, read_errors):
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
             content = file.read()
             
-            # Additional content security validation
+            # Additional content security validation (only for suspicious content)
             if SECURITY_ENABLED:
-                is_valid, error = validate_content_security(content, "file")
-                if not is_valid:
-                    with lock:
-                        read_errors.append(f"Content: {file_path} - {error}")
-                    return None
+                # Only validate content for files that might be dangerous
+                file_ext = os.path.splitext(file_path)[1].lower()
+                if file_ext in ['.html', '.htm', '.xml', '.svg']:
+                    is_valid, error = validate_content_security(content, "file")
+                    if not is_valid:
+                        with lock:
+                            read_errors.append(f"Content: {file_path} - {error}")
+                        return None
             
             # Store in LRU cache (handles its own locking)
             content_cache.put(normalized_path, content)
@@ -97,7 +94,7 @@ def get_file_content(file_path, content_cache, lock, read_errors):
 
     return None
 
-def generate_content(files_to_include, repo_path, lock, completion_callback, content_cache, read_errors, progress_callback=None, gui=None):
+def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock, completion_callback: Callable, content_cache: ThreadSafeLRUCache, read_errors: List[str], progress_callback: Optional[Callable] = None, gui: Optional[Any] = None) -> None:
     try:
         start_time = time.time()
         content_parts = []

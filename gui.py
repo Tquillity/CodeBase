@@ -2,6 +2,7 @@
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, Toplevel, BooleanVar, IntVar, StringVar
+from typing import Dict, List, Set, Optional, Any, Callable
 from colors import *
 from tabs.content_tab import ContentTab
 from tabs.structure_tab import StructureTab
@@ -36,7 +37,7 @@ setup_logging(
     format_string=LOG_FORMAT
 )
 class RepoPromptGUI:
-    def __init__(self, root):
+    def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.version = VERSION
         self.settings = SettingsManager()
@@ -228,7 +229,7 @@ class RepoPromptGUI:
         self.status_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=(5, 10))
         self.status_timer_id = None
 
-    def show_loading_state(self, message):
+    def show_loading_state(self, message: str) -> None:
         self.progress.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
         self.progress.start()
         self.show_status_message(message, duration=ERROR_MESSAGE_DURATION)
@@ -236,14 +237,14 @@ class RepoPromptGUI:
         self.root.config(cursor="watch")
         self.root.update_idletasks()
 
-    def hide_loading_state(self):
+    def hide_loading_state(self) -> None:
         self.progress.stop()
         self.progress.grid_remove()
         self.is_loading = False
         self.root.config(cursor="")
         self.root.update_idletasks()
 
-    def show_status_message(self, message, duration=STATUS_MESSAGE_DURATION, error=False):
+    def show_status_message(self, message: str, duration: int = STATUS_MESSAGE_DURATION, error: bool = False) -> None:
         if self.status_timer_id:
             self.root.after_cancel(self.status_timer_id)
             self.status_timer_id = None

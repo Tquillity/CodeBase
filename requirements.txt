@@ -1,2 +1,5 @@
+# Runtime dependencies for CodeBase
+# For development dependencies, see requirements-dev.txt
+
 pyperclip
 appdirs

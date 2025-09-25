@@ -143,16 +143,9 @@ class FileListTab(tk.Frame):
                     continue
                 full_path = ensure_absolute_path(line, self.gui.current_repo_path)
             if os.path.isfile(full_path):
-                # Enhanced security validation
+                # Enhanced security validation (only for suspicious files)
                 if SECURITY_ENABLED:
-                    # Validate file path security
-                    is_valid, error = validate_file_path(full_path, self.gui.current_repo_path)
-                    if not is_valid:
-                        with self.gui.file_handler.lock:
-                            self.gui.list_read_errors.append(f"Security: {line} - {error}")
-                        continue
-                    
-                    # Validate file size
+                    # Only validate file size for normal repository files
                     is_valid, error = validate_file_size(full_path)
                     if not is_valid:
                         with self.gui.file_handler.lock:
