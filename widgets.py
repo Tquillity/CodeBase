@@ -165,6 +165,9 @@ class FolderDialog:
     def _create_list_item(self, folder_path):
         item_frame = tk.Frame(self.list_frame, bg=self.colors['bg_accent'])
         item_frame.pack(fill="x", expand=True)
+        
+        # Store reference to item frame for highlighting
+        item_frame.folder_path = folder_path
 
         delete_button = tk.Button(item_frame, text="🗑", command=lambda p=folder_path, f=item_frame: self._delete_item(p, f),
                                   bg=self.colors['btn_bg'], fg=self.colors['status'], relief="flat", activebackground=self.colors['btn_hover'])
@@ -174,6 +177,9 @@ class FolderDialog:
         path_label = tk.Label(item_frame, text=folder_path, anchor="w",
                               bg=self.colors['bg_accent'], fg=self.colors['fg'])
         path_label.pack(side=tk.LEFT, fill="x", expand=True)
+        
+        # Store reference to path label for highlighting
+        item_frame.path_label = path_label
 
         # Bind clicks for selection
         path_label.bind("<Button-1>", lambda e, p=folder_path: self.on_label_click(p))
@@ -182,10 +188,24 @@ class FolderDialog:
 
     def on_label_click(self, folder_path):
         self.folder_var.set(folder_path)
+        self._highlight_selected_item(folder_path)
 
     def on_label_double_click(self, folder_path):
         self.folder_var.set(folder_path)
         self.confirm()
+
+    def _highlight_selected_item(self, selected_folder_path):
+        """Highlight the selected folder item and unhighlight others."""
+        for widget in self.list_frame.winfo_children():
+            if hasattr(widget, 'folder_path') and hasattr(widget, 'path_label'):
+                if widget.folder_path == selected_folder_path:
+                    # Highlight selected item
+                    widget.config(bg=self.colors['btn_hover'])
+                    widget.path_label.config(bg=self.colors['btn_hover'], fg=self.colors['fg'])
+                else:
+                    # Unhighlight other items
+                    widget.config(bg=self.colors['bg_accent'])
+                    widget.path_label.config(bg=self.colors['bg_accent'], fg=self.colors['fg'])
 
     def _delete_item(self, folder_path, frame_widget):
         if self.on_delete_callback:

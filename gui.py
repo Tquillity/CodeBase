@@ -174,6 +174,13 @@ class RepoPromptGUI:
     def update_recent_folders(self, new_folder):
         if not new_folder: return
         abs_path = os.path.abspath(new_folder)
+        
+        # Validate folder exists and is not a dummy folder
+        if not os.path.exists(abs_path) or not os.path.isdir(abs_path):
+            return
+        if abs_path.startswith('/folder') and abs_path[7:].isdigit():
+            return  # Skip dummy folders like /folder1, /folder2, etc.
+            
         if abs_path in self.recent_folders:
             self.recent_folders.remove(abs_path)
         self.recent_folders.insert(0, abs_path)
