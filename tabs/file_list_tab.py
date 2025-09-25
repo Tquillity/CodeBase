@@ -8,7 +8,8 @@ from file_scanner import is_text_file
 from path_utils import normalize_path, is_path_within_base, ensure_absolute_path
 from exceptions import FileOperationError, SecurityError, UIError
 from error_handler import handle_error, safe_execute
-from constants import ERROR_HANDLING_ENABLED
+from constants import ERROR_HANDLING_ENABLED, SECURITY_ENABLED
+from security import validate_file_path, validate_file_size, validate_content_security
 class FileListTab(tk.Frame):
     def __init__(self, parent, gui):
         super().__init__(parent)
@@ -142,6 +143,22 @@ class FileListTab(tk.Frame):
                     continue
                 full_path = ensure_absolute_path(line, self.gui.current_repo_path)
             if os.path.isfile(full_path):
+                # Enhanced security validation
+                if SECURITY_ENABLED:
+                    # Validate file path security
+                    is_valid, error = validate_file_path(full_path, self.gui.current_repo_path)
+                    if not is_valid:
+                        with self.gui.file_handler.lock:
+                            self.gui.list_read_errors.append(f"Security: {line} - {error}")
+                        continue
+                    
+                    # Validate file size
+                    is_valid, error = validate_file_size(full_path)
+                    if not is_valid:
+                        with self.gui.file_handler.lock:
+                            self.gui.list_read_errors.append(f"Size: {line} - {error}")
+                        continue
+                
                 # Optional: Check if it's a text file
                 if is_text_file(full_path, self.gui):
                     with self.gui.file_handler.lock:

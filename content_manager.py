@@ -2,11 +2,12 @@ import os
 import time
 import threading
 import logging
-from constants import FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED
+from constants import FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED, SECURITY_ENABLED
 from lru_cache import ThreadSafeLRUCache
 from path_utils import normalize_for_cache, get_relative_path
 from exceptions import FileOperationError, RepositoryError
 from error_handler import handle_error, safe_execute
+from security import validate_file_path, validate_file_size, validate_content_security
 
 def get_file_content(file_path, content_cache, lock, read_errors):
     # Use normalized path for cache keys for cross-platform consistency
@@ -17,10 +18,35 @@ def get_file_content(file_path, content_cache, lock, read_errors):
     if cached_content is not None:
         return cached_content
 
+    # Enhanced security validation
+    if SECURITY_ENABLED:
+        # Validate file path security
+        is_valid, error = validate_file_path(file_path)
+        if not is_valid:
+            with lock:
+                read_errors.append(f"Security: {file_path} - {error}")
+            return None
+        
+        # Validate file size
+        is_valid, error = validate_file_size(file_path)
+        if not is_valid:
+            with lock:
+                read_errors.append(f"Size: {file_path} - {error}")
+            return None
+
     try:
         # FIX: Use the original, case-sensitive file_path for opening the file.
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
             content = file.read()
+            
+            # Additional content security validation
+            if SECURITY_ENABLED:
+                is_valid, error = validate_content_security(content, "file")
+                if not is_valid:
+                    with lock:
+                        read_errors.append(f"Content: {file_path} - {error}")
+                    return None
+            
             # Store in LRU cache (handles its own locking)
             content_cache.put(normalized_path, content)
             return content

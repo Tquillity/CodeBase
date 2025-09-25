@@ -10,7 +10,7 @@ import time
 
 from file_scanner import scan_repo, parse_gitignore, is_ignored_path, is_text_file
 from content_manager import get_file_content, generate_content
-from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED
+from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED, TREE_MAX_ITEMS, TREE_UI_UPDATE_INTERVAL, TREE_SAFETY_LIMIT
 from lru_cache import ThreadSafeLRUCache
 from path_utils import normalize_for_cache, is_same_path
 from exceptions import FileOperationError, UIError, ThreadingError
@@ -270,26 +270,67 @@ class FileHandler:
         thread.start()
 
     def expand_all(self, item=""):
+        """Iterative expand_all implementation to prevent stack overflow and improve performance."""
         tree = self.gui.structure_tab.tree
-        children = tree.get_children(item)
-        for child_id in children:
-            tags = tree.item(child_id)['tags']
-            if 'folder' in tags:
-                # Ensure it's populated before opening and recursing
-                self.expand_folder(child_id)
-                if tree.exists(child_id):
-                     tree.item(child_id, open=True)
-                     self.expand_all(child_id)
+        
+        # Use a queue for iterative processing instead of recursion
+        items_to_process = [item]
+        processed_count = 0
+        
+        while items_to_process and processed_count < TREE_SAFETY_LIMIT:
+            current_item = items_to_process.pop(0)
+            processed_count += 1
+            
+            # Get children of current item
+            children = tree.get_children(current_item)
+            
+            # Process each child
+            for child_id in children:
+                tags = tree.item(child_id)['tags']
+                if 'folder' in tags:
+                    # Ensure it's populated before opening
+                    self.expand_folder(child_id)
+                    if tree.exists(child_id):
+                        tree.item(child_id, open=True)
+                        # Add to queue for processing (instead of recursion)
+                        items_to_process.append(child_id)
+            
+            # Allow UI updates to prevent blocking
+            if processed_count % TREE_UI_UPDATE_INTERVAL == 0:
+                tree.update_idletasks()
+        
+        if processed_count >= TREE_SAFETY_LIMIT:
+            logging.warning(f"expand_all: Processed {processed_count} items, stopped at safety limit")
 
     def collapse_all(self, item=""):
+        """Iterative collapse_all implementation to prevent stack overflow and improve performance."""
         tree = self.gui.structure_tab.tree
-        children = tree.get_children(item)
-        for child_id in children:
-            tags = tree.item(child_id)['tags']
-            if 'folder' in tags:
-                tree.item(child_id, open=False)
-                # We also recurse on collapse to ensure all sub-folders are closed
-                self.collapse_all(child_id)
+        
+        # Use a queue for iterative processing instead of recursion
+        items_to_process = [item]
+        processed_count = 0
+        
+        while items_to_process and processed_count < TREE_SAFETY_LIMIT:
+            current_item = items_to_process.pop(0)
+            processed_count += 1
+            
+            # Get children of current item
+            children = tree.get_children(current_item)
+            
+            # Process each child
+            for child_id in children:
+                tags = tree.item(child_id)['tags']
+                if 'folder' in tags:
+                    tree.item(child_id, open=False)
+                    # Add to queue for processing (instead of recursion)
+                    items_to_process.append(child_id)
+            
+            # Allow UI updates to prevent blocking
+            if processed_count % TREE_UI_UPDATE_INTERVAL == 0:
+                tree.update_idletasks()
+        
+        if processed_count >= TREE_SAFETY_LIMIT:
+            logging.warning(f"collapse_all: Processed {processed_count} items, stopped at safety limit")
 
     def generate_folder_structure_text(self):
         tree = self.gui.structure_tab.tree
@@ -325,29 +366,67 @@ class FileHandler:
         return "\n".join(structure_lines)
 
     def are_all_folders_expanded(self, item=""):
+        """Iterative are_all_folders_expanded implementation to prevent stack overflow and improve performance."""
         tree = self.gui.structure_tab.tree
-        children = tree.get_children(item)
-        for child_id in children:
-            tags = tree.item(child_id)['tags']
-            if 'folder' in tags:
-                if not tree.item(child_id)['open']:
-                    return False
-                # If it's open, we need to check its children too
-                if not self.are_all_folders_expanded(child_id):
-                    return False
+        
+        # Use a queue for iterative processing instead of recursion
+        items_to_check = [item]
+        processed_count = 0
+        
+        while items_to_check and processed_count < TREE_SAFETY_LIMIT:
+            current_item = items_to_check.pop(0)
+            processed_count += 1
+            
+            # Get children of current item
+            children = tree.get_children(current_item)
+            
+            # Check each child
+            for child_id in children:
+                tags = tree.item(child_id)['tags']
+                if 'folder' in tags:
+                    if not tree.item(child_id)['open']:
+                        return False
+                    # Add to queue for checking (instead of recursion)
+                    items_to_check.append(child_id)
+        
+        if processed_count >= TREE_SAFETY_LIMIT:
+            logging.warning(f"are_all_folders_expanded: Processed {processed_count} items, stopped at safety limit")
+        
         return True
 
     def expand_levels(self, levels, item="", current_level=0):
+        """Iterative expand_levels implementation to prevent stack overflow and improve performance."""
         tree = self.gui.structure_tab.tree
-        if current_level >= levels:
-             return
-        children = tree.get_children(item)
-        for child_id in children:
-            tags = tree.item(child_id)['tags']
-            if 'folder' in tags:
-                # Ensure it's populated before opening
-                self.expand_folder(child_id)
-                if tree.exists(child_id):
-                    tree.item(child_id, open=True)
-                    # Recurse for the next level
-                    self.expand_levels(levels, child_id, current_level + 1)
+        
+        # Use a queue for iterative processing with level tracking
+        items_to_process = [(item, current_level)]
+        processed_count = 0
+        
+        while items_to_process and processed_count < TREE_SAFETY_LIMIT:
+            current_item, level = items_to_process.pop(0)
+            processed_count += 1
+            
+            # Stop if we've reached the desired level
+            if level >= levels:
+                continue
+            
+            # Get children of current item
+            children = tree.get_children(current_item)
+            
+            # Process each child
+            for child_id in children:
+                tags = tree.item(child_id)['tags']
+                if 'folder' in tags:
+                    # Ensure it's populated before opening
+                    self.expand_folder(child_id)
+                    if tree.exists(child_id):
+                        tree.item(child_id, open=True)
+                        # Add to queue for next level processing (instead of recursion)
+                        items_to_process.append((child_id, level + 1))
+            
+            # Allow UI updates to prevent blocking
+            if processed_count % TREE_UI_UPDATE_INTERVAL == 0:
+                tree.update_idletasks()
+        
+        if processed_count >= TREE_SAFETY_LIMIT:
+            logging.warning(f"expand_levels: Processed {processed_count} items, stopped at safety limit")

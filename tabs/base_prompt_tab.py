@@ -3,6 +3,8 @@ from tkinter import scrolledtext, filedialog, messagebox
 import os
 import logging
 from widgets import Tooltip
+from security import validate_template_file, validate_content_security, sanitize_content
+from constants import SECURITY_ENABLED
 
 class BasePromptTab(tk.Frame):
     def __init__(self, parent, gui, template_dir):
@@ -121,11 +123,32 @@ class BasePromptTab(tk.Frame):
         )
         if template_file:
             try:
+                # Enhanced security validation
+                if SECURITY_ENABLED:
+                    is_valid, error = validate_template_file(template_file)
+                    if not is_valid:
+                        messagebox.showerror("Security Warning", f"Template validation failed:\n{error}")
+                        return
+                
                 with open(template_file, 'r', encoding='utf-8') as file:
                     content = file.read()
-                if any(tag in content for tag in ['<script>', '<?php', 'eval(', 'subprocess']):
-                    messagebox.showerror("Security Warning", "Template content might be unsafe. Loading cancelled.")
-                    return
+                
+                # Additional content security validation
+                if SECURITY_ENABLED:
+                    is_valid, error = validate_content_security(content, "template")
+                    if not is_valid:
+                        messagebox.showerror("Security Warning", f"Template content validation failed:\n{error}")
+                        return
+                    
+                    # Sanitize content if needed
+                    sanitized_content = sanitize_content(content)
+                    if sanitized_content != content:
+                        if messagebox.askyesno("Security Notice", 
+                            "Potentially unsafe content detected and sanitized. Continue with sanitized version?"):
+                            content = sanitized_content
+                        else:
+                            return
+                
                 self.base_prompt_text.delete(1.0, tk.END)
                 self.base_prompt_text.insert(tk.END, content)
                 self.gui.show_status_message(f"Template '{os.path.basename(template_file)}' loaded.")
