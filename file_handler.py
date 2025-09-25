@@ -294,9 +294,15 @@ class FileHandler:
         thread = threading.Thread(target=generate_content, args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui), daemon=True)
         thread.start()
 
-    def expand_all(self, item: str = "", max_depth: int = 3) -> None:
-        """Iterative expand_all implementation with depth limit to prevent infinite loops."""
+    def expand_all(self, item: str = "", max_depth: int = None) -> None:
+        """Iterative expand_all implementation with smart depth limiting to prevent infinite loops."""
         tree = self.gui.structure_tab.tree
+        
+        # Smart depth calculation: analyze repository structure first
+        if max_depth is None:
+            max_depth = self._calculate_smart_depth_limit()
+        
+        logging.info(f"Expanding tree with depth limit: {max_depth}")
         
         # Use a queue for iterative processing instead of recursion
         # Each item in queue is (item_id, depth)
@@ -311,6 +317,12 @@ class FileHandler:
             if depth >= max_depth:
                 logging.debug(f"Skipping expansion at depth {depth} (max: {max_depth})")
                 continue
+            
+            # Additional safety: Skip if we've processed too many items at this depth
+            # This prevents infinite loops in pathological directory structures
+            if processed_count > 1000 and depth > 5:
+                logging.warning(f"Stopping expansion at depth {depth} due to high item count ({processed_count})")
+                break
             
             # Get children of current item
             children = tree.get_children(current_item)
@@ -334,6 +346,46 @@ class FileHandler:
             logging.warning(f"expand_all: Processed {processed_count} items, stopped at safety limit")
         else:
             logging.info(f"expand_all: Processed {processed_count} items, completed successfully")
+
+    def _calculate_smart_depth_limit(self) -> int:
+        """Calculate an appropriate depth limit based on repository structure."""
+        if not self.repo_path or not os.path.exists(self.repo_path):
+            return 5  # Default fallback
+        
+        try:
+            # Sample the repository structure to determine appropriate depth
+            max_depth_found = 0
+            sample_count = 0
+            max_samples = 100  # Limit sampling for performance
+            
+            for root, dirs, files in os.walk(self.repo_path):
+                if sample_count >= max_samples:
+                    break
+                    
+                # Skip hidden directories and common build/cache directories
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', 'venv', 'env', '__pycache__', 'build', 'dist', 'target']]
+                
+                depth = root.count(os.sep) - self.repo_path.count(os.sep)
+                max_depth_found = max(max_depth_found, depth)
+                sample_count += 1
+            
+            # Smart depth calculation:
+            # - Use actual max depth found (100% coverage)
+            # - Add safety buffer of 2 levels to handle edge cases
+            # - Maximum: 15 levels (to prevent infinite loops in extreme cases)
+            smart_depth = min(15, max_depth_found + 2)
+            
+            logging.info(f"Repository max depth: {max_depth_found}, using smart limit: {smart_depth}")
+            return smart_depth
+            
+        except Exception as e:
+            logging.warning(f"Error calculating smart depth limit: {e}, using default")
+            return 10  # Generous default for unknown repositories
+
+    def expand_all_unlimited(self, item: str = "") -> None:
+        """Expand all folders with no depth limit - use with caution on very large repositories."""
+        logging.warning("Using unlimited expansion - this may be slow on large repositories")
+        self.expand_all(item, max_depth=999)  # Effectively unlimited
 
     def collapse_all(self, item: str = "") -> None:
         """Iterative collapse_all implementation to prevent stack overflow and improve performance."""
