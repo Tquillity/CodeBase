@@ -9,7 +9,8 @@ from content_manager import get_file_content, generate_content, FILE_SEPARATOR
 from lru_cache import ThreadSafeLRUCache
 
 # Setup logging for tests
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+from logging_config import setup_logging
+setup_logging(level="INFO", console_output=False)
 
 @pytest.fixture
 def temp_repo():

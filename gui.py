@@ -23,15 +23,24 @@ from handlers.repo_handler import RepoHandler
 from handlers.theme_manager import ThemeManager
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
 import queue  # FIX: Added for thread-safe Tkinter callbacks
-from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION
+from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION, ERROR_HANDLING_ENABLED, DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT
+from exceptions import UIError, ConfigurationError, ThreadingError
+from error_handler import handle_error, safe_execute, get_error_handler
+from logging_config import setup_logging, get_logger
 
-# NEW_LOG: Set level to DEBUG to see all messages
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', filename='codebase_debug.log', filemode='w')
+# Setup centralized logging configuration (will be updated after settings load)
+setup_logging(
+    level=DEFAULT_LOG_LEVEL,
+    log_file=LOG_FILE_PATH if LOG_TO_FILE else None,
+    console_output=LOG_TO_CONSOLE,
+    format_string=LOG_FORMAT
+)
 class RepoPromptGUI:
     def __init__(self, root):
         self.root = root
         self.version = VERSION
         self.settings = SettingsManager()
+        self.logger = get_logger(__name__)
         self.high_contrast_mode = BooleanVar(value=self.settings.get('app', 'high_contrast', 0))
         self.theme_manager = ThemeManager(self)
         self.theme_manager.apply_theme()
@@ -76,7 +85,34 @@ class RepoPromptGUI:
         
         # FIX: Added queue for thread-safe Tkinter callbacks from background threads
         self.task_queue = queue.Queue()
+        
+        # Update logging configuration based on settings
+        self._update_logging_config()
+        
         self._poll_queue()
+
+    def _update_logging_config(self):
+        """Update logging configuration based on user settings."""
+        try:
+            from logging_config import LoggingConfig
+            
+            # Get logging settings from user preferences
+            log_level = self.settings.get('app', 'log_level', DEFAULT_LOG_LEVEL)
+            log_to_file = self.settings.get('app', 'log_to_file', 1) == 1
+            log_to_console = self.settings.get('app', 'log_to_console', 1) == 1
+            
+            # Update logging configuration
+            LoggingConfig.setup_logging(
+                level=log_level,
+                log_file=LOG_FILE_PATH if log_to_file else None,
+                console_output=log_to_console,
+                format_string=LOG_FORMAT
+            )
+            
+            self.logger.info(f"Logging configured: level={log_level}, file={log_to_file}, console={log_to_console}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update logging configuration: {e}")
 
     # FIX: Polling method to process queued tasks in the main thread
     def _poll_queue(self):

@@ -28,6 +28,23 @@ VERSION = "3.2"
 CACHE_MAX_SIZE = 1000  # Maximum number of cached files
 CACHE_MAX_MEMORY_MB = 100  # Maximum memory usage in MB
 
+# Path normalization settings
+PATH_NORMALIZATION_ENABLED = True  # Enable consistent path normalization
+CROSS_PLATFORM_PATHS = True  # Use forward slashes for cross-platform compatibility
+
+# Error handling settings
+ERROR_HANDLING_ENABLED = True  # Enable centralized error handling
+ERROR_UI_FEEDBACK = True  # Show UI error messages
+ERROR_LOGGING_LEVEL = "ERROR"  # Default error logging level
+ERROR_RECOVERY_ATTEMPTS = 3  # Number of recovery attempts for recoverable errors
+
+# Logging configuration
+DEFAULT_LOG_LEVEL = "INFO"  # Default logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+LOG_TO_FILE = True  # Enable file logging
+LOG_TO_CONSOLE = True  # Enable console logging
+LOG_FILE_PATH = "codebase_debug.log"  # Default log file path
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"  # Log format string
+
 # UI Configuration
 DEFAULT_WINDOW_SIZE = "1200x800"
 DEFAULT_WINDOW_POSITION = "+100+100"

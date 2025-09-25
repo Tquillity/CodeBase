@@ -4,6 +4,10 @@ import fnmatch
 import mimetypes
 import time
 import logging
+from path_utils import normalize_path, get_relative_path
+from exceptions import RepositoryError, FileOperationError, SecurityError
+from error_handler import handle_error, safe_execute
+from constants import ERROR_HANDLING_ENABLED
 
 def scan_repo(folder, gui, progress_callback, completion_callback, lock):
     try:
@@ -55,7 +59,14 @@ def scan_repo(folder, gui, progress_callback, completion_callback, lock):
         gui.root.after(0, completion_callback, repo_path, ignore_patterns, scanned_files_temp, loaded_files_temp, errors)
 
     except Exception as e:
-        logging.error(f"Unexpected scan error: {e}", exc_info=True)
+        error = RepositoryError(
+            f"Unexpected error during repository scan: {str(e)}",
+            repo_path=folder,
+            operation="scan_repo",
+            details={"error_type": type(e).__name__, "original_error": str(e)}
+        )
+        if ERROR_HANDLING_ENABLED:
+            handle_error(error, "scan_repo", show_ui=True)
         gui.root.after(0, completion_callback, None, None, set(), set(), [f"Unexpected scan error: {e}"])
 
 
@@ -80,7 +91,9 @@ def parse_gitignore(gitignore_path):
 def is_ignored_path(path, repo_root, ignore_list, gui):
     rel_path = None
     try:
-        rel_path = os.path.relpath(path, repo_root)
+        rel_path = get_relative_path(path, repo_root)
+        if rel_path is None:
+            return False
         # NEW_LOG
         logging.debug(f"Checking if ignored: {path} (rel: {rel_path})")
         rel_path_parts = rel_path.replace('\\', '/').split('/')

@@ -6,14 +6,23 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import signal
 import logging
+from logging_config import setup_logging, get_logger
+from constants import DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Setup logging for live reload
+setup_logging(
+    level=DEFAULT_LOG_LEVEL,
+    log_file=LOG_FILE_PATH if LOG_TO_FILE else None,
+    console_output=LOG_TO_CONSOLE,
+    format_string=LOG_FORMAT
+)
 
 class RestartHandler(FileSystemEventHandler):
     def __init__(self, script_to_watch, script_to_run):
         self.script_to_watch = script_to_watch # The script whose changes trigger restart
         self.script_to_run = script_to_run     # The script to execute (e.g., main.py)
         self.process = None
+        self.logger = get_logger(__name__)
         self.last_restart_time = 0
         self.debounce_delay = 2  # 2 seconds delay to avoid rapid restarts
         self.start_script()

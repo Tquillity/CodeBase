@@ -30,7 +30,10 @@ class SettingsManager:
                 "high_contrast": 0,
                 "search_case_sensitive": 0,
                 "search_whole_word": 0,
-                "default_base_prompt": ""
+                "default_base_prompt": "",
+                "log_level": "INFO",
+                "log_to_file": 1,
+                "log_to_console": 1
                 # Add default for text_extensions if needed, though FileHandler provides it
             },
             "repo": {} # For future repo-specific settings if needed

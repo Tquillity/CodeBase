@@ -5,6 +5,10 @@ import logging
 import os
 from file_list_handler import generate_list_content
 from file_scanner import is_text_file
+from path_utils import normalize_path, is_path_within_base, ensure_absolute_path
+from exceptions import FileOperationError, SecurityError, UIError
+from error_handler import handle_error, safe_execute
+from constants import ERROR_HANDLING_ENABLED
 class FileListTab(tk.Frame):
     def __init__(self, parent, gui):
         super().__init__(parent)
@@ -124,9 +128,9 @@ class FileListTab(tk.Frame):
             if not line or line in seen_paths:
                 continue
             if os.path.isabs(line):
-                full_path = os.path.normpath(line) # Normalize absolute path
+                full_path = normalize_path(line) # Normalize absolute path
                 # Security: Ensure it's within the current repo (or home dir)
-                if self.gui.current_repo_path and not full_path.startswith(self.gui.current_repo_path):
+                if self.gui.current_repo_path and not is_path_within_base(full_path, self.gui.current_repo_path):
                     with self.gui.file_handler.lock:
                         self.gui.list_read_errors.append(f"Invalid (outside repo): {line}")
                     continue
@@ -136,7 +140,7 @@ class FileListTab(tk.Frame):
                     with self.gui.file_handler.lock:
                         self.gui.list_read_errors.append(f"No repo loaded for relative: {line}")
                     continue
-                full_path = os.path.normpath(os.path.join(self.gui.current_repo_path, line))
+                full_path = ensure_absolute_path(line, self.gui.current_repo_path)
             if os.path.isfile(full_path):
                 # Optional: Check if it's a text file
                 if is_text_file(full_path, self.gui):

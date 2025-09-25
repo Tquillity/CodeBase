@@ -3,6 +3,10 @@ from tkinter import ttk
 from widgets import Tooltip
 import logging
 import os
+from path_utils import normalize_for_cache, get_relative_path
+from exceptions import UIError, FileOperationError
+from error_handler import handle_error, safe_execute
+from constants import ERROR_HANDLING_ENABLED
 
 class StructureTab(tk.Frame):
     def __init__(self, parent, gui, file_handler, settings, show_unloaded_var):
@@ -160,7 +164,7 @@ class StructureTab(tk.Frame):
              if any(t in tags for t in ['file_selected', 'file_default', 'file_unloaded']):
                  file_path = values[0]
                  try:
-                     rel_path = os.path.relpath(file_path, self.gui.current_repo_path)
+                     rel_path = get_relative_path(file_path, self.gui.current_repo_path) or file_path
                  except ValueError:
                      rel_path = file_path
 
@@ -272,7 +276,7 @@ class StructureTab(tk.Frame):
             elif values and len(values) > 0:
                  item_path = values[0]
                  # FIX: Normalize path for comparison with the set
-                 item_path_norm = os.path.normcase(item_path)
+                 item_path_norm = normalize_for_cache(item_path)
                  is_selected = item_path_norm in loaded_files_copy
 
                  if 'file_selected' in tags: tags.remove('file_selected')

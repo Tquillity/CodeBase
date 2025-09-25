@@ -10,8 +10,11 @@ import time
 
 from file_scanner import scan_repo, parse_gitignore, is_ignored_path, is_text_file
 from content_manager import get_file_content, generate_content
-from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB
+from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED
 from lru_cache import ThreadSafeLRUCache
+from path_utils import normalize_for_cache, is_same_path
+from exceptions import FileOperationError, UIError, ThreadingError
+from error_handler import handle_error, safe_execute
 
 class FileHandler:
     text_extensions_default = TEXT_EXTENSIONS_DEFAULT
@@ -76,7 +79,7 @@ class FileHandler:
         added_items = 0
         for item in items:
             item_path = os.path.join(path, item)
-            item_path_norm = os.path.normcase(item_path)
+            item_path_norm = normalize_for_cache(item_path)
 
             if is_ignored_path(item_path, self.repo_path, self.ignore_patterns, self.gui):
                 logging.debug(f"Ignored: {item_path}")
@@ -178,7 +181,7 @@ class FileHandler:
         new_state_bool = new_state_symbol == "☑"
         
         item_path = values[0]
-        item_path_norm = os.path.normcase(item_path)
+        item_path_norm = normalize_for_cache(item_path)
         
         tags = list(item_data['tags'])
         content_changed = False
@@ -222,7 +225,7 @@ class FileHandler:
             if not values or len(values) < 2: continue
 
             child_path = values[0]
-            child_path_norm = os.path.normcase(child_path)
+            child_path_norm = normalize_for_cache(child_path)
             tags = list(child_data['tags'])
             new_state_symbol = "☑" if selected else "☐"
             

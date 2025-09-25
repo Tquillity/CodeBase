@@ -8,9 +8,11 @@ import threading
 import logging
 import time # For timing tasks
 from widgets import FolderDialog
-from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION
+from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION, ERROR_HANDLING_ENABLED
 from lru_cache import ThreadSafeLRUCache
 from file_scanner import parse_gitignore, is_ignored_path
+from exceptions import RepositoryError, FileOperationError, SecurityError
+from error_handler import handle_error, safe_execute
 class RepoHandler:
     # Default text extensions (remains class variable for access in settings)
     text_extensions_default = TEXT_EXTENSIONS_DEFAULT
@@ -176,6 +178,13 @@ class RepoHandler:
             start_time = time.time()
             abs_path = os.path.abspath(folder)
             if not os.path.commonpath([abs_path, os.path.expanduser("~")]).startswith(os.path.expanduser("~")):
+                error = SecurityError(
+                    "Access outside user directory is not allowed",
+                    attempted_path=abs_path,
+                    details={"user_home": os.path.expanduser("~"), "attempted_path": abs_path}
+                )
+                if ERROR_HANDLING_ENABLED:
+                    handle_error(error, "_scan_repo_worker", show_ui=True)
                 self.gui.task_queue.put((completion_callback, (None, None, set(), set(), ["Security Error: Access outside user directory is not allowed."])))
                 return
             repo_path = abs_path
