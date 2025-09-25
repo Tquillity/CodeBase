@@ -53,6 +53,11 @@ class FileHandler:
         tree = self.gui.structure_tab.tree
         logging.info(f"Populating tree for root: {root_dir}")
         tree.delete(*tree.get_children())
+        
+        # Clear expanding items set to prevent conflicts with new repository
+        if hasattr(self, '_expanding_items'):
+            self._expanding_items.clear()
+        
         if not root_dir or not os.path.exists(root_dir):
             logging.warning("populate_tree called with invalid root_dir")
             return
@@ -131,34 +136,48 @@ class FileHandler:
         if not tree.exists(item_id):
             return
 
-        logging.info(f"Received expand request for item_id: '{item_id}'")
-        children = tree.get_children(item_id)
-
-        # *** THE FIX IS HERE ***
-        # Only build the level if the children list is not empty AND the first child has the 'dummy' tag.
-        # This is the only state where we need to populate the folder.
-        if children and 'dummy' in tree.item(children[0])['tags']:
-            logging.debug(f"Item '{item_id}' has a dummy child. Proceeding to build level.")
+        # Add a simple check to prevent infinite loops
+        if not hasattr(self, '_expanding_items'):
+            self._expanding_items = set()
+        
+        if item_id in self._expanding_items:
+            logging.debug(f"Item '{item_id}' is already being expanded, skipping")
+            return
             
-            values = tree.item(item_id)['values']
-            if not values or len(values) < 2:
-                logging.error(f"Cannot expand folder: Item {item_id} has invalid values '{values}'")
-                for child in children:
-                    tree.delete(child)
-                tree.insert(item_id, "end", text="Error: Invalid data", tags=('error',))
-                return
+        self._expanding_items.add(item_id)
+        
+        try:
+            logging.info(f"Received expand request for item_id: '{item_id}'")
+            children = tree.get_children(item_id)
 
-            item_path = values[0]
-            logging.info(f"Extracted path for expansion: '{item_path}'")
-            parent_selected = values[1] == "☑"
-            
-            self.build_tree_level(item_path, item_id, parent_selected)
-            logging.debug(f"Finished building level for {item_id}. It now has {len(tree.get_children(item_id))} children.")
-        else:
-            logging.debug(f"Item '{item_id}' is either empty or already populated. No action needed.")
+            # *** THE FIX IS HERE ***
+            # Only build the level if the children list is not empty AND the first child has the 'dummy' tag.
+            # This is the only state where we need to populate the folder.
+            if children and 'dummy' in tree.item(children[0])['tags']:
+                logging.debug(f"Item '{item_id}' has a dummy child. Proceeding to build level.")
+                
+                values = tree.item(item_id)['values']
+                if not values or len(values) < 2:
+                    logging.error(f"Cannot expand folder: Item {item_id} has invalid values '{values}'")
+                    for child in children:
+                        tree.delete(child)
+                    tree.insert(item_id, "end", text="Error: Invalid data", tags=('error',))
+                    return
 
-        # This can be called regardless, as it's a lightweight UI update
-        self.gui.root.after(0, self.gui.structure_tab.update_tree_strikethrough)
+                item_path = values[0]
+                logging.info(f"Extracted path for expansion: '{item_path}'")
+                parent_selected = values[1] == "☑"
+                
+                self.build_tree_level(item_path, item_id, parent_selected)
+                logging.debug(f"Finished building level for {item_id}. It now has {len(tree.get_children(item_id))} children.")
+            else:
+                logging.debug(f"Item '{item_id}' is either empty or already populated. No action needed.")
+
+            # This can be called regardless, as it's a lightweight UI update
+            self.gui.root.after(0, self.gui.structure_tab.update_tree_strikethrough)
+        finally:
+            # Remove from expanding set when done
+            self._expanding_items.discard(item_id)
 
 
     def toggle_selection(self, event):
@@ -275,17 +294,23 @@ class FileHandler:
         thread = threading.Thread(target=generate_content, args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui), daemon=True)
         thread.start()
 
-    def expand_all(self, item: str = "") -> None:
-        """Iterative expand_all implementation to prevent stack overflow and improve performance."""
+    def expand_all(self, item: str = "", max_depth: int = 3) -> None:
+        """Iterative expand_all implementation with depth limit to prevent infinite loops."""
         tree = self.gui.structure_tab.tree
         
         # Use a queue for iterative processing instead of recursion
-        items_to_process = [item]
+        # Each item in queue is (item_id, depth)
+        items_to_process = [(item, 0)]
         processed_count = 0
         
         while items_to_process and processed_count < TREE_SAFETY_LIMIT:
-            current_item = items_to_process.pop(0)
+            current_item, depth = items_to_process.pop(0)
             processed_count += 1
+            
+            # Skip if we've reached max depth
+            if depth >= max_depth:
+                logging.debug(f"Skipping expansion at depth {depth} (max: {max_depth})")
+                continue
             
             # Get children of current item
             children = tree.get_children(current_item)
@@ -298,8 +323,8 @@ class FileHandler:
                     self.expand_folder(child_id)
                     if tree.exists(child_id):
                         tree.item(child_id, open=True)
-                        # Add to queue for processing (instead of recursion)
-                        items_to_process.append(child_id)
+                        # Add to queue for processing with incremented depth
+                        items_to_process.append((child_id, depth + 1))
             
             # Allow UI updates to prevent blocking
             if processed_count % TREE_UI_UPDATE_INTERVAL == 0:
@@ -307,6 +332,8 @@ class FileHandler:
         
         if processed_count >= TREE_SAFETY_LIMIT:
             logging.warning(f"expand_all: Processed {processed_count} items, stopped at safety limit")
+        else:
+            logging.info(f"expand_all: Processed {processed_count} items, completed successfully")
 
     def collapse_all(self, item: str = "") -> None:
         """Iterative collapse_all implementation to prevent stack overflow and improve performance."""
