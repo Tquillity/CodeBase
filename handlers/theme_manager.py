@@ -60,6 +60,7 @@ class ThemeManager:
         self.gui.left_frame.config(bg=self.gui.colors['bg'])
         self.gui.left_separator.config(bg=self.gui.colors['btn_bg'])
         self.gui.info_label.config(bg=self.gui.colors['bg'], fg=self.gui.colors['fg'])
+        self.gui.cache_info_label.config(bg=self.gui.colors['bg'], fg=self.gui.colors['fg'])
         self.gui.prepend_checkbox.config(bg=self.gui.colors['bg'], fg=self.gui.colors['fg'], selectcolor=self.gui.colors['bg_accent'])
         self.gui.clear_button_frame.config(bg=self.gui.colors['bg'])
         for btn in [self.gui.select_button, self.gui.refresh_button, self.gui.copy_button, self.gui.copy_all_button, self.gui.copy_structure_button, self.gui.clear_button, self.gui.clear_all_button]:

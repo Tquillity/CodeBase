@@ -23,20 +23,43 @@ from handlers.repo_handler import RepoHandler
 from handlers.theme_manager import ThemeManager
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
 import queue  # FIX: Added for thread-safe Tkinter callbacks
+from constants import VERSION
 
 # NEW_LOG: Set level to DEBUG to see all messages
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', filename='codebase_debug.log', filemode='w')
 class RepoPromptGUI:
     def __init__(self, root):
         self.root = root
-        self.version = "3.0"
+        self.version = VERSION
         self.settings = SettingsManager()
         self.high_contrast_mode = BooleanVar(value=self.settings.get('app', 'high_contrast', 0))
         self.theme_manager = ThemeManager(self)
         self.theme_manager.apply_theme()
         self.root.title(f"CodeBase v{self.version}")
-        self.root.geometry(self.settings.get('app', 'window_geometry', "1920x1080"))
+        self.root.geometry(self.settings.get('app', 'window_geometry', "1200x800"))
         self.root.configure(bg=self.colors['bg'])
+        
+        # Ensure window is visible and properly sized
+        self.root.update_idletasks()
+        
+        # Force window to be visible and properly sized
+        self.root.deiconify()  # Restore if minimized
+        self.root.lift()        # Bring to front
+        self.root.focus_force() # Force focus
+        
+        # Set a reasonable size if the saved geometry is invalid
+        current_geometry = self.root.geometry()
+        if 'x1' in current_geometry or current_geometry == '1x1+0+0':
+            self.root.geometry("1200x800+100+100")
+            logging.info("Fixed invalid window geometry")
+        
+        # Temporarily bring to top
+        self.root.attributes('-topmost', True)
+        self.root.after(100, lambda: self.root.attributes('-topmost', False))
+        
+        # Debug: Log window creation
+        logging.info(f"Window created with geometry: {self.root.geometry()}")
+        logging.info(f"Window state: {self.root.state()}")
         self.prepend_var = IntVar(value=self.settings.get('app', 'prepend_prompt', 1))
         self.show_unloaded_var = IntVar(value=self.settings.get('app', 'show_unloaded', 0))
         self.user_data_dir = appdirs.user_data_dir("CodeBase")
@@ -59,21 +82,39 @@ class RepoPromptGUI:
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.list_selected_files = set()
         self.list_read_errors = []
+        
+        # Resource cleanup tracking (must be before _poll_queue)
+        self._shutdown_requested = False
+        self._background_threads = []
+        
         # FIX: Added queue for thread-safe Tkinter callbacks from background threads
         self.task_queue = queue.Queue()
         self._poll_queue()
 
     # FIX: Polling method to process queued tasks in the main thread
     def _poll_queue(self):
+        # Stop polling if shutdown requested
+        if self._shutdown_requested:
+            return
+            
         try:
-            while not self.task_queue.empty():
+            # Process all available tasks in the queue
+            while True:
                 task = self.task_queue.get_nowait()
                 if isinstance(task, tuple) and len(task) == 2:
                     func, args = task
-                    func(*args)
+                    try:
+                        func(*args)
+                    except Exception as e:
+                        logging.error(f"Error executing queued task: {e}")
         except queue.Empty:
             pass
-        self.root.after(100, self._poll_queue)  # Poll every 100ms
+        except Exception as e:
+            logging.error(f"Error in queue polling: {e}")
+        finally:
+            # Schedule next poll only if not shutting down
+            if not self._shutdown_requested:
+                self.root.after(50, self._poll_queue)  # Poll every 50ms for better responsiveness
 
     def trigger_preview_update(self):
         """Triggers the generation of the content preview tab."""
@@ -193,6 +234,16 @@ class RepoPromptGUI:
         self.status_bar.config(text=" Ready", fg=self.colors['status'])
         self.status_timer_id = None
 
+    def update_cache_info(self):
+        """Update the cache information display."""
+        try:
+            stats = self.file_handler.content_cache.stats()
+            cache_text = f"Cache: {stats['size']} items ({stats['memory_mb']:.1f} MB)"
+            self.cache_info_label.config(text=cache_text)
+        except Exception as e:
+            logging.warning(f"Error updating cache info: {e}")
+            self.cache_info_label.config(text="Cache: Error")
+
     def clear_current(self):
         if self.is_loading: self.show_status_message("Loading...", error=True); return
         current_index = self.notebook.index('current')
@@ -281,10 +332,92 @@ class RepoPromptGUI:
                             "© 2024-2025")
 
     def on_close(self):
-        self.settings.set('app', 'window_geometry', self.root.geometry())
-        self.settings.save()
-        logging.info("Closing application.")
-        self.root.destroy()
+        """Handle application shutdown with proper resource cleanup."""
+        logging.info("Starting application shutdown...")
+        
+        # Set shutdown flag to stop background operations
+        self._shutdown_requested = True
+        
+        # Save settings
+        try:
+            self.settings.set('app', 'window_geometry', self.root.geometry())
+            self.settings.save()
+            logging.info("Settings saved successfully.")
+        except Exception as e:
+            logging.error(f"Error saving settings: {e}")
+        
+        # Clean up resources
+        self._cleanup_resources()
+        
+        # Destroy the window
+        try:
+            self.root.destroy()
+            logging.info("Application closed successfully.")
+        except Exception as e:
+            logging.error(f"Error during window destruction: {e}")
+    
+    def _cleanup_resources(self):
+        """Clean up all application resources."""
+        logging.info("Cleaning up resources...")
+        
+        # Clear content cache
+        try:
+            if hasattr(self.file_handler, 'content_cache'):
+                self.file_handler.content_cache.clear()
+                logging.info("Content cache cleared.")
+        except Exception as e:
+            logging.error(f"Error clearing content cache: {e}")
+        
+        # Clear repo handler cache
+        try:
+            if hasattr(self.repo_handler, 'content_cache'):
+                self.repo_handler.content_cache.clear()
+                logging.info("Repo handler cache cleared.")
+        except Exception as e:
+            logging.error(f"Error clearing repo handler cache: {e}")
+        
+        # Wait for background threads to finish (with timeout)
+        self._wait_for_threads(timeout=5.0)
+        
+        # Clear task queue
+        try:
+            while not self.task_queue.empty():
+                try:
+                    self.task_queue.get_nowait()
+                except queue.Empty:
+                    break
+            logging.info("Task queue cleared.")
+        except Exception as e:
+            logging.error(f"Error clearing task queue: {e}")
+        
+        # Clear file lists
+        try:
+            self.list_selected_files.clear()
+            self.list_read_errors.clear()
+            logging.info("File lists cleared.")
+        except Exception as e:
+            logging.error(f"Error clearing file lists: {e}")
+    
+    def _wait_for_threads(self, timeout=5.0):
+        """Wait for background threads to complete with timeout."""
+        import time
+        
+        start_time = time.time()
+        while self._background_threads and (time.time() - start_time) < timeout:
+            # Remove completed threads
+            self._background_threads = [t for t in self._background_threads if t.is_alive()]
+            if self._background_threads:
+                time.sleep(0.1)  # Short sleep to avoid busy waiting
+        
+        if self._background_threads:
+            logging.warning(f"Some background threads did not complete within {timeout}s timeout")
+        else:
+            logging.info("All background threads completed successfully.")
+    
+    def register_background_thread(self, thread):
+        """Register a background thread for cleanup tracking."""
+        self._background_threads.append(thread)
+        logging.debug(f"Registered background thread: {thread.name}")
 
     def bind_keys(self):
         self.root.bind('<Control-r>', lambda e: self.repo_handler.select_repo())

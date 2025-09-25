@@ -62,10 +62,20 @@ class SettingsManager:
             logging.info(f"Settings file not found at {self.settings_file}. Using default settings.")
             settings = default_settings
 
-        # Ensure text_extensions uses FileHandler default if missing
-        if 'text_extensions' not in settings['app']:
-             from file_handler import FileHandler # Local import to avoid circular dep issues
-             settings['app']['text_extensions'] = {ext: 1 for ext in FileHandler.text_extensions_default}
+        # ** THE FIX IS HERE **
+        # Ensure that any new default text extensions are merged into the loaded settings,
+        # preserving the user's choices for existing extensions.
+        from constants import TEXT_EXTENSIONS_DEFAULT
+        # Get the full default list with every extension enabled by default.
+        default_extensions = {ext: 1 for ext in TEXT_EXTENSIONS_DEFAULT}
+        # Get the user's currently loaded extensions (or an empty dict if none exist).
+        loaded_extensions = settings['app'].get('text_extensions', {})
+        # Update the defaults with the user's settings. This means if a user has
+        # turned an extension OFF, their choice is preserved. Any NEW extensions
+        # from the default list that are not in the loaded list will be added.
+        default_extensions.update(loaded_extensions)
+        # Assign the fully merged dictionary back to the settings.
+        settings['app']['text_extensions'] = default_extensions
 
         return settings
 

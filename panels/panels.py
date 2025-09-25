@@ -7,9 +7,10 @@ from tabs.base_prompt_tab import BasePromptTab
 from tabs.settings_tab import SettingsTab
 from tabs.file_list_tab import FileListTab
 from colors import COLOR_HC_FG, COLOR_BG
+from constants import VERSION
 
 class HeaderFrame(tk.Frame):
-    def __init__(self, parent, colors, title="CodeBase", version="3.0"):
+    def __init__(self, parent, colors, title="CodeBase", version=VERSION):
         super().__init__(parent, bg=colors['bg'])
         self.colors = colors
         self.grid(row=0, column=0, columnspan=3, padx=10, pady=(10,0), sticky="ew")
@@ -44,7 +45,10 @@ class LeftPanel(tk.Frame):
         self.gui.refresh_button.pack(pady=button_pady, padx=10, fill='x')
 
         self.gui.info_label = tk.Label(self, text="Token Count: 0", bg=self.colors['bg'], fg=self.colors['fg'])
-        self.gui.info_label.pack(pady=10)
+        self.gui.info_label.pack(pady=5)
+        
+        self.gui.cache_info_label = tk.Label(self, text="Cache: 0 items (0 MB)", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 8))
+        self.gui.cache_info_label.pack(pady=2)
 
         self.gui.copy_button = self.gui.create_button(self, "Copy Contents (Ctrl+C)", self.gui.copy_handler.copy_contents, "Copy selected file contents", state=tk.DISABLED)
         self.gui.copy_button.pack(pady=button_pady, padx=10, fill='x')

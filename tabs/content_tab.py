@@ -152,6 +152,9 @@ class ContentTab(tk.Frame):
         if self.gui.current_repo_path:
              self.gui.copy_button.config(state=tk.NORMAL)
              self.gui.copy_all_button.config(state=tk.NORMAL)
+        
+        # Update cache information
+        self.gui.update_cache_info()
 
         self.update_content_expand_collapse_button()
 

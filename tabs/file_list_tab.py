@@ -21,6 +21,8 @@ class FileListTab(tk.Frame):
         self.load_list_button.pack(side=tk.LEFT, padx=10, pady=5)
         self.copy_list_button = self.gui.create_button(self, "Copy from List", self.copy_from_list, "Copy content from listed files", state=tk.DISABLED)
         self.copy_list_button.pack(side=tk.LEFT, padx=10, pady=5)
+        self.clear_list_button = self.gui.create_button(self, "Clear List", self.clear_file_list, "Clear the file list text area")
+        self.clear_list_button.pack(side=tk.LEFT, padx=10, pady=5)
         self.error_label = tk.Label(self, text="", bg=self.colors['bg'], fg=self.colors['status'], anchor="w")
         self.error_label.pack(fill="x", pady=5)
 
@@ -29,6 +31,7 @@ class FileListTab(tk.Frame):
         self.file_list_text.config(bg=colors['bg_accent'], fg=colors['fg'])
         self.load_list_button.config(bg=colors['btn_bg'], fg=colors['btn_fg'])
         self.copy_list_button.config(bg=colors['btn_bg'], fg=colors['btn_fg'])
+        self.clear_list_button.config(bg=colors['btn_bg'], fg=colors['btn_fg'])
         self.error_label.config(bg=colors['bg'], fg=colors['status'])
 
     def perform_search(self, query, case_sensitive, whole_word):
@@ -89,17 +92,31 @@ class FileListTab(tk.Frame):
         self.copy_list_button.config(state=tk.DISABLED)
         self.error_label.config(text="")
 
+    def clear_file_list(self):
+        """Clear the file list text area and reset state."""
+        self.file_list_text.delete("1.0", tk.END)
+        with self.gui.file_handler.lock:
+            self.gui.list_selected_files.clear()
+            self.gui.list_read_errors.clear()
+        self.copy_list_button.config(state=tk.DISABLED)
+        self.error_label.config(text="")
+        self.gui.show_status_message("File list cleared.")
+
     def load_file_list(self):
         if self.gui.is_loading:
             self.gui.show_status_message("Loading...", error=True)
             return
+        
+        # Ensure text area remains editable
+        self.file_list_text.config(state=tk.NORMAL)
         text_content = self.file_list_text.get("1.0", tk.END).strip()
         if not text_content:
             self.gui.show_status_message("No file list provided.", error=True)
             self.copy_list_button.config(state=tk.DISABLED)
             return
-        self.gui.list_selected_files.clear()
-        self.gui.list_read_errors.clear()
+        with self.gui.file_handler.lock:
+            self.gui.list_selected_files.clear()
+            self.gui.list_read_errors.clear()
         seen_paths = set() # To avoid duplicates
         lines = text_content.splitlines()
         for line in lines:
@@ -110,23 +127,28 @@ class FileListTab(tk.Frame):
                 full_path = os.path.normpath(line) # Normalize absolute path
                 # Security: Ensure it's within the current repo (or home dir)
                 if self.gui.current_repo_path and not full_path.startswith(self.gui.current_repo_path):
-                    self.gui.list_read_errors.append(f"Invalid (outside repo): {line}")
+                    with self.gui.file_handler.lock:
+                        self.gui.list_read_errors.append(f"Invalid (outside repo): {line}")
                     continue
             else:
                 # Relative: Join with repo path
                 if not self.gui.current_repo_path:
-                    self.gui.list_read_errors.append(f"No repo loaded for relative: {line}")
+                    with self.gui.file_handler.lock:
+                        self.gui.list_read_errors.append(f"No repo loaded for relative: {line}")
                     continue
                 full_path = os.path.normpath(os.path.join(self.gui.current_repo_path, line))
             if os.path.isfile(full_path):
                 # Optional: Check if it's a text file
                 if is_text_file(full_path, self.gui):
-                    self.gui.list_selected_files.add(full_path)
+                    with self.gui.file_handler.lock:
+                        self.gui.list_selected_files.add(full_path)
                     seen_paths.add(line) # Track original line to dedup
                 else:
-                    self.gui.list_read_errors.append(f"Non-text file: {line}")
+                    with self.gui.file_handler.lock:
+                        self.gui.list_read_errors.append(f"Non-text file: {line}")
             else:
-                self.gui.list_read_errors.append(f"Not Found: {line}")
+                with self.gui.file_handler.lock:
+                    self.gui.list_read_errors.append(f"Not Found: {line}")
         if self.gui.list_selected_files:
             self.copy_list_button.config(state=tk.NORMAL)
             self.gui.show_status_message(f"Loaded {len(self.gui.list_selected_files)} files from list.")
@@ -135,6 +157,9 @@ class FileListTab(tk.Frame):
             self.gui.show_status_message("No valid files in list.", error=True)
         if self.gui.list_read_errors:
             self.error_label.config(text=f"Errors: {'; '.join(self.gui.list_read_errors[:3])}")
+        
+        # Ensure text area remains editable after loading
+        self.file_list_text.config(state=tk.NORMAL)
 
     def copy_from_list(self):
         if self.gui.is_loading:

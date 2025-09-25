@@ -21,39 +21,34 @@ def scan_repo(folder, gui, progress_callback, completion_callback, lock):
         errors = []
         file_count = 0
 
+        # Use a single pass with os.walk for responsiveness
         for dirpath, dirnames, filenames in os.walk(repo_path, topdown=True):
-            # NEW_LOG
             logging.debug(f"Scanning directory: {dirpath} (dirs: {len(dirnames)}, files: {len(filenames)})")
+            # Filter ignored directories early to avoid walking them
             dirnames[:] = [d for d in dirnames if not is_ignored_path(os.path.join(dirpath, d), repo_path, ignore_patterns, gui)]
-            # NEW_LOG
             logging.debug(f"After ignore filter: {len(dirnames)} dirs remain")
 
             for filename in filenames:
-                # FIX: Use the original, case-sensitive absolute path throughout.
+                file_count += 1
+                # Update progress periodically
+                if file_count % 50 == 0:  # Update every 50 files
+                    elapsed = time.time() - start_time
+                    message = f"Scanning... {file_count} files ({elapsed:.1f}s)"
+                    gui.root.after(0, progress_callback, message)
+
                 file_path_abs = os.path.join(dirpath, filename)
                 if is_ignored_path(file_path_abs, repo_path, ignore_patterns, gui):
-                    # NEW_LOG
                     logging.debug(f"Ignored file: {file_path_abs}")
                     continue
                 
-                file_count += 1
                 if is_text_file(file_path_abs, gui):
-                    # NEW_LOG
                     logging.debug(f"Text file found: {file_path_abs}")
-                    # Add the original path to the sets. Normalization will happen
-                    # later when doing comparisons.
                     scanned_files_temp.add(file_path_abs)
                     loaded_files_temp.add(file_path_abs)
                 else:
-                    # NEW_LOG
                     logging.debug(f"Non-text file: {file_path_abs}")
 
-                if file_count % 50 == 0:
-                    elapsed = time.time() - start_time
-                    gui.root.after(0, progress_callback, f"Scanning... {file_count} files ({elapsed:.1f}s)")
-
         end_time = time.time()
-        # NEW_LOG
         logging.info(f"Scan summary: {file_count} total files, {len(scanned_files_temp)} text files, {len(errors)} errors")
         logging.info(f"Scan complete for {repo_path}. Found {len(scanned_files_temp)} text files out of {file_count} total files in {end_time - start_time:.2f} seconds.")
 
@@ -62,6 +57,7 @@ def scan_repo(folder, gui, progress_callback, completion_callback, lock):
     except Exception as e:
         logging.error(f"Unexpected scan error: {e}", exc_info=True)
         gui.root.after(0, completion_callback, None, None, set(), set(), [f"Unexpected scan error: {e}"])
+
 
 def parse_gitignore(gitignore_path):
     ignore_patterns = []

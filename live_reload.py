@@ -22,7 +22,9 @@ class RestartHandler(FileSystemEventHandler):
         self.stop_script() # Ensure previous process is stopped
         try:
             logging.info(f"Starting {self.script_to_run}...")
-            self.process = subprocess.Popen([sys.executable, self.script_to_run])
+            # Use python3 explicitly to avoid Node.js conflicts
+            python_cmd = "python3" if os.name != 'nt' else "python"
+            self.process = subprocess.Popen([python_cmd, self.script_to_run])
             logging.info(f"Started process {self.process.pid}")
         except FileNotFoundError:
             logging.error(f"Error: Could not find Python executable '{sys.executable}' or script '{self.script_to_run}'")

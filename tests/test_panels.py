@@ -63,7 +63,7 @@ def mock_gui(mock_root):
 def test_header_frame_init(mock_parent, mock_gui):
     frame = HeaderFrame(mock_parent, mock_gui.colors)
     assert frame.title_label.cget('text') == "CodeBase"
-    assert frame.version_label.cget('text') == "v3.0"
+    assert frame.version_label.cget('text') == "v3.2"
     assert frame.repo_label.cget('text') == "Current Repo: None"
 
 def test_left_panel_init(mock_parent, mock_gui):

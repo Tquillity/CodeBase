@@ -8,10 +8,13 @@ import threading
 import logging
 import time # For timing tasks
 from widgets import FolderDialog
+from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB
+from lru_cache import ThreadSafeLRUCache
+from file_scanner import parse_gitignore, is_ignored_path
 class RepoHandler:
     # Default text extensions (remains class variable for access in settings)
-    text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx', '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg', '.gitignore', '.yml', '.yaml', '.toml', '.ini', '.properties', '.csv', '.tsv', '.log', '.sql', '.sh', '.bash', '.zsh', '.fish', '.awk', '.sed', '.bat', '.cmd', '.ps1', '.php', '.rb', '.erb', '.haml', '.slim', '.pl', '.lua', '.r', '.m', '.mm', '.asm', '.v', '.vhdl', '.verilog', '.s', '.swift', '.kt', '.kts', '.go', '.rs', '.dart', '.vue', '.pug', '.coffee', '.proto', '.dockerfile', '.make', '.tf', '.hcl', '.sol', '.gradle', '.groovy', '.scala', '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm', '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', '.bib', '.sty', '.cls', '.cs', '.fs', '.fsx', '.mdx', '.rst', '.adoc', '.org', '.texinfo', '.w', '.man', '.conf', '.cfg', '.env', '.ipynb', '.rmd', '.qmd', '.lock', '.srt', '.vtt', '.po', '.pot'}
-    FILE_SEPARATOR = "===FILE_SEPARATOR===\n"
+    text_extensions_default = TEXT_EXTENSIONS_DEFAULT
+    FILE_SEPARATOR = FILE_SEPARATOR
     def __init__(self, gui):
         self.gui = gui
         self.repo_path = None
@@ -20,7 +23,7 @@ class RepoHandler:
         self.ignore_patterns = []
         # Ensure recent folders are loaded correctly via gui method
         self.recent_folders = gui.load_recent_folders()
-        self.content_cache = {}
+        self.content_cache = ThreadSafeLRUCache(CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB)
         self.lock = threading.Lock() # Lock for accessing shared resources like loaded_files, cache
         self.read_errors = [] # Collect errors during read operations
 
@@ -163,92 +166,81 @@ class RepoHandler:
         return groups
 
     def _scan_repo_worker(self, folder, progress_callback, completion_callback):
-        """Worker function to run in a separate thread."""
+        """Worker function to run in a separate thread with detailed progress."""
         try:
+            # Check if shutdown was requested
+            if self.gui._shutdown_requested:
+                logging.info("Shutdown requested, aborting repository scan")
+                return
+                
             start_time = time.time()
             abs_path = os.path.abspath(folder)
-            # Security check remains important
             if not os.path.commonpath([abs_path, os.path.expanduser("~")]).startswith(os.path.expanduser("~")):
-                 # FIX: Queue the error callback instead of direct after
-                 self.gui.task_queue.put((completion_callback, (None, None, set(), set(), ["Security Error: Access outside user directory is not allowed."])))
-                 return
+                self.gui.task_queue.put((completion_callback, (None, None, set(), set(), ["Security Error: Access outside user directory is not allowed."])))
+                return
             repo_path = abs_path
-            ignore_patterns = self.parse_gitignore(os.path.join(repo_path, '.gitignore'))
-            scanned_files_temp = set()
-            loaded_files_temp = set() # Keep track of initially selected files
+            ignore_patterns = parse_gitignore(os.path.join(repo_path, '.gitignore'))
             errors = []
-            file_count = 0
+        
+            # --- Collect all non-ignored file paths ---
+            file_paths = []
             for dirpath, dirnames, filenames in os.walk(repo_path, topdown=True):
-                # Filter ignored directories early
-                dirnames[:] = [d for d in dirnames if not self.is_ignored_path(os.path.join(dirpath, d), repo_path, ignore_patterns)]
+                dirnames[:] = [d for d in dirnames if not is_ignored_path(os.path.join(dirpath, d), repo_path, ignore_patterns, self.gui)]
                 for filename in filenames:
                     file_path_abs = os.path.join(dirpath, filename)
-                    if not self.is_ignored_path(file_path_abs, repo_path, ignore_patterns):
-                        file_count += 1
-                        if self.is_text_file(file_path_abs):
-                             # Use the original path; normalization happens in FileHandler/UI
-                            scanned_files_temp.add(file_path_abs)
-                            loaded_files_temp.add(file_path_abs) # Initially select all text files
-                        # Report progress intermittently
-                        if file_count % 50 == 0:
-                            elapsed = time.time() - start_time
-                            # FIX: Queue progress updates (progress_callback calls Tk methods)
-                            self.gui.task_queue.put((progress_callback, (f"Scanning... {file_count} files ({elapsed:.1f}s)",)))
-           
-            logging.info(f"Scanned {len(scanned_files_temp)} text files from {file_count} total")
+                    if not is_ignored_path(file_path_abs, repo_path, ignore_patterns, self.gui):
+                        file_paths.append(file_path_abs)
+        
+            total_files = len(file_paths)
+            # Queue initial processing message and switch to determinate bar
+            def set_determinate(total):
+                self.gui.progress.config(mode='determinate', maximum=total, value=0)
+                self.gui.status_bar.config(text=f"Found {total} files, identifying text files: 0 of {total} (0.0s)")
+            self.gui.task_queue.put((set_determinate, (total_files,)))
+        
+            # --- Process files ---
+            processed_count = 0
+            scanned_files_temp = set()
+            loaded_files_temp = set()
+            scan_start_time = time.time()
+            for file_path_abs in file_paths:
+                processed_count += 1
+            
+                if self.is_text_file(file_path_abs):
+                    scanned_files_temp.add(file_path_abs)
+                    loaded_files_temp.add(file_path_abs)
+            
+                # Update progress every 10 files or on last
+                if processed_count % 10 == 0 or processed_count == total_files:
+                    elapsed = time.time() - scan_start_time
+                    if processed_count > 5:
+                        avg_time = elapsed / processed_count
+                        est_remaining = avg_time * (total_files - processed_count)
+                        message = f"Identifying text files: {processed_count} of {total_files} ({elapsed:.1f}s, est. {est_remaining:.1f}s left)"
+                    else:
+                        message = f"Identifying text files: {processed_count} of {total_files} ({elapsed:.1f}s)"
+                
+                    # Queue status update and progress value
+                    def update_prog(value, msg):
+                        self.gui.progress.config(value=value)
+                        self.gui.status_bar.config(text=msg)
+                    self.gui.task_queue.put((update_prog, (processed_count, message)))
+        
             end_time = time.time()
-            logging.info(f"Scan complete for {repo_path}. Found {len(scanned_files_temp)} text files out of {file_count} total files in {end_time - start_time:.2f} seconds.")
-            # FIX: Queue the completion callback with results
+            logging.info(f"Scan complete for {repo_path}. Found {len(scanned_files_temp)} text files out of {total_files} total files in {end_time - start_time:.2f} seconds.")
             self.gui.task_queue.put((completion_callback, (repo_path, ignore_patterns, scanned_files_temp, loaded_files_temp, errors)))
         except Exception as e:
             logging.error(f"Error during repo scan worker: {e}", exc_info=True)
-            # FIX: Queue the error callback
             self.gui.task_queue.put((completion_callback, (None, None, set(), set(), [f"Unexpected scan error: {e}"])))
+
 
     def load_repo(self, folder, progress_callback, completion_callback):
         """Starts the repository scan in a background thread."""
         thread = threading.Thread(target=self._scan_repo_worker, args=(folder, progress_callback, completion_callback), daemon=True)
+        thread.name = f"RepoScan-{os.path.basename(folder)}"
+        self.gui.register_background_thread(thread)
         thread.start()
 
-    def parse_gitignore(self, gitignore_path):
-        ignore_patterns = []
-        default_ignores = ['.git']
-        if os.path.exists(gitignore_path):
-            try:
-                with open(gitignore_path, 'r', encoding='utf-8', errors='ignore') as file:
-                    for line in file:
-                        line = line.strip()
-                        if line and not line.startswith('#'):
-                            ignore_patterns.append(line)
-            except Exception as e:
-                logging.warning(f"Could not read .gitignore file {gitignore_path}: {e}")
-        return default_ignores + ignore_patterns
-
-    def is_ignored_path(self, path, repo_root, ignore_list):
-        """Checks if a given path should be ignored based on patterns and settings."""
-        try:
-            rel_path = os.path.relpath(path, repo_root)
-            rel_path_parts = rel_path.replace('\\', '/').split('/')
-            path_basename = os.path.basename(path)
-            for pattern in ignore_list:
-                if fnmatch.fnmatch(path_basename, pattern) or fnmatch.fnmatch(rel_path.replace('\\', '/'), pattern):
-                    return True
-                if pattern.endswith('/') and os.path.isdir(path) and fnmatch.fnmatch(rel_path.replace('\\', '/') + '/', pattern):
-                    return True
-                if pattern.endswith('/') and fnmatch.fnmatch(rel_path.replace('\\', '/'), pattern.rstrip('/')):
-                     if os.path.isfile(path):
-                          return True
-            if self.gui.settings.get('app', 'exclude_node_modules', 1) == 1 and 'node_modules' in rel_path_parts:
-                return True
-            if self.gui.settings.get('app', 'exclude_dist', 1) == 1 and 'dist' in rel_path_parts:
-                return True
-        except ValueError:
-             if '.git' in path.split(os.sep): return True
-             if self.gui.settings.get('app', 'exclude_node_modules', 1) == 1 and 'node_modules' in path.split(os.sep): return True
-             if self.gui.settings.get('app', 'exclude_dist', 1) == 1 and 'dist' in path.split(os.sep): return True
-        except Exception as e:
-            logging.warning(f"Error during is_ignored check for {path}: {e}")
-        return False
 
     def is_text_file(self, file_path):
         try:

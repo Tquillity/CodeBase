@@ -10,10 +10,12 @@ import time
 
 from file_scanner import scan_repo, parse_gitignore, is_ignored_path, is_text_file
 from content_manager import get_file_content, generate_content
+from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB
+from lru_cache import ThreadSafeLRUCache
 
 class FileHandler:
-    text_extensions_default = {'.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx', '.jsx', '.css', '.scss', '.html', '.json', '.md', '.xml', '.svg', '.gitignore', '.yml', '.yaml', '.toml', '.ini', '.properties', '.csv', '.tsv', '.log', '.sql', '.sh', '.bash', '.zsh', '.fish', '.awk', '.sed', '.bat', '.cmd', '.ps1', '.php', '.rb', '.erb', '.haml', '.slim', '.pl', '.lua', '.r', '.m', '.mm', '.asm', '.v', '.vhdl', '.verilog', '.s', '.swift', '.kt', '.kts', '.go', '.rs', '.dart', '.vue', '.pug', '.coffee', '.proto', '.dockerfile', '.make', '.tf', '.hcl', '.sol', '.gradle', '.groovy', '.scala', '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm', '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', '.bib', '.sty', '.cls', '.cs', '.fs', '.fsx', '.mdx', '.rst', '.adoc', '.org', '.texinfo', '.w', '.man', '.conf', '.cfg', '.env', '.ipynb', '.rmd', '.qmd', '.lock', '.srt', '.vtt', '.po', '.pot', '.mts'}
-    FILE_SEPARATOR = "===FILE_SEPARATOR===\n"
+    text_extensions_default = TEXT_EXTENSIONS_DEFAULT
+    FILE_SEPARATOR = FILE_SEPARATOR
 
     def __init__(self, gui):
         self.gui = gui
@@ -22,7 +24,7 @@ class FileHandler:
         self.scanned_text_files = set()
         self.ignore_patterns = []
         self.recent_folders = gui.load_recent_folders()
-        self.content_cache = {}
+        self.content_cache = ThreadSafeLRUCache(CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB)
         self.lock = threading.Lock()
         self.read_errors = []
 
@@ -247,7 +249,22 @@ class FileHandler:
         with self.lock:
             files_to_include = set(self.loaded_files)
         logging.info(f"Generating preview for {len(files_to_include)} files")
-        generate_content(files_to_include, self.repo_path, self.lock, completion_callback, self.content_cache, self.read_errors)
+        self.gui.show_loading_state("Generating content preview...")
+        def update_progress(processed, total, elapsed):
+            if processed > 5:
+                avg = elapsed / processed
+                remaining = avg * (total - processed)
+                message = f"Reading {processed} of {total} files ({elapsed:.1f}s, est. {remaining:.1f}s left)"
+            else:
+                message = f"Reading {processed} of {total} files ({elapsed:.1f}s)"
+            self.gui.status_bar.config(text=f" {message}")
+        def queued_progress(processed, total, elapsed):
+            self.gui.task_queue.put((update_progress, (processed, total, elapsed)))
+        def wrapped_completion(content, token_count, errors):
+            self.gui.task_queue.put((completion_callback, (content, token_count, errors)))
+            self.gui.task_queue.put((self.gui.hide_loading_state, ()))
+        thread = threading.Thread(target=generate_content, args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui), daemon=True)
+        thread.start()
 
     def expand_all(self, item=""):
         tree = self.gui.structure_tab.tree

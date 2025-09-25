@@ -113,7 +113,7 @@ def test_clear_internal_state(repo_handler, mock_gui):
         assert len(repo_handler.loaded_files) == 0
         assert len(repo_handler.scanned_text_files) == 0
         assert repo_handler.ignore_patterns == []
-        assert len(repo_handler.content_cache) == 0
+        assert repo_handler.content_cache.size() == 0
         assert len(repo_handler.read_errors) == 0
         assert mock_gui.current_repo_path is None
         mock_update_ui.assert_called_once()

@@ -27,7 +27,7 @@ class CopyHandler:
             status_message="Copied selected file contents" if not errors else "Copy failed with errors"
         )
 
-        generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors)
+        generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors, None, self.gui)
 
     def copy_structure(self):
         if self.gui.is_loading: self.gui.show_status_message("Loading...", error=True); return
@@ -72,7 +72,7 @@ class CopyHandler:
         )
 
         if files_to_copy:
-            generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors)
+            generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors, None, self.gui)
         else:
             self._handle_copy_completion_final(prompt=prompt, content="", structure=structure, errors=[], status_message="Copied All (Prompt, Structure)")
 
