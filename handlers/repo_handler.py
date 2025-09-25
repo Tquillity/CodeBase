@@ -8,7 +8,7 @@ import threading
 import logging
 import time # For timing tasks
 from widgets import FolderDialog
-from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB
+from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION
 from lru_cache import ThreadSafeLRUCache
 from file_scanner import parse_gitignore, is_ignored_path
 class RepoHandler:
@@ -273,7 +273,7 @@ class RepoHandler:
             logging.error(f"Load errors: {errors}")
             error_message = "Error loading repository."
             if errors: error_message += f" Details: {'; '.join(errors[:3])}"
-            self.gui.show_status_message(error_message, error=True, duration=10000)
+            self.gui.show_status_message(error_message, error=True, duration=ERROR_MESSAGE_DURATION)
             messagebox.showerror("Load Error", f"Failed to load repository.\n{error_message}")
             self._clear_internal_state(clear_ui=True)
             return
@@ -302,7 +302,7 @@ class RepoHandler:
         else:
             self.gui.copy_structure_button.config(state=tk.DISABLED)
         self.gui.trigger_preview_update()
-        self.gui.show_status_message(f"Loaded {repo_name} successfully.", duration=5000)
+        self.gui.show_status_message(f"Loaded {repo_name} successfully.", duration=STATUS_MESSAGE_DURATION)
 
     def _handle_refresh_completion(self, repo_path, ignore_patterns, scanned_files, errors, previous_selections, expansion_state):
         """Callback specifically for handling a repository refresh."""
@@ -312,7 +312,7 @@ class RepoHandler:
             logging.error(f"Refresh errors: {errors}")
             error_message = "Error refreshing repository."
             if errors: error_message += f" Details: {'; '.join(errors[:3])}"
-            self.gui.show_status_message(error_message, error=True, duration=10000)
+            self.gui.show_status_message(error_message, error=True, duration=ERROR_MESSAGE_DURATION)
             messagebox.showerror("Refresh Error", f"Failed to refresh repository.\n{error_message}")
             # Don't clear state on failed refresh, just report error
             return
@@ -333,4 +333,4 @@ class RepoHandler:
        
         # --- FINALIZE ---
         self.gui.trigger_preview_update()
-        self.gui.show_status_message(f"Refreshed {os.path.basename(repo_path)} successfully.", duration=5000)
+        self.gui.show_status_message(f"Refreshed {os.path.basename(repo_path)} successfully.", duration=STATUS_MESSAGE_DURATION)

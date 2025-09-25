@@ -3,6 +3,7 @@ import logging
 import tkinter as tk
 from tkinter import messagebox
 from content_manager import generate_content
+from constants import ERROR_MESSAGE_DURATION
 
 class CopyHandler:
     def __init__(self, gui):
@@ -82,7 +83,7 @@ class CopyHandler:
          if errors:
              error_msg = "Errors occurred during content preparation for copy."
              if errors: error_msg += f" Files: {'; '.join(errors[:3])}"
-             self.gui.show_status_message(error_msg, error=True, duration=10000)
+             self.gui.show_status_message(error_msg, error=True, duration=ERROR_MESSAGE_DURATION)
              messagebox.showwarning("Copy Error", error_msg)
 
          final_parts = []

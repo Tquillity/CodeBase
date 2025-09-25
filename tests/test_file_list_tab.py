@@ -11,7 +11,7 @@ from file_scanner import is_text_file
 def mock_gui():
     gui = MagicMock()
     gui.colors = {'bg': '#fff', 'fg': '#000', 'bg_accent': '#eee', 'btn_bg': '#ddd', 'btn_fg': '#000', 'status': '#f00', 'btn_hover': '#ccc'}
-    gui.create_button = MagicMock(side_effect=[MagicMock() for _ in range(2)])  # For load and copy buttons
+    gui.create_button = MagicMock(side_effect=[MagicMock() for _ in range(3)])  # For load, copy, and clear buttons
     gui.is_loading = False
     gui.current_repo_path = "/repo"
     gui.list_selected_files = set()

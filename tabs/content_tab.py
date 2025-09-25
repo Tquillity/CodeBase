@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import scrolledtext
 from widgets import Tooltip
 import logging
+from constants import ERROR_MESSAGE_DURATION
 
 class ContentTab(tk.Frame):
     def __init__(self, parent, gui, file_handler):
@@ -113,7 +114,7 @@ class ContentTab(tk.Frame):
         if errors:
              error_msg = "Errors generating preview content."
              if errors: error_msg += f" Files: {'; '.join(errors[:3])}"
-             self.gui.show_status_message(error_msg, error=True, duration=10000)
+             self.gui.show_status_message(error_msg, error=True, duration=ERROR_MESSAGE_DURATION)
 
         self.content_text.config(state=tk.NORMAL)
         self.content_text.delete(1.0, tk.END)

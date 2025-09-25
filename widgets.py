@@ -1,11 +1,12 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os # For path manipulation in FolderDialog
+from constants import TOOLTIP_DELAY, TOOLTIP_WRAP_LENGTH, DIALOG_MIN_WIDTH
 
 
 class Tooltip:
     """ Creates a tooltip for a given widget. """
-    def __init__(self, widget, text, bg='#ffffe0', delay=500, relief="solid", borderwidth=1):
+    def __init__(self, widget, text, bg='#ffffe0', delay=TOOLTIP_DELAY, relief="solid", borderwidth=1):
         self.widget = widget
         self.text = text
         self.tooltip_bg = bg
@@ -45,7 +46,7 @@ class Tooltip:
 
         label = tk.Label(tw, text=self.text, justify='left',
                        background=self.tooltip_bg, relief=self.relief, borderwidth=self.borderwidth,
-                       wraplength=300) # Wrap text if too long
+                       wraplength=TOOLTIP_WRAP_LENGTH) # Wrap text if too long
         label.pack(ipadx=5, ipady=3) # Add internal padding
 
         # Adjust position if tooltip goes off-screen
@@ -81,7 +82,7 @@ class FolderDialog:
         self.selected_folder = None
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Select Repository Folder")
-        min_width = 500
+        min_width = DIALOG_MIN_WIDTH
         min_height = 400
         self.dialog.minsize(min_width, min_height)
         self.dialog.geometry(f"{min_width}x{min_height}")

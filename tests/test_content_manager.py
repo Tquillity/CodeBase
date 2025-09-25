@@ -6,6 +6,7 @@ import threading
 import logging
 import pytest
 from content_manager import get_file_content, generate_content, FILE_SEPARATOR
+from lru_cache import ThreadSafeLRUCache
 
 # Setup logging for tests
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,18 +36,19 @@ def temp_repo():
 
 def test_get_file_content_success(temp_repo):
     temp_dir, file1_path, _, _, _ = temp_repo
-    content_cache = {}
+    content_cache = ThreadSafeLRUCache(100, 10)  # Small cache for testing
     lock = threading.Lock()
     read_errors = []
 
     content = get_file_content(file1_path, content_cache, lock, read_errors)
     assert content == "Content of file1"
-    assert os.path.normcase(file1_path) in content_cache  # Check caching
+    assert content_cache.get(os.path.normcase(file1_path)) == "Content of file1"  # Check caching
     assert not read_errors
 
 def test_get_file_content_cached(temp_repo):
     temp_dir, file1_path, _, _, _ = temp_repo
-    content_cache = {os.path.normcase(file1_path): "Cached content"}
+    content_cache = ThreadSafeLRUCache(100, 10)
+    content_cache.put(os.path.normcase(file1_path), "Cached content")
     lock = threading.Lock()
     read_errors = []
 
@@ -56,7 +58,7 @@ def test_get_file_content_cached(temp_repo):
 
 def test_get_file_content_missing_file(temp_repo):
     temp_dir, _, _, _, missing_path = temp_repo
-    content_cache = {}
+    content_cache = ThreadSafeLRUCache(100, 10)
     lock = threading.Lock()
     read_errors = []
 
@@ -66,7 +68,7 @@ def test_get_file_content_missing_file(temp_repo):
 
 def test_get_file_content_permission_denied(monkeypatch, temp_repo):
     temp_dir, file1_path, _, _, _ = temp_repo
-    content_cache = {}
+    content_cache = ThreadSafeLRUCache(100, 10)
     lock = threading.Lock()
     read_errors = []
 
@@ -82,7 +84,7 @@ def test_get_file_content_permission_denied(monkeypatch, temp_repo):
 
 def test_get_file_content_binary_file(temp_repo):
     temp_dir, _, _, binary_path, _ = temp_repo
-    content_cache = {}
+    content_cache = ThreadSafeLRUCache(100, 10)
     lock = threading.Lock()
     read_errors = []
 
@@ -92,7 +94,7 @@ def test_get_file_content_binary_file(temp_repo):
 
 def test_get_file_content_general_error(monkeypatch, temp_repo):
     temp_dir, file1_path, _, _, _ = temp_repo
-    content_cache = {}
+    content_cache = ThreadSafeLRUCache(100, 10)
     lock = threading.Lock()
     read_errors = []
 
@@ -110,7 +112,7 @@ def test_generate_content_success(temp_repo):
     temp_dir, file1_path, file2_path, _, _ = temp_repo
     files_to_include = {file1_path, file2_path}
     lock = threading.Lock()
-    content_cache = {}
+    content_cache = ThreadSafeLRUCache(100, 10)
     read_errors = []
 
     generated_content = []
@@ -122,7 +124,7 @@ def test_generate_content_success(temp_repo):
         token_counts.append(token_count)
         local_errors.extend(errors)
 
-    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors)
+    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
 
     # Since it's sync, callback is called immediately
     assert len(generated_content) == 1
@@ -141,7 +143,7 @@ def test_generate_content_with_errors(temp_repo):
     temp_dir, _, _, _, missing_path = temp_repo
     files_to_include = {missing_path}
     lock = threading.Lock()
-    content_cache = {}
+    content_cache = ThreadSafeLRUCache(100, 10)
     read_errors = []
 
     generated_content = []
@@ -151,7 +153,7 @@ def test_generate_content_with_errors(temp_repo):
         generated_content.append(content)
         local_errors.extend(errors)
 
-    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors)
+    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
 
     assert generated_content[0] == ""
     assert "Not Found: " in local_errors[0]
@@ -165,7 +167,7 @@ def test_generate_content_sorted_order(temp_repo):
 
     files_to_include = {file1_path, file2_path, file0_path}
     lock = threading.Lock()
-    content_cache = {}
+    content_cache = ThreadSafeLRUCache(100, 10)
     read_errors = []
 
     generated_content = []
@@ -173,7 +175,7 @@ def test_generate_content_sorted_order(temp_repo):
     def completion_callback(content, *args):
         generated_content.append(content)
 
-    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors)
+    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
 
     content = generated_content[0]
     parts = content.split(FILE_SEPARATOR)
@@ -188,7 +190,7 @@ def test_generate_content_token_count(temp_repo):
     temp_dir, file1_path, _, _, _ = temp_repo
     files_to_include = {file1_path}
     lock = threading.Lock()
-    content_cache = {}
+    content_cache = ThreadSafeLRUCache(100, 10)
     read_errors = []
 
     token_counts = []
@@ -196,7 +198,7 @@ def test_generate_content_token_count(temp_repo):
     def completion_callback(_, token_count, __):
         token_counts.append(token_count)
 
-    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors)
+    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
 
     # Approximate, but >0
     assert token_counts[0] > 5
@@ -206,14 +208,14 @@ def test_generate_content_performance(caplog, temp_repo):
     temp_dir, file1_path, file2_path, _, _ = temp_repo
     files_to_include = {file1_path, file2_path}
     lock = threading.Lock()
-    content_cache = {}
+    content_cache = ThreadSafeLRUCache(100, 10)
     read_errors = []
 
     def completion_callback(*args):
         pass
 
     start_time = time.time()
-    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors)
+    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
     duration = time.time() - start_time
 
     assert duration < 1  # Should be fast for small files

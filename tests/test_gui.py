@@ -228,7 +228,7 @@ def test_copy_contents(gui):
          patch('tkinter.messagebox.showwarning'):
         gui.copy_handler.copy_contents()
         mock_show_loading.assert_called_with("Preparing content for clipboard...")
-        mock_gen.assert_called_with(set(["file1"]), gui.current_repo_path, ANY, ANY, ANY, ANY)
+        mock_gen.assert_called_with(set(["file1"]), gui.current_repo_path, ANY, ANY, ANY, ANY, None, gui)
 
 def test_load_file_list_empty_input(gui):
     gui.is_loading = False

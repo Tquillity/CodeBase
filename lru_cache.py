@@ -4,6 +4,7 @@
 import threading
 from collections import OrderedDict
 import logging
+from constants import CACHE_OVERHEAD_BYTES
 
 class ThreadSafeLRUCache:
     """
@@ -81,7 +82,7 @@ class ThreadSafeLRUCache:
             # Rough estimation: key size + value size + overhead
             key_size = len(str(key).encode('utf-8'))
             value_size = len(str(value).encode('utf-8'))
-            return key_size + value_size + 100  # 100 bytes overhead
+            return key_size + value_size + CACHE_OVERHEAD_BYTES  # Overhead bytes
         except:
             # Fallback estimation
             return 1000

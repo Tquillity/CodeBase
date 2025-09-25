@@ -6,6 +6,18 @@ import pytest
 import time
 from unittest.mock import patch, MagicMock
 from file_list_handler import generate_list_content
+
+@pytest.fixture
+def mock_gui():
+    gui = MagicMock()
+    gui.task_queue = MagicMock()
+    # Make the task_queue.put method call the callback directly for testing
+    def mock_put(task):
+        if isinstance(task, tuple) and len(task) == 2:
+            func, args = task
+            func(*args)
+    gui.task_queue.put = mock_put
+    return gui
 from content_manager import FILE_SEPARATOR
 
 @pytest.fixture
@@ -24,11 +36,12 @@ def temp_repo():
 
         yield temp_dir, file1_path, file2_path, missing_path
 
-def test_generate_list_content_success(temp_repo):
+def test_generate_list_content_success(temp_repo, mock_gui):
     temp_dir, file1_path, file2_path, _ = temp_repo
     files_to_copy = {file1_path, file2_path}
     lock = threading.Lock()
-    content_cache = {}
+    from lru_cache import ThreadSafeLRUCache
+    content_cache = ThreadSafeLRUCache(100, 10)
     list_read_errors = []
 
     generated_contents = []
@@ -40,7 +53,7 @@ def test_generate_list_content_success(temp_repo):
         token_counts.append(token_count)
         errors_list.extend(errors)
 
-    generate_list_content(files_to_copy, temp_dir, lock, completion_callback, content_cache, list_read_errors)
+    generate_list_content(mock_gui, files_to_copy, temp_dir, lock, completion_callback, content_cache, list_read_errors)
 
     # Wait for thread to complete
     time.sleep(0.5)  # Short wait, assuming fast execution
@@ -57,11 +70,12 @@ def test_generate_list_content_success(temp_repo):
     assert not errors_list
     assert not list_read_errors
 
-def test_generate_list_content_with_missing_file(temp_repo):
+def test_generate_list_content_with_missing_file(temp_repo, mock_gui):
     temp_dir, _, _, missing_path = temp_repo
     files_to_copy = {missing_path}
     lock = threading.Lock()
-    content_cache = {}
+    from lru_cache import ThreadSafeLRUCache
+    content_cache = ThreadSafeLRUCache(100, 10)
     list_read_errors = []
 
     generated_contents = []
@@ -71,20 +85,21 @@ def test_generate_list_content_with_missing_file(temp_repo):
         generated_contents.append(content)
         errors_list.extend(errors)
 
-    generate_list_content(files_to_copy, temp_dir, lock, completion_callback, content_cache, list_read_errors)
+    generate_list_content(mock_gui, files_to_copy, temp_dir, lock, completion_callback, content_cache, list_read_errors)
 
     time.sleep(0.5)
 
     assert generated_contents[0] == ""
     assert "Not Found: " in errors_list[0]
 
-def test_generate_list_content_threading():
+def test_generate_list_content_threading(mock_gui):
     # Test that it starts a thread
     with patch('threading.Thread') as mock_thread:
         thread_instance = MagicMock()
         mock_thread.return_value = thread_instance
+        from lru_cache import ThreadSafeLRUCache
 
-        generate_list_content(set(), "", threading.Lock(), lambda *a: None, {}, [])
+        generate_list_content(mock_gui, set(), "", threading.Lock(), lambda *a: None, ThreadSafeLRUCache(100, 10), [])
 
         mock_thread.assert_called_once()
         thread_instance.start.assert_called_once()

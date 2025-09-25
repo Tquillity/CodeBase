@@ -7,7 +7,7 @@ from tabs.base_prompt_tab import BasePromptTab
 from tabs.settings_tab import SettingsTab
 from tabs.file_list_tab import FileListTab
 from colors import COLOR_HC_FG, COLOR_BG
-from constants import VERSION
+from constants import VERSION, LEFT_PANEL_WIDTH
 
 class HeaderFrame(tk.Frame):
     def __init__(self, parent, colors, title="CodeBase", version=VERSION):
@@ -29,7 +29,7 @@ class HeaderFrame(tk.Frame):
 
 class LeftPanel(tk.Frame):
     def __init__(self, parent, colors, gui):
-        super().__init__(parent, bg=colors['bg'], width=200)
+        super().__init__(parent, bg=colors['bg'], width=LEFT_PANEL_WIDTH)
         self.colors = colors
         self.gui = gui
         self.grid(row=2, column=0, padx=(10, 0), pady=10, sticky="nsw")

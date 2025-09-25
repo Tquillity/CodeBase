@@ -23,7 +23,7 @@ from handlers.repo_handler import RepoHandler
 from handlers.theme_manager import ThemeManager
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
 import queue  # FIX: Added for thread-safe Tkinter callbacks
-from constants import VERSION
+from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION
 
 # NEW_LOG: Set level to DEBUG to see all messages
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', filename='codebase_debug.log', filemode='w')
@@ -36,30 +36,17 @@ class RepoPromptGUI:
         self.theme_manager = ThemeManager(self)
         self.theme_manager.apply_theme()
         self.root.title(f"CodeBase v{self.version}")
-        self.root.geometry(self.settings.get('app', 'window_geometry', "1200x800"))
+        self.root.geometry(self.settings.get('app', 'window_geometry', DEFAULT_WINDOW_SIZE))
         self.root.configure(bg=self.colors['bg'])
         
-        # Ensure window is visible and properly sized
-        self.root.update_idletasks()
-        
-        # Force window to be visible and properly sized
-        self.root.deiconify()  # Restore if minimized
-        self.root.lift()        # Bring to front
-        self.root.focus_force() # Force focus
-        
-        # Set a reasonable size if the saved geometry is invalid
+        # Quick window visibility check and fix
         current_geometry = self.root.geometry()
         if 'x1' in current_geometry or current_geometry == '1x1+0+0':
-            self.root.geometry("1200x800+100+100")
-            logging.info("Fixed invalid window geometry")
+            self.root.geometry(f"{DEFAULT_WINDOW_SIZE}{DEFAULT_WINDOW_POSITION}")
         
-        # Temporarily bring to top
-        self.root.attributes('-topmost', True)
-        self.root.after(100, lambda: self.root.attributes('-topmost', False))
-        
-        # Debug: Log window creation
-        logging.info(f"Window created with geometry: {self.root.geometry()}")
-        logging.info(f"Window state: {self.root.state()}")
+        # Ensure window is visible (minimal operations)
+        self.root.deiconify()
+        self.root.lift()
         self.prepend_var = IntVar(value=self.settings.get('app', 'prepend_prompt', 1))
         self.show_unloaded_var = IntVar(value=self.settings.get('app', 'show_unloaded', 0))
         self.user_data_dir = appdirs.user_data_dir("CodeBase")
@@ -208,7 +195,7 @@ class RepoPromptGUI:
     def show_loading_state(self, message):
         self.progress.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
         self.progress.start()
-        self.show_status_message(message, duration=10000)
+        self.show_status_message(message, duration=ERROR_MESSAGE_DURATION)
         self.is_loading = True
         self.root.config(cursor="watch")
         self.root.update_idletasks()
@@ -220,7 +207,7 @@ class RepoPromptGUI:
         self.root.config(cursor="")
         self.root.update_idletasks()
 
-    def show_status_message(self, message, duration=5000, error=False):
+    def show_status_message(self, message, duration=STATUS_MESSAGE_DURATION, error=False):
         if self.status_timer_id:
             self.root.after_cancel(self.status_timer_id)
             self.status_timer_id = None
@@ -307,7 +294,7 @@ class RepoPromptGUI:
             self.apply_default_tab()
             if self.current_repo_path:
                  self.show_status_message("Settings saved. Refreshing repository view...")
-                 self.root.after(100, self.repo_handler.refresh_repo)
+                 self.root.after(WINDOW_TOP_DURATION, self.repo_handler.refresh_repo)
         except Exception as e:
             logging.error(f"Error saving settings: {e}", exc_info=True)
             messagebox.showerror("Settings Error", f"Could not save settings:\n{e}")
