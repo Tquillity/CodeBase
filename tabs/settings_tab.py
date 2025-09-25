@@ -79,6 +79,80 @@ class SettingsTab(tk.Frame):
         include_icons_checkbox.grid(row=row, column=0, columnspan=2, padx=10, pady=5, sticky="w")
         row += 1
 
+        # Performance Settings Section
+        performance_label = tk.Label(inner_frame, text="Performance Settings", bg=self.colors['bg'], fg=self.colors['header'], font=("Arial", 12, "bold"))
+        performance_label.grid(row=row, column=0, columnspan=2, padx=10, pady=(20, 5), sticky="w")
+        row += 1
+
+        # Cache settings
+        self.cache_max_size_var = tk.StringVar(value=str(self.settings.get('app', 'cache_max_size', 1000)))
+        cache_size_label = tk.Label(inner_frame, text="Cache Max Size:", bg=self.colors['bg'], fg=self.colors['fg'])
+        cache_size_label.grid(row=row, column=0, padx=10, pady=5, sticky="w")
+        cache_size_entry = tk.Entry(inner_frame, textvariable=self.cache_max_size_var, width=10, bg=self.colors['bg_accent'], fg=self.colors['fg'])
+        cache_size_entry.grid(row=row, column=1, padx=10, pady=5, sticky="w")
+        row += 1
+
+        self.cache_max_memory_var = tk.StringVar(value=str(self.settings.get('app', 'cache_max_memory_mb', 100)))
+        cache_memory_label = tk.Label(inner_frame, text="Cache Max Memory (MB):", bg=self.colors['bg'], fg=self.colors['fg'])
+        cache_memory_label.grid(row=row, column=0, padx=10, pady=5, sticky="w")
+        cache_memory_entry = tk.Entry(inner_frame, textvariable=self.cache_max_memory_var, width=10, bg=self.colors['bg_accent'], fg=self.colors['fg'])
+        cache_memory_entry.grid(row=row, column=1, padx=10, pady=5, sticky="w")
+        row += 1
+
+        # Tree operation settings
+        self.tree_max_items_var = tk.StringVar(value=str(self.settings.get('app', 'tree_max_items', 10000)))
+        tree_items_label = tk.Label(inner_frame, text="Tree Max Items:", bg=self.colors['bg'], fg=self.colors['fg'])
+        tree_items_label.grid(row=row, column=0, padx=10, pady=5, sticky="w")
+        tree_items_entry = tk.Entry(inner_frame, textvariable=self.tree_max_items_var, width=10, bg=self.colors['bg_accent'], fg=self.colors['fg'])
+        tree_items_entry.grid(row=row, column=1, padx=10, pady=5, sticky="w")
+        row += 1
+
+        # Security Settings Section
+        security_label = tk.Label(inner_frame, text="Security Settings", bg=self.colors['bg'], fg=self.colors['header'], font=("Arial", 12, "bold"))
+        security_label.grid(row=row, column=0, columnspan=2, padx=10, pady=(20, 5), sticky="w")
+        row += 1
+
+        self.security_enabled_var = tk.IntVar(value=self.settings.get('app', 'security_enabled', 1))
+        security_enabled_checkbox = tk.Checkbutton(inner_frame, text="Enable Security Validation", variable=self.security_enabled_var,
+                                                   bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'])
+        security_enabled_checkbox.grid(row=row, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+        row += 1
+
+        self.max_file_size_var = tk.StringVar(value=str(self.settings.get('app', 'max_file_size_mb', 10)))
+        max_file_size_label = tk.Label(inner_frame, text="Max File Size (MB):", bg=self.colors['bg'], fg=self.colors['fg'])
+        max_file_size_label.grid(row=row, column=0, padx=10, pady=5, sticky="w")
+        max_file_size_entry = tk.Entry(inner_frame, textvariable=self.max_file_size_var, width=10, bg=self.colors['bg_accent'], fg=self.colors['fg'])
+        max_file_size_entry.grid(row=row, column=1, padx=10, pady=5, sticky="w")
+        row += 1
+
+        # Logging Settings Section
+        logging_label = tk.Label(inner_frame, text="Logging Settings", bg=self.colors['bg'], fg=self.colors['header'], font=("Arial", 12, "bold"))
+        logging_label.grid(row=row, column=0, columnspan=2, padx=10, pady=(20, 5), sticky="w")
+        row += 1
+
+        # Log level
+        self.log_level_var = tk.StringVar(value=self.settings.get('app', 'log_level', 'INFO'))
+        log_level_label = tk.Label(inner_frame, text="Log Level:", bg=self.colors['bg'], fg=self.colors['fg'])
+        log_level_label.grid(row=row, column=0, padx=10, pady=5, sticky="w")
+        log_level_options = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        log_level_menu = ttk.Combobox(inner_frame, textvariable=self.log_level_var, values=log_level_options, state="readonly", width=15)
+        log_level_menu.grid(row=row, column=1, padx=10, pady=5, sticky="w")
+        row += 1
+
+        # Log to file
+        self.log_to_file_var = tk.IntVar(value=self.settings.get('app', 'log_to_file', 1))
+        log_to_file_checkbox = tk.Checkbutton(inner_frame, text="Log to File", variable=self.log_to_file_var,
+                                             bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'])
+        log_to_file_checkbox.grid(row=row, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+        row += 1
+
+        # Log to console
+        self.log_to_console_var = tk.IntVar(value=self.settings.get('app', 'log_to_console', 1))
+        log_to_console_checkbox = tk.Checkbutton(inner_frame, text="Log to Console", variable=self.log_to_console_var,
+                                                  bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'])
+        log_to_console_checkbox.grid(row=row, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+        row += 1
+
         extensions_label = tk.Label(inner_frame, text="Text File Extensions:", bg=self.colors['bg'], fg=self.colors['fg'])
         extensions_label.grid(row=row, column=0, padx=10, pady=10, sticky="w")
         row += 1

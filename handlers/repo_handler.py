@@ -39,7 +39,7 @@ class RepoHandler:
         if folder:
             self.gui.update_recent_folders(folder)
             self._clear_internal_state(clear_ui=True)
-            self.gui.show_loading_state(f"Scanning {os.path.basename(folder)}...")
+            self.gui.show_loading_state(f"Scanning {os.path.basename(folder)}...", show_cancel=True)
             self.load_repo(folder, self.gui.show_status_message, self._handle_load_completion)
 
     def refresh_repo(self):
@@ -53,7 +53,7 @@ class RepoHandler:
             self.gui.show_status_message("No repository loaded to refresh.", error=True)
             return
         logging.info("Starting repository refresh...")
-        self.gui.show_loading_state(f"Refreshing {os.path.basename(self.repo_path)}...")
+        self.gui.show_loading_state(f"Refreshing {os.path.basename(self.repo_path)}...", show_cancel=True)
         # --- PRESERVE STATE ---
         # 1. Save the set of currently selected files
         with self.gui.file_handler.lock:

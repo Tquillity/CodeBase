@@ -34,7 +34,27 @@ class SettingsManager:
                 "default_base_prompt": "",
                 "log_level": "INFO",
                 "log_to_file": 1,
-                "log_to_console": 1
+                "log_to_console": 1,
+                # Performance settings
+                "cache_max_size": 1000,
+                "cache_max_memory_mb": 100,
+                "tree_max_items": 10000,
+                "tree_ui_update_interval": 100,
+                "tree_safety_limit": 10000,
+                # Security settings
+                "security_enabled": 1,
+                "max_file_size_mb": 10,
+                "max_template_size_mb": 1,
+                "max_content_length_mb": 50,
+                "security_strict_mode": 1,
+                # Error handling settings
+                "error_handling_enabled": 1,
+                "error_ui_feedback": 1,
+                "error_logging_level": "ERROR",
+                "error_recovery_attempts": 3,
+                # Path normalization settings
+                "path_normalization_enabled": 1,
+                "cross_platform_paths": 1
                 # Add default for text_extensions if needed, though FileHandler provides it
             },
             "repo": {} # For future repo-specific settings if needed

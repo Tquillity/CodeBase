@@ -1,6 +1,12 @@
 # constants.py
 # Centralized constants for CodeBase application
 
+def get_configurable_constant(settings_manager, key: str, default_value):
+    """Get a configurable constant from settings, with fallback to default."""
+    if settings_manager is None:
+        return default_value
+    return settings_manager.get('app', key, default_value)
+
 # Default text file extensions that CodeBase recognizes
 TEXT_EXTENSIONS_DEFAULT = {
     '.txt', '.py', '.cpp', '.c', '.h', '.java', '.js', '.ts', '.tsx', '.jsx', 

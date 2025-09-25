@@ -229,12 +229,25 @@ class RepoPromptGUI:
         self.status_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=(5, 10))
         self.status_timer_id = None
 
-    def show_loading_state(self, message: str) -> None:
+    def show_loading_state(self, message: str, show_cancel: bool = False) -> None:
         self.progress.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
         self.progress.start()
         self.show_status_message(message, duration=ERROR_MESSAGE_DURATION)
         self.is_loading = True
         self.root.config(cursor="watch")
+        
+        # Add cancel button if requested
+        if show_cancel and not hasattr(self, 'cancel_button'):
+            self.cancel_button = self.create_button(
+                self.root, 
+                "Cancel", 
+                self.cancel_operation,
+                "Cancel the current operation"
+            )
+            self.cancel_button.grid(row=3, column=2, padx=10, pady=5, sticky="e")
+        elif not show_cancel and hasattr(self, 'cancel_button'):
+            self.cancel_button.grid_remove()
+            
         self.root.update_idletasks()
 
     def hide_loading_state(self) -> None:
@@ -242,7 +255,21 @@ class RepoPromptGUI:
         self.progress.grid_remove()
         self.is_loading = False
         self.root.config(cursor="")
+        
+        # Remove cancel button if it exists
+        if hasattr(self, 'cancel_button'):
+            self.cancel_button.grid_remove()
+            
         self.root.update_idletasks()
+
+    def cancel_operation(self) -> None:
+        """Cancel the current operation."""
+        if hasattr(self, '_shutdown_requested'):
+            self._shutdown_requested = True
+            self.show_status_message("Operation cancelled by user", error=True)
+            self.hide_loading_state()
+        else:
+            self.show_status_message("No operation to cancel", error=True)
 
     def show_status_message(self, message: str, duration: int = STATUS_MESSAGE_DURATION, error: bool = False) -> None:
         if self.status_timer_id:
@@ -324,6 +351,40 @@ class RepoPromptGUI:
             self.settings.set('app', 'high_contrast', self.high_contrast_mode.get())
             ext_settings = {ext: var.get() for ext, (cb, var, *_) in self.settings_tab.extension_checkboxes.items()}
             self.settings.set('app', 'text_extensions', ext_settings)
+            
+            # Save new configurable settings
+            # Performance settings
+            try:
+                cache_max_size = int(self.settings_tab.cache_max_size_var.get())
+                self.settings.set('app', 'cache_max_size', cache_max_size)
+            except ValueError:
+                pass
+            
+            try:
+                cache_max_memory = int(self.settings_tab.cache_max_memory_var.get())
+                self.settings.set('app', 'cache_max_memory_mb', cache_max_memory)
+            except ValueError:
+                pass
+            
+            try:
+                tree_max_items = int(self.settings_tab.tree_max_items_var.get())
+                self.settings.set('app', 'tree_max_items', tree_max_items)
+            except ValueError:
+                pass
+            
+            # Security settings
+            self.settings.set('app', 'security_enabled', self.settings_tab.security_enabled_var.get())
+            try:
+                max_file_size = int(self.settings_tab.max_file_size_var.get())
+                self.settings.set('app', 'max_file_size_mb', max_file_size)
+            except ValueError:
+                pass
+            
+            # Logging settings
+            self.settings.set('app', 'log_level', self.settings_tab.log_level_var.get())
+            self.settings.set('app', 'log_to_file', self.settings_tab.log_to_file_var.get())
+            self.settings.set('app', 'log_to_console', self.settings_tab.log_to_console_var.get())
+            
             self.settings.save()
             self.show_status_message("Settings saved successfully.")
             self.theme_manager.apply_theme()
