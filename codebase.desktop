@@ -1,6 +1,6 @@
 [Desktop Entry]
-Version=3.7
-Name=CodeBase v3.7
+Version=4.0
+Name=CodeBase v4.0
 Comment=Code repository browser and file manager
 Exec=/home/digislinger/.local/bin/CodeBase
 Icon=codebase
