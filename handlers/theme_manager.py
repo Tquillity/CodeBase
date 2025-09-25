@@ -89,3 +89,7 @@ class ThemeManager:
         self.gui.file_list_tab.reconfigure_colors(self.gui.colors)
 
         self.gui.status_bar.config(bg=self.gui.colors['bg'], fg=self.gui.colors['status'])
+        
+        # Reconfigure file counter styling
+        if hasattr(self.gui, 'reconfigure_file_counter'):
+            self.gui.reconfigure_file_counter()

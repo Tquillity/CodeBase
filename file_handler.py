@@ -261,7 +261,12 @@ class FileHandler:
                 message = f"Reading {processed} of {total} files ({elapsed:.1f}s, est. {remaining:.1f}s left)"
             else:
                 message = f"Reading {processed} of {total} files ({elapsed:.1f}s)"
+            
+            # Update both status bar and progress bar
             self.gui.status_bar.config(text=f" {message}")
+            percentage = int((processed / total) * 100) if total > 0 else 0
+            file_count_text = f"{processed}/{total} files"
+            self.gui.update_progress(percentage, message, file_count_text)
         def queued_progress(processed, total, elapsed):
             self.gui.task_queue.put((update_progress, (processed, total, elapsed)))
         def wrapped_completion(content, token_count, errors):

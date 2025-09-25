@@ -141,6 +141,7 @@ class RepoHandler:
         """Resets the UI to its initial state when no repo is loaded."""
         self.gui.header_frame.repo_label.config(text="Current Repo: None")
         self.gui.info_label.config(text="Token Count: 0")
+        self.gui.cache_info_label.config(text="Cache: 0 items (0 MB)")
         self.gui.structure_tab.clear()
         self.gui.content_tab.clear()
         self.gui.file_list_tab.clear()
@@ -202,11 +203,8 @@ class RepoHandler:
                         file_paths.append(file_path_abs)
         
             total_files = len(file_paths)
-            # Queue initial processing message and switch to determinate bar
-            def set_determinate(total):
-                self.gui.progress.config(mode='determinate', maximum=total, value=0)
-                self.gui.status_bar.config(text=f"Found {total} files, identifying text files: 0 of {total} (0.0s)")
-            self.gui.task_queue.put((set_determinate, (total_files,)))
+            # Skip progress bar for first pass since it's too fast to be useful
+            print(f"DEBUG: Found {total_files} files, skipping progress bar for fast scan")
         
             # --- Process files ---
             processed_count = 0
@@ -220,21 +218,11 @@ class RepoHandler:
                     scanned_files_temp.add(file_path_abs)
                     loaded_files_temp.add(file_path_abs)
             
-                # Update progress every 10 files or on last
-                if processed_count % 10 == 0 or processed_count == total_files:
+                # Skip progress updates for first pass since it's too fast to be useful
+                # Just log occasionally for debugging
+                if processed_count % 50 == 0 or processed_count == total_files:
                     elapsed = time.time() - scan_start_time
-                    if processed_count > 5:
-                        avg_time = elapsed / processed_count
-                        est_remaining = avg_time * (total_files - processed_count)
-                        message = f"Identifying text files: {processed_count} of {total_files} ({elapsed:.1f}s, est. {est_remaining:.1f}s left)"
-                    else:
-                        message = f"Identifying text files: {processed_count} of {total_files} ({elapsed:.1f}s)"
-                
-                    # Queue status update and progress value
-                    def update_prog(value, msg):
-                        self.gui.progress.config(value=value)
-                        self.gui.status_bar.config(text=msg)
-                    self.gui.task_queue.put((update_prog, (processed_count, message)))
+                    print(f"DEBUG: Processed {processed_count}/{total_files} files in {elapsed:.1f}s")
         
             end_time = time.time()
             logging.info(f"Scan complete for {repo_path}. Found {len(scanned_files_temp)} text files out of {total_files} total files in {end_time - start_time:.2f} seconds.")

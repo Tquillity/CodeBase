@@ -220,7 +220,10 @@ class RepoPromptGUI:
         self.left_separator.grid(row=2, column=1, padx=5, pady=10, sticky="ns")
         self.right_frame = RightPanel(self.root, self.colors, self)
         self.setup_status_bar()
-        self.progress = ttk.Progressbar(self.root, mode='indeterminate')
+        # Create large file counter display instead of progress bar
+        self.file_counter = tk.Label(self.root, text="", bg=self.colors['bg'], fg=self.colors['fg'], 
+                                   font=("Arial", 36, "bold"), relief="solid", bd=2, padx=20, pady=15)
+        self._style_file_counter()
 
     def create_button(self, parent, text, command, tooltip_text=None, state=tk.NORMAL):
         btn = tk.Button(parent, text=text, command=command, bg=self.colors['btn_bg'], fg=self.colors['btn_fg'], state=state)
@@ -241,8 +244,17 @@ class RepoPromptGUI:
         self.status_bar.bind("<Button-2>", self._show_status_context_menu)  # Middle click for Linux
 
     def show_loading_state(self, message: str, show_cancel: bool = False) -> None:
-        self.progress.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
-        self.progress.start()
+        print(f"DEBUG: show_loading_state called with message: {message}")
+        
+        # Show file counter in center of screen
+        print("DEBUG: Showing file counter")
+        self.file_counter.grid(row=2, column=0, columnspan=3, padx=20, pady=20)
+        
+        # Initialize file counter (don't show "0" initially)
+        print("DEBUG: Initializing file counter")
+        self.file_counter.config(text="")
+        print(f"DEBUG: File counter initialized - text: {self.file_counter.cget('text')}")
+        
         self.show_status_message(message, duration=ERROR_MESSAGE_DURATION)
         self.is_loading = True
         self.root.config(cursor="watch")
@@ -262,8 +274,7 @@ class RepoPromptGUI:
         self.root.update_idletasks()
 
     def hide_loading_state(self) -> None:
-        self.progress.stop()
-        self.progress.grid_remove()
+        self.file_counter.grid_remove()
         self.is_loading = False
         self.root.config(cursor="")
         
@@ -350,6 +361,64 @@ class RepoPromptGUI:
     def _clear_status_bar(self):
         """Clear the status bar."""
         self.reset_status_bar()
+
+    def _style_file_counter(self):
+        """Style the file counter display to match the application theme."""
+        self.file_counter.config(
+            bg=self.colors['bg'], 
+            fg=self.colors['fg'],
+            font=("Arial", 36, "bold"),
+            relief="solid",
+            bd=2,
+            padx=20,
+            pady=15
+        )
+
+    def reconfigure_file_counter(self):
+        """Reconfigure file counter styling when theme changes."""
+        self._style_file_counter()
+
+    def update_progress(self, percentage: int, message: str = None, file_count: str = None):
+        """Update the file counter display."""
+        try:
+            percentage = max(0, min(100, percentage))  # Clamp between 0-100
+            print(f"DEBUG: update_progress called with percentage={percentage}, message={message}, file_count={file_count}")
+            
+            # Check if file counter exists
+            if not hasattr(self, 'file_counter'):
+                print("DEBUG: File counter not found!")
+                return
+                
+            # Show file count if available, otherwise percentage
+            if file_count:
+                # Show the full "X/Y files" format
+                self.file_counter.config(text=file_count)
+                print(f"DEBUG: File counter set to: {file_count}")
+            else:
+                self.file_counter.config(text=f"{percentage}%")
+                print(f"DEBUG: File counter set to percentage: {percentage}%")
+                
+            print(f"DEBUG: File counter text set to {self.file_counter.cget('text')}")
+            
+            if message:
+                print(f"DEBUG: Showing status message: {message}")
+                self.show_status_message(message, duration=1000)
+            
+            # Force immediate UI update
+            print("DEBUG: Forcing UI update")
+            self.root.update_idletasks()
+            self.root.update()
+            print("DEBUG: UI update completed")
+        except Exception as e:
+            print(f"DEBUG: Error updating progress: {e}")
+            logging.warning(f"Error updating progress: {e}")
+
+    def set_progress_max(self, max_value: int):
+        """Set the maximum value for the progress bar."""
+        try:
+            self.progress['maximum'] = max_value
+        except Exception as e:
+            logging.warning(f"Error setting progress max: {e}")
 
     def update_cache_info(self):
         """Update the cache information display."""
