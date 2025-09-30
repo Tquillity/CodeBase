@@ -1,44 +1,39 @@
+import ttkbootstrap as ttk
 import tkinter as tk
-from tkinter import scrolledtext, filedialog, messagebox
+from ttkbootstrap.scrolled import ScrolledText
+from tkinter import filedialog, messagebox
 import os
 import logging
 from widgets import Tooltip
 from security import validate_template_file, validate_content_security, sanitize_content
 from constants import SECURITY_ENABLED
 
-class BasePromptTab(tk.Frame):
+class BasePromptTab(ttk.Frame):
     def __init__(self, parent, gui, template_dir):
         super().__init__(parent)
         self.gui = gui
         self.template_dir = template_dir
-        self.colors = gui.colors
+        # Colors now managed by ttkbootstrap theme
         self.setup_ui()
 
     def setup_ui(self):
-        self.base_prompt_text = scrolledtext.ScrolledText(self, wrap=tk.WORD,
-                                                          bg=self.colors['bg_accent'], fg=self.colors['fg'],
-                                                          font=("Arial", 10), relief=tk.FLAT, borderwidth=0)
+        self.base_prompt_text = ScrolledText(self, wrap=ttk.WORD,
+                                                          font=("Arial", 10), bootstyle="dark")
         self.base_prompt_text.pack(fill="both", expand=True, padx=5, pady=(5, 10))
 
-        self.base_prompt_button_frame = tk.Frame(self, bg=self.colors['bg'])
-        self.base_prompt_button_frame.pack(side=tk.BOTTOM, fill='x', pady=(0, 10))
+        self.base_prompt_button_frame = ttk.Frame(self)
+        self.base_prompt_button_frame.pack(side=ttk.BOTTOM, fill='x', pady=(0, 10))
 
         self.save_template_button = self.gui.create_button(self.base_prompt_button_frame, "Save Template (Ctrl+T)", self.save_template, "Save current prompt text as a template")
-        self.save_template_button.pack(side=tk.LEFT, padx=(10, 5), pady=8)
+        self.save_template_button.pack(side=ttk.LEFT, padx=(10, 5), pady=8)
         self.load_template_button = self.gui.create_button(self.base_prompt_button_frame, "Load Template (Ctrl+L)", self.load_template, "Load a saved prompt template")
-        self.load_template_button.pack(side=tk.LEFT, padx=5, pady=8)
+        self.load_template_button.pack(side=ttk.LEFT, padx=5, pady=8)
         self.delete_template_button = self.gui.create_button(self.base_prompt_button_frame, "Delete Template", self.delete_template, "Delete a saved prompt template")
-        self.delete_template_button.pack(side=tk.LEFT, padx=5, pady=8)
+        self.delete_template_button.pack(side=ttk.LEFT, padx=5, pady=8)
         default_prompt = self.gui.settings.get('app', 'default_base_prompt', '')
         if default_prompt:
              self.base_prompt_text.insert('1.0', default_prompt)
 
-    def reconfigure_colors(self, colors):
-        self.colors = colors
-        self.base_prompt_text.config(bg=colors['bg_accent'], fg=colors['fg'])
-        self.base_prompt_button_frame.config(bg=colors['bg'])
-        for btn in [self.save_template_button, self.load_template_button, self.delete_template_button]:
-             btn.config(bg=colors['btn_bg'], fg=colors['btn_fg'])
 
     def perform_search(self, query, case_sensitive, whole_word):
         matches = []

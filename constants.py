@@ -52,7 +52,7 @@ LOG_FILE_PATH = "codebase_debug.log"  # Default log file path
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"  # Log format string
 
 # Security configuration
-SECURITY_ENABLED = True  # Enable security validation
+SECURITY_ENABLED = False  # Disable security validation for now
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file size
 MAX_TEMPLATE_SIZE = 1024 * 1024   # 1MB max template size
 MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max content length

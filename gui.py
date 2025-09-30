@@ -1,9 +1,9 @@
 # gui.py
 import os
+import ttkbootstrap as ttk
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, Toplevel, BooleanVar, IntVar, StringVar
+from tkinter import messagebox, filedialog, Toplevel, BooleanVar, IntVar, StringVar
 from typing import Dict, List, Set, Optional, Any, Callable
-from colors import *
 from tabs.content_tab import ContentTab
 from tabs.structure_tab import StructureTab
 from tabs.base_prompt_tab import BasePromptTab
@@ -21,7 +21,7 @@ from file_list_handler import generate_list_content
 from handlers.search_handler import SearchHandler
 from handlers.copy_handler import CopyHandler
 from handlers.repo_handler import RepoHandler
-from handlers.theme_manager import ThemeManager
+# ThemeManager removed - using ttkbootstrap instead
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
 import queue  # FIX: Added for thread-safe Tkinter callbacks
 from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION, ERROR_HANDLING_ENABLED, DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT
@@ -37,17 +37,16 @@ setup_logging(
     format_string=LOG_FORMAT
 )
 class RepoPromptGUI:
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self, root: ttk.Window) -> None:
         self.root = root
         self.version = VERSION
         self.settings = SettingsManager()
         self.logger = get_logger(__name__)
         self.high_contrast_mode = BooleanVar(value=self.settings.get('app', 'high_contrast', 0))
-        self.theme_manager = ThemeManager(self)
-        self.theme_manager.apply_theme()
+        # Theme management now handled by ttkbootstrap
         self.root.title(f"CodeBase v{self.version}")
         self.root.geometry(self.settings.get('app', 'window_geometry', DEFAULT_WINDOW_SIZE))
-        self.root.configure(bg=self.colors['bg'])
+        # Background color now managed by ttkbootstrap theme
         
         # Quick window visibility check and fix
         current_geometry = self.root.geometry()
@@ -149,8 +148,8 @@ class RepoPromptGUI:
         if self.current_repo_path:
             self.show_status_message("Updating content preview...")
             # Disable copy buttons while updating
-            self.copy_button.config(state=tk.DISABLED)
-            self.copy_all_button.config(state=tk.DISABLED)
+            self.copy_button.config(state=ttk.DISABLED)
+            self.copy_all_button.config(state=ttk.DISABLED)
             self.file_handler.generate_and_update_preview(None, self.content_tab._handle_preview_completion)
 
     def load_recent_folders(self):
@@ -196,46 +195,42 @@ class RepoPromptGUI:
             logging.info(f"Removed recent folder: {folder_to_delete}")
 
     def setup_ui(self):
-        self.menu = tk.Menu(self.root, bg=self.colors['btn_bg'], fg=self.colors['btn_fg'], tearoff=0)
+        self.menu = tk.Menu(self.root, tearoff=0)
         self.root.config(menu=self.menu)
-        file_menu = tk.Menu(self.menu, bg=self.colors['btn_bg'], fg=self.colors['btn_fg'], tearoff=0)
+        file_menu = tk.Menu(self.menu, tearoff=0)
         self.menu.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Select Repo", accelerator="Ctrl+R", command=self.repo_handler.select_repo)
         file_menu.add_command(label="Refresh Repo", accelerator="Ctrl+F5", command=self.repo_handler.refresh_repo)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.on_close)
-        edit_menu = tk.Menu(self.menu, bg=self.colors['btn_bg'], fg=self.colors['btn_fg'], tearoff=0)
+        edit_menu = tk.Menu(self.menu, tearoff=0)
         self.menu.add_cascade(label="Edit", menu=edit_menu)
         edit_menu.add_command(label="Copy Contents", accelerator="Ctrl+C", command=self.copy_handler.copy_contents)
         edit_menu.add_command(label="Copy Structure", accelerator="Ctrl+S", command=self.copy_handler.copy_structure)
         edit_menu.add_command(label="Copy All", accelerator="Ctrl+A", command=self.copy_handler.copy_all)
-        help_menu = tk.Menu(self.menu, bg=self.colors['btn_bg'], fg=self.colors['btn_fg'], tearoff=0)
+        help_menu = tk.Menu(self.menu, tearoff=0)
         self.menu.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About", command=self.show_about)
         self.root.grid_rowconfigure(2, weight=1)
         self.root.grid_columnconfigure(2, weight=1)
-        self.header_frame = HeaderFrame(self.root, self.colors, title="CodeBase", version=self.version)
-        self.left_frame = LeftPanel(self.root, self.colors, self)
-        self.left_separator = tk.Frame(self.root, bg=self.colors['btn_bg'], width=2)
+        self.header_frame = HeaderFrame(self.root, title="CodeBase", version=self.version)
+        self.left_frame = LeftPanel(self.root, self)
+        self.left_separator = ttk.Frame(self.root, width=2)
         self.left_separator.grid(row=2, column=1, padx=8, pady=15, sticky="ns")
-        self.right_frame = RightPanel(self.root, self.colors, self)
+        self.right_frame = RightPanel(self.root, self)
         self.setup_status_bar()
         # Create large file counter display instead of progress bar
-        self.file_counter = tk.Label(self.root, text="", bg=self.colors['bg'], fg=self.colors['fg'], 
-                                   font=("Arial", 36, "bold"), relief="solid", bd=2, padx=20, pady=15)
+        self.file_counter = ttk.Label(self.root, text="", font=("Arial", 36, "bold"))
         self._style_file_counter()
 
-    def create_button(self, parent, text, command, tooltip_text=None, state=tk.NORMAL):
-        btn = tk.Button(parent, text=text, command=command, bg=self.colors['btn_bg'], fg=self.colors['btn_fg'], state=state)
-        btn.bind("<Enter>", lambda e: btn.config(bg=self.colors['btn_hover']))
-        btn.bind("<Leave>", lambda e: btn.config(bg=self.colors['btn_bg']))
+    def create_button(self, parent, text, command, tooltip_text=None, state=ttk.NORMAL, bootstyle="primary"):
+        btn = ttk.Button(parent, text=text, command=command, state=state, bootstyle=bootstyle)
         if tooltip_text:
             Tooltip(btn, tooltip_text)
         return btn
 
     def setup_status_bar(self):
-        self.status_bar = tk.Label(self.root, text="Ready", bd=1, relief="sunken", anchor="w",
-                                   bg=self.colors['bg'], fg=self.colors['status'], padx=5)
+        self.status_bar = ttk.Label(self.root, text="Ready", anchor="w")
         self.status_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=(5, 10))
         self.status_timer_id = None
         
@@ -297,21 +292,22 @@ class RepoPromptGUI:
         if self.status_timer_id:
             self.root.after_cancel(self.status_timer_id)
             self.status_timer_id = None
-        status_color = self.colors['status']
+        # Status bar color now managed by ttkbootstrap theme
         if error:
-             status_color = '#FF0000'
-        self.status_bar.config(text=f" {message}", fg=status_color)
+            self.status_bar.config(text=f" {message}", bootstyle="danger")
+        else:
+            self.status_bar.config(text=f" {message}")
         self.status_timer_id = self.root.after(duration, self.reset_status_bar)
 
     def reset_status_bar(self):
-        self.status_bar.config(text=" Ready", fg=self.colors['status'])
+        self.status_bar.config(text=" Ready")
         self.status_timer_id = None
 
     def _show_status_context_menu(self, event):
         """Show right-click context menu for status bar."""
         try:
             # Create context menu
-            context_menu = tk.Menu(self.root, tearoff=0, bg=self.colors['btn_bg'], fg=self.colors['btn_fg'])
+            context_menu = tk.Menu(self.root, tearoff=0)
             context_menu.add_command(label="Copy", command=self._copy_status_bar)
             context_menu.add_command(label="Paste", command=self._paste_to_status_bar)
             context_menu.add_separator()
@@ -334,7 +330,7 @@ class RepoPromptGUI:
                     self.status_timer_id = None
                 
                 # Show pasted content in status bar
-                self.status_bar.config(text=f" {clipboard_content}", fg=self.colors['status'])
+                self.status_bar.config(text=f" {clipboard_content}")
                 logging.info(f"Pasted to status bar: {clipboard_content[:50]}...")
             else:
                 self.show_status_message("Clipboard is empty", error=True)
@@ -365,13 +361,7 @@ class RepoPromptGUI:
     def _style_file_counter(self):
         """Style the file counter display to match the application theme."""
         self.file_counter.config(
-            bg=self.colors['bg'], 
-            fg=self.colors['fg'],
-            font=("Arial", 36, "bold"),
-            relief="solid",
-            bd=2,
-            padx=20,
-            pady=15
+            font=("Arial", 36, "bold")
         )
 
     def reconfigure_file_counter(self):
@@ -525,8 +515,7 @@ class RepoPromptGUI:
             
             self.settings.save()
             self.show_status_message("Settings saved successfully.")
-            self.theme_manager.apply_theme()
-            self.theme_manager.reconfigure_ui_colors()
+            # Theme is now managed by ttkbootstrap automatically
             self.apply_default_tab()
             if self.current_repo_path:
                  self.show_status_message("Settings saved. Refreshing repository view...")
@@ -651,6 +640,6 @@ class RepoPromptGUI:
         self.root.bind('<Control-t>', lambda e: self.base_prompt_tab.save_template())
         self.root.bind('<Control-l>', lambda e: self.base_prompt_tab.load_template())
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = ttk.Window(themename="darkly")
     app = RepoPromptGUI(root)
     root.mainloop()

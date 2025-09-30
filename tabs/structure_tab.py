@@ -1,5 +1,5 @@
+import ttkbootstrap as ttk
 import tkinter as tk
-from tkinter import ttk
 from widgets import Tooltip
 import logging
 import os
@@ -8,55 +8,52 @@ from exceptions import UIError, FileOperationError
 from error_handler import handle_error, safe_execute
 from constants import ERROR_HANDLING_ENABLED
 
-class StructureTab(tk.Frame):
+class StructureTab(ttk.Frame):
     def __init__(self, parent, gui, file_handler, settings, show_unloaded_var):
         super().__init__(parent)
         self.gui = gui
         self.file_handler = file_handler
         self.settings = settings
         self.show_unloaded_var = show_unloaded_var
-        self.colors = gui.colors
-        self.expand_collapse_var = tk.BooleanVar(value=True)
+        # Colors now managed by ttkbootstrap theme
+        self.expand_collapse_var = ttk.BooleanVar(value=True)
         self.setup_ui()
 
     def setup_ui(self):
-        self.structure_button_frame = tk.Frame(self, bg=self.colors['bg'])
-        self.structure_button_frame.pack(side=tk.TOP, fill='x', pady=(10, 5))
+        self.structure_button_frame = ttk.Frame(self)
+        self.structure_button_frame.pack(side=ttk.TOP, fill='x', pady=(10, 5))
 
         self.expand_collapse_button = self.gui.create_button(self.structure_button_frame, "Expand All", self.toggle_expand_collapse, "Expand/collapse all folders in the tree")
-        self.expand_collapse_button.pack(side=tk.LEFT, padx=(10, 5), pady=8)
+        self.expand_collapse_button.pack(side=ttk.LEFT, padx=(10, 5), pady=8)
 
-        self.show_unloaded_checkbox = tk.Checkbutton(self.structure_button_frame, text="Mark Unselected Files", variable=self.show_unloaded_var,
-                                                     command=self.update_tree_strikethrough, bg=self.colors['bg'], fg=self.colors['fg'],
-                                                     selectcolor=self.colors['bg_accent'], anchor='w',
-                                                     activebackground=self.colors['bg'], activeforeground=self.colors['fg'])
-        self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=(5, 10), pady=8)
+        self.show_unloaded_checkbox = ttk.Checkbutton(self.structure_button_frame, text="Mark Unselected Files", variable=self.show_unloaded_var,
+                                                     command=self.update_tree_strikethrough)
+        self.show_unloaded_checkbox.pack(side=ttk.LEFT, padx=(5, 10), pady=8)
         Tooltip(self.show_unloaded_checkbox, "Apply visual marker (strikethrough) to text files currently not selected for inclusion")
 
-        style = ttk.Style()
-        style.configure("Custom.Treeview", background=self.colors['bg_accent'], foreground=self.colors['fg'],
-                        fieldbackground=self.colors['bg_accent'], borderwidth=0, rowheight=25)
-        style.map("Custom.Treeview", background=[('selected', self.colors['btn_bg'])])
-        style.layout("Custom.Treeview", [('Custom.Treeview.treearea', {'sticky': 'nswe'})])
-
+        # Treeview styling now handled by ttkbootstrap theme
         self.tree = ttk.Treeview(self, columns=("path", "checkbox"), show="tree headings",
-                                 style="Custom.Treeview", selectmode="browse")
+                                 selectmode="browse", bootstyle="primary")
         self.tree.column("#0", width=400, anchor='w')
-        self.tree.column("path", width=0, stretch=tk.NO)
-        self.tree.column("checkbox", width=40, anchor="center", stretch=tk.NO)
+        self.tree.column("path", width=0, stretch=ttk.NO)
+        self.tree.column("checkbox", width=40, anchor="center", stretch=ttk.NO)
         self.tree.heading("#0", text="Name", anchor='w')
         self.tree.heading("checkbox", text="Sel")
 
+        # Get theme colors from ttkbootstrap
+        style = ttk.Style()
+        colors = style.colors
+        
         unloaded_font = ('TkDefaultFont', -1, 'overstrike') if self.gui.high_contrast_mode.get() else (None, -10, 'overstrike')
-        self.tree.tag_configure('folder', foreground=self.colors['folder'])
-        self.tree.tag_configure('file_selected', foreground=self.colors['file_selected'])
-        self.tree.tag_configure('file_unloaded', foreground=self.colors['file_unloaded'], font=unloaded_font)
-        self.tree.tag_configure('file_default', foreground=self.colors['file_default'])
-        self.tree.tag_configure('file_nontext', foreground=self.colors['file_nontext'])
-        self.tree.tag_configure('error', foreground=self.colors['status'])
-        self.tree.tag_configure('empty', foreground=self.colors['file_nontext'])
-        self.tree.tag_configure("highlight", background=self.colors['highlight_bg'], foreground=self.colors['highlight_fg'])
-        self.tree.tag_configure("focused_highlight", background=self.colors['focused_highlight_bg'], foreground=self.colors['focused_highlight_fg'])
+        self.tree.tag_configure('folder', foreground=colors.info)
+        self.tree.tag_configure('file_selected', foreground=colors.success)
+        self.tree.tag_configure('file_unloaded', foreground=colors.secondary, font=unloaded_font)
+        self.tree.tag_configure('file_default', foreground=colors.fg)
+        self.tree.tag_configure('file_nontext', foreground=colors.fg)
+        self.tree.tag_configure('error', foreground=colors.danger)
+        self.tree.tag_configure('empty', foreground=colors.fg)
+        self.tree.tag_configure("highlight", background=colors.warning, foreground=colors.bg)
+        self.tree.tag_configure("focused_highlight", background=colors.primary, foreground=colors.bg)
 
         tree_scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=tree_scrollbar.set)
@@ -68,22 +65,6 @@ class StructureTab(tk.Frame):
         self.tree.bind('<Double-1>', self.handle_tree_double_click)
         self.tree.bind('<<TreeviewOpen>>', self.handle_tree_open)
 
-    def reconfigure_colors(self, colors):
-        self.colors = colors
-        self.structure_button_frame.config(bg=colors['bg'])
-        self.expand_collapse_button.config(bg=colors['btn_bg'], fg=colors['btn_fg'])
-        self.show_unloaded_checkbox.config(bg=colors['bg'], fg=colors['fg'], selectcolor=colors['bg_accent'])
-        style = ttk.Style()
-        style.configure("Custom.Treeview", background=colors['bg_accent'], foreground=colors['fg'], fieldbackground=colors['bg_accent'])
-        style.map("Custom.Treeview", background=[('selected', colors['btn_bg'])])
-        self.tree.tag_configure('folder', foreground=colors['folder'])
-        unloaded_font = ('TkDefaultFont', -1, 'overstrike') if self.gui.high_contrast_mode.get() else (None, -10, 'overstrike')
-        self.tree.tag_configure('file_selected', foreground=colors['file_selected'])
-        self.tree.tag_configure('file_unloaded', foreground=colors['file_unloaded'], font=unloaded_font)
-        self.tree.tag_configure('file_default', foreground=colors['file_default'])
-        self.tree.tag_configure('file_nontext', foreground=colors['file_nontext'])
-        self.tree.tag_configure("highlight", background=colors['highlight_bg'], foreground=colors['highlight_fg'])
-        self.tree.tag_configure("focused_highlight", background=colors['focused_highlight_bg'], foreground=colors['focused_highlight_fg'])
 
     def populate_tree(self, root_dir):
         # NEW_LOG
@@ -171,7 +152,7 @@ class StructureTab(tk.Frame):
                  self.gui.notebook.select(0)
                  self.gui.root.update_idletasks()
 
-                 self.gui.content_tab.content_text.config(state=tk.NORMAL)
+                 # ttkbootstrap ScrolledText is always editable
                  pos = self.gui.content_tab.content_text.search(f"File: {rel_path}", "1.0", tk.END, exact=True)
                  if pos:
                      self.gui.content_tab.content_text.tag_remove("focused_highlight", "1.0", tk.END)
@@ -182,7 +163,7 @@ class StructureTab(tk.Frame):
                      self.gui.show_status_message(f"Jumped to {os.path.basename(file_path)}")
                  else:
                      self.gui.show_status_message(f"Content for {os.path.basename(file_path)} not found in preview.", error=True)
-                 self.gui.content_tab.content_text.config(state=tk.DISABLED)
+                 # ttkbootstrap ScrolledText is always editable
         except Exception as e:
              logging.error(f"Error jumping to file content: {e}")
              self.gui.show_status_message("Error jumping to content.", error=True)
@@ -361,3 +342,19 @@ class StructureTab(tk.Frame):
 
     def clear(self):
         self.tree.delete(*self.tree.get_children())
+
+    def update_tag_colors(self):
+        """Updates treeview tag colors to match the current theme."""
+        style = ttk.Style()
+        colors = style.colors
+
+        unloaded_font = ('TkDefaultFont', -1, 'overstrike') if self.gui.high_contrast_mode.get() else (None, -10, 'overstrike')
+        self.tree.tag_configure('folder', foreground=colors.info)
+        self.tree.tag_configure('file_selected', foreground=colors.success)
+        self.tree.tag_configure('file_unloaded', foreground=colors.secondary, font=unloaded_font)
+        self.tree.tag_configure('file_default', foreground=colors.fg)
+        self.tree.tag_configure('file_nontext', foreground=colors.fg)
+        self.tree.tag_configure('error', foreground=colors.danger)
+        self.tree.tag_configure('empty', foreground=colors.fg)
+        self.tree.tag_configure("highlight", background=colors.warning, foreground=colors.bg)
+        self.tree.tag_configure("focused_highlight", background=colors.primary, foreground=colors.bg)

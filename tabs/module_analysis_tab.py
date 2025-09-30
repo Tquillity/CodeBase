@@ -1,22 +1,23 @@
+import ttkbootstrap as ttk
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from ttkbootstrap.scrolled import ScrolledText
 import logging
 from widgets import Tooltip
 from constants import ERROR_MESSAGE_DURATION
 
-class ModuleAnalysisTab(tk.Frame):
+class ModuleAnalysisTab(ttk.Frame):
     def __init__(self, parent, gui):
         super().__init__(parent)
         self.gui = gui
-        self.colors = gui.colors
+        # Colors now managed by ttkbootstrap theme
         self.analysis_results = None
         self.setup_ui()
 
     def setup_ui(self):
         """Setup the module analysis tab UI components."""
         # Main button frame
-        self.button_frame = tk.Frame(self, bg=self.colors['bg'])
-        self.button_frame.pack(side=tk.TOP, fill='x', pady=5)
+        self.button_frame = ttk.Frame(self)
+        self.button_frame.pack(side=ttk.TOP, fill='x', pady=5)
 
         # Analysis button
         self.analyze_button = self.gui.create_button(
@@ -25,7 +26,7 @@ class ModuleAnalysisTab(tk.Frame):
             self.start_analysis,
             "Analyze repository for module dependencies and groupings"
         )
-        self.analyze_button.pack(side=tk.LEFT, padx=10, pady=5)
+        self.analyze_button.pack(side=ttk.LEFT, padx=10, pady=5)
 
         # Clear button
         self.clear_button = self.gui.create_button(
@@ -34,7 +35,7 @@ class ModuleAnalysisTab(tk.Frame):
             self.clear_results,
             "Clear current analysis results"
         )
-        self.clear_button.pack(side=tk.LEFT, padx=5, pady=5)
+        self.clear_button.pack(side=ttk.LEFT, padx=5, pady=5)
 
         # Export button (initially disabled)
         self.export_button = self.gui.create_button(
@@ -44,32 +45,30 @@ class ModuleAnalysisTab(tk.Frame):
             "Export module analysis results",
             state=tk.DISABLED
         )
-        self.export_button.pack(side=tk.LEFT, padx=5, pady=5)
+        self.export_button.pack(side=ttk.LEFT, padx=5, pady=5)
 
         # Progress frame
-        self.progress_frame = tk.Frame(self, bg=self.colors['bg'])
-        self.progress_frame.pack(side=tk.TOP, fill='x', pady=5)
+        self.progress_frame = ttk.Frame(self)
+        self.progress_frame.pack(side=ttk.TOP, fill='x', pady=5)
 
-        self.progress_label = tk.Label(
+        self.progress_label = ttk.Label(
             self.progress_frame, 
-            text="Ready to analyze", 
-            bg=self.colors['bg'], 
-            fg=self.colors['fg']
+            text="Ready to analyze"
         )
-        self.progress_label.pack(side=tk.LEFT, padx=10)
+        self.progress_label.pack(side=ttk.LEFT, padx=10)
 
         # Main content area with notebook for different views
         self.content_notebook = ttk.Notebook(self)
         self.content_notebook.pack(fill="both", expand=True, padx=5, pady=5)
 
         # Module tree view
-        self.tree_frame = tk.Frame(self.content_notebook)
+        self.tree_frame = ttk.Frame(self.content_notebook)
         self.content_notebook.add(self.tree_frame, text="Module Tree")
 
         self.setup_tree_view()
 
         # Dependency graph view
-        self.graph_frame = tk.Frame(self.content_notebook)
+        self.graph_frame = ttk.Frame(self.content_notebook)
         self.content_notebook.add(self.graph_frame, text="Dependency Graph")
 
         self.setup_graph_view()
@@ -106,36 +105,26 @@ class ModuleAnalysisTab(tk.Frame):
 
     def setup_graph_view(self):
         """Setup the dependency graph view."""
-        self.graph_text = scrolledtext.ScrolledText(
+        self.graph_text = ScrolledText(
             self.graph_frame,
-            wrap=tk.WORD,
-            bg=self.colors['bg_accent'],
-            fg=self.colors['fg'],
+            wrap=ttk.WORD,
             font=("Arial", 10),
-            state=tk.DISABLED
+            state=ttk.DISABLED,
+            bootstyle="dark"
         )
         self.graph_text.pack(fill="both", expand=True, padx=5, pady=5)
 
     def setup_details_view(self):
         """Setup the analysis details view."""
-        self.details_text = scrolledtext.ScrolledText(
+        self.details_text = ScrolledText(
             self.details_frame,
-            wrap=tk.WORD,
-            bg=self.colors['bg_accent'],
-            fg=self.colors['fg'],
+            wrap=ttk.WORD,
             font=("Arial", 10),
-            state=tk.DISABLED
+            state=ttk.DISABLED,
+            bootstyle="dark"
         )
         self.details_text.pack(fill="both", expand=True, padx=5, pady=5)
 
-    def reconfigure_colors(self, colors):
-        """Reconfigure colors when theme changes."""
-        self.colors = colors
-        self.button_frame.config(bg=colors['bg'])
-        self.progress_frame.config(bg=colors['bg'])
-        self.progress_label.config(bg=colors['bg'], fg=colors['fg'])
-        self.graph_text.config(bg=colors['bg_accent'], fg=colors['fg'])
-        self.details_text.config(bg=colors['bg_accent'], fg=colors['fg'])
 
     def start_analysis(self):
         """Start the module analysis process."""
@@ -230,7 +219,7 @@ class ModuleAnalysisTab(tk.Frame):
 
     def _update_graph_view(self, results):
         """Update the dependency graph view."""
-        self.graph_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         self.graph_text.delete(1.0, tk.END)
 
         # Simple text representation of dependencies
@@ -249,11 +238,11 @@ class ModuleAnalysisTab(tk.Frame):
             graph_text += "\n"
 
         self.graph_text.insert(1.0, graph_text)
-        self.graph_text.config(state=tk.DISABLED)
+        # ttkbootstrap ScrolledText is always editable
 
     def _update_details_view(self, results, errors):
         """Update the analysis details view."""
-        self.details_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         self.details_text.delete(1.0, tk.END)
 
         details = f"Module Analysis Results\n{'='*50}\n\n"
@@ -291,7 +280,7 @@ class ModuleAnalysisTab(tk.Frame):
                 details += f"- {error}\n"
 
         self.details_text.insert(1.0, details)
-        self.details_text.config(state=tk.DISABLED)
+        # ttkbootstrap ScrolledText is always editable
 
     def on_module_double_click(self, event):
         """Handle double-click on module tree item."""
@@ -322,13 +311,13 @@ class ModuleAnalysisTab(tk.Frame):
             self.module_tree.delete(item)
 
         # Clear text views
-        self.graph_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         self.graph_text.delete(1.0, tk.END)
-        self.graph_text.config(state=tk.DISABLED)
+        # ttkbootstrap ScrolledText is always editable
 
-        self.details_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         self.details_text.delete(1.0, tk.END)
-        self.details_text.config(state=tk.DISABLED)
+        # ttkbootstrap ScrolledText is always editable
 
         # Reset UI
         self.progress_label.config(text="Ready to analyze")

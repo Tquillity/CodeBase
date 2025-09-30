@@ -1,15 +1,16 @@
+import ttkbootstrap as ttk
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import filedialog
 import os
 from file_handler import FileHandler
 
-class SettingsTab(tk.Frame):
+class SettingsTab(ttk.Frame):
     def __init__(self, parent, gui, settings, high_contrast_mode):
         super().__init__(parent)
         self.gui = gui
         self.settings = settings
         self.high_contrast_mode = high_contrast_mode
-        self.colors = gui.colors
+        # Colors now managed by ttkbootstrap theme
         self.exclude_file_vars = {}
         self.extension_checkboxes = {}
         self.default_tab_var = tk.StringVar(value=self.settings.get('app', 'default_tab', 'Content Preview'))
@@ -22,14 +23,14 @@ class SettingsTab(tk.Frame):
 
     def setup_ui(self):
         scroll_frame = ttk.Scrollbar(self, orient="vertical")
-        scroll_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        scroll_frame.pack(side=ttk.RIGHT, fill=ttk.Y)
 
-        canvas = tk.Canvas(self, bg=self.colors['bg'], yscrollcommand=scroll_frame.set)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(self, yscrollcommand=scroll_frame.set)
+        canvas.pack(side=ttk.LEFT, fill=ttk.BOTH, expand=True)
 
         scroll_frame.config(command=canvas.yview)
 
-        inner_frame = tk.Frame(canvas, bg=self.colors['bg'])
+        inner_frame = tk.Frame(canvas)
         inner_frame_id = canvas.create_window((0, 0), window=inner_frame, anchor="nw")
 
         def _on_configure(event):
@@ -42,108 +43,105 @@ class SettingsTab(tk.Frame):
         canvas.bind("<MouseWheel>", _on_mousewheel)
         inner_frame.bind("<MouseWheel>", _on_mousewheel)
 
-        default_tab_label = tk.Label(inner_frame, text="Default Tab:", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        # Default Tab Selection
+        default_tab_label = ttk.Label(inner_frame, text="Default Tab:", font=("Arial", 10, "bold"))
         default_tab_label.grid(row=0, column=0, padx=15, pady=8, sticky="w")
         default_tab_options = ["Content Preview", "Folder Structure", "Base Prompt", "Settings", "File List Selection"]
         default_tab_menu = ttk.Combobox(inner_frame, textvariable=self.default_tab_var, values=default_tab_options, state="readonly")
         default_tab_menu.grid(row=0, column=1, padx=15, pady=8, sticky="w")
 
-        expansion_label = tk.Label(inner_frame, text="Initial Expansion:", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        # Expansion Settings
+        expansion_label = ttk.Label(inner_frame, text="Initial Expansion:", font=("Arial", 10, "bold"))
         expansion_label.grid(row=1, column=0, padx=15, pady=8, sticky="w")
         expansion_options = ["Collapsed", "Expanded", "Levels"]
         expansion_menu = ttk.Combobox(inner_frame, textvariable=self.expansion_var, values=expansion_options, state="readonly")
         expansion_menu.grid(row=1, column=1, padx=15, pady=8, sticky="w")
 
-        levels_label = tk.Label(inner_frame, text="Expansion Levels:", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        # Expansion Levels
+        levels_label = ttk.Label(inner_frame, text="Expansion Levels:", font=("Arial", 10, "bold"))
         levels_label.grid(row=2, column=0, padx=15, pady=8, sticky="w")
-        self.levels_entry = tk.Entry(inner_frame, textvariable=self.levels_var, width=5, bg=self.colors['bg_accent'], fg=self.colors['fg'])
+        self.levels_entry = ttk.Entry(inner_frame, textvariable=self.levels_var, width=5)
         self.levels_entry.grid(row=2, column=1, padx=15, pady=8, sticky="w")
 
-        exclude_node_modules_checkbox = tk.Checkbutton(inner_frame, text="Exclude node_modules", variable=self.exclude_node_modules_var,
-                                                       bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'],
-                                                       font=("Arial", 10))
+        # Exclude node_modules
+        exclude_node_modules_checkbox = ttk.Checkbutton(inner_frame, text="Exclude node_modules", variable=self.exclude_node_modules_var)
         exclude_node_modules_checkbox.grid(row=3, column=0, columnspan=2, padx=15, pady=8, sticky="w")
 
-        exclude_dist_checkbox = tk.Checkbutton(inner_frame, text="Exclude dist/build folders", variable=self.exclude_dist_var,
-                                               bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'],
-                                               font=("Arial", 10))
+        # Exclude dist/build folders
+        exclude_dist_checkbox = ttk.Checkbutton(inner_frame, text="Exclude dist/build folders", variable=self.exclude_dist_var)
         exclude_dist_checkbox.grid(row=4, column=0, columnspan=2, padx=15, pady=8, sticky="w")
 
-        exclude_files_label = tk.Label(inner_frame, text="Exclude Specific Files:", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        # Exclude Specific Files
+        exclude_files_label = ttk.Label(inner_frame, text="Exclude Specific Files:", font=("Arial", 10, "bold"))
         exclude_files_label.grid(row=5, column=0, padx=15, pady=8, sticky="w")
 
         exclude_files = self.settings.get('app', 'exclude_files', {})
         row = 6
         for file, value in exclude_files.items():
             var = tk.IntVar(value=value)
-            checkbox = tk.Checkbutton(inner_frame, text=file, variable=var,
-                                      bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'],
-                                      font=("Arial", 10))
+            checkbox = ttk.Checkbutton(inner_frame, text=file, variable=var)
             checkbox.grid(row=row, column=0, columnspan=2, padx=15, pady=8, sticky="w")
             self.exclude_file_vars[file] = var
             row += 1
 
-        include_icons_checkbox = tk.Checkbutton(inner_frame, text="Include Icons in Structure", variable=self.include_icons_var,
-                                                bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'],
-                                                font=("Arial", 10))
+        # Include Icons
+        include_icons_checkbox = ttk.Checkbutton(inner_frame, text="Include Icons in Structure", variable=self.include_icons_var)
         include_icons_checkbox.grid(row=row, column=0, columnspan=2, padx=15, pady=8, sticky="w")
         row += 1
 
         # Performance Settings Section
-        performance_label = tk.Label(inner_frame, text="Performance Settings", bg=self.colors['bg'], fg=self.colors['header'], font=("Arial", 12, "bold"))
+        performance_label = ttk.Label(inner_frame, text="Performance Settings", font=("Arial", 12, "bold"))
         performance_label.grid(row=row, column=0, columnspan=2, padx=15, pady=(20, 10), sticky="w")
         row += 1
 
         # Cache settings
         self.cache_max_size_var = tk.StringVar(value=str(self.settings.get('app', 'cache_max_size', 1000)))
-        cache_size_label = tk.Label(inner_frame, text="Cache Max Size:", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        cache_size_label = ttk.Label(inner_frame, text="Cache Max Size:", font=("Arial", 10, "bold"))
         cache_size_label.grid(row=row, column=0, padx=15, pady=8, sticky="w")
-        cache_size_entry = tk.Entry(inner_frame, textvariable=self.cache_max_size_var, width=10, bg=self.colors['bg_accent'], fg=self.colors['fg'])
+        cache_size_entry = ttk.Entry(inner_frame, textvariable=self.cache_max_size_var, width=10)
         cache_size_entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
         row += 1
 
         self.cache_max_memory_var = tk.StringVar(value=str(self.settings.get('app', 'cache_max_memory_mb', 100)))
-        cache_memory_label = tk.Label(inner_frame, text="Cache Max Memory (MB):", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        cache_memory_label = ttk.Label(inner_frame, text="Cache Max Memory (MB):", font=("Arial", 10, "bold"))
         cache_memory_label.grid(row=row, column=0, padx=15, pady=8, sticky="w")
-        cache_memory_entry = tk.Entry(inner_frame, textvariable=self.cache_max_memory_var, width=10, bg=self.colors['bg_accent'], fg=self.colors['fg'])
+        cache_memory_entry = ttk.Entry(inner_frame, textvariable=self.cache_max_memory_var, width=10)
         cache_memory_entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
         row += 1
 
         # Tree operation settings
         self.tree_max_items_var = tk.StringVar(value=str(self.settings.get('app', 'tree_max_items', 10000)))
-        tree_items_label = tk.Label(inner_frame, text="Tree Max Items:", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        tree_items_label = ttk.Label(inner_frame, text="Tree Max Items:", font=("Arial", 10, "bold"))
         tree_items_label.grid(row=row, column=0, padx=15, pady=8, sticky="w")
-        tree_items_entry = tk.Entry(inner_frame, textvariable=self.tree_max_items_var, width=10, bg=self.colors['bg_accent'], fg=self.colors['fg'])
+        tree_items_entry = ttk.Entry(inner_frame, textvariable=self.tree_max_items_var, width=10)
         tree_items_entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
         row += 1
 
         # Security Settings Section
-        security_label = tk.Label(inner_frame, text="Security Settings", bg=self.colors['bg'], fg=self.colors['header'], font=("Arial", 12, "bold"))
+        security_label = ttk.Label(inner_frame, text="Security Settings", font=("Arial", 12, "bold"))
         security_label.grid(row=row, column=0, columnspan=2, padx=15, pady=(20, 10), sticky="w")
         row += 1
 
         self.security_enabled_var = tk.IntVar(value=self.settings.get('app', 'security_enabled', 1))
-        security_enabled_checkbox = tk.Checkbutton(inner_frame, text="Enable Security Validation", variable=self.security_enabled_var,
-                                                   bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'],
-                                                   font=("Arial", 10))
+        security_enabled_checkbox = ttk.Checkbutton(inner_frame, text="Enable Security Validation", variable=self.security_enabled_var)
         security_enabled_checkbox.grid(row=row, column=0, columnspan=2, padx=15, pady=8, sticky="w")
         row += 1
 
         self.max_file_size_var = tk.StringVar(value=str(self.settings.get('app', 'max_file_size_mb', 10)))
-        max_file_size_label = tk.Label(inner_frame, text="Max File Size (MB):", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        max_file_size_label = ttk.Label(inner_frame, text="Max File Size (MB):", font=("Arial", 10, "bold"))
         max_file_size_label.grid(row=row, column=0, padx=15, pady=8, sticky="w")
-        max_file_size_entry = tk.Entry(inner_frame, textvariable=self.max_file_size_var, width=10, bg=self.colors['bg_accent'], fg=self.colors['fg'])
+        max_file_size_entry = ttk.Entry(inner_frame, textvariable=self.max_file_size_var, width=10)
         max_file_size_entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
         row += 1
 
         # Logging Settings Section
-        logging_label = tk.Label(inner_frame, text="Logging Settings", bg=self.colors['bg'], fg=self.colors['header'], font=("Arial", 12, "bold"))
+        logging_label = ttk.Label(inner_frame, text="Logging Settings", font=("Arial", 12, "bold"))
         logging_label.grid(row=row, column=0, columnspan=2, padx=15, pady=(20, 10), sticky="w")
         row += 1
 
         # Log level
         self.log_level_var = tk.StringVar(value=self.settings.get('app', 'log_level', 'INFO'))
-        log_level_label = tk.Label(inner_frame, text="Log Level:", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        log_level_label = ttk.Label(inner_frame, text="Log Level:", font=("Arial", 10, "bold"))
         log_level_label.grid(row=row, column=0, padx=15, pady=8, sticky="w")
         log_level_options = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         log_level_menu = ttk.Combobox(inner_frame, textvariable=self.log_level_var, values=log_level_options, state="readonly", width=15)
@@ -152,49 +150,44 @@ class SettingsTab(tk.Frame):
 
         # Log to file
         self.log_to_file_var = tk.IntVar(value=self.settings.get('app', 'log_to_file', 1))
-        log_to_file_checkbox = tk.Checkbutton(inner_frame, text="Log to File", variable=self.log_to_file_var,
-                                               bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'],
-                                               font=("Arial", 10))
+        log_to_file_checkbox = ttk.Checkbutton(inner_frame, text="Log to File", variable=self.log_to_file_var)
         log_to_file_checkbox.grid(row=row, column=0, columnspan=2, padx=15, pady=8, sticky="w")
         row += 1
 
         # Log to console
         self.log_to_console_var = tk.IntVar(value=self.settings.get('app', 'log_to_console', 1))
-        log_to_console_checkbox = tk.Checkbutton(inner_frame, text="Log to Console", variable=self.log_to_console_var,
-                                                  bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'],
-                                                  font=("Arial", 10))
+        log_to_console_checkbox = ttk.Checkbutton(inner_frame, text="Log to Console", variable=self.log_to_console_var)
         log_to_console_checkbox.grid(row=row, column=0, columnspan=2, padx=15, pady=8, sticky="w")
         row += 1
 
         # Folder Selection Settings Section
-        folder_selection_label = tk.Label(inner_frame, text="Folder Selection Settings", bg=self.colors['bg'], fg=self.colors['header'], font=("Arial", 12, "bold"))
+        folder_selection_label = ttk.Label(inner_frame, text="Folder Selection Settings", font=("Arial", 12, "bold"))
         folder_selection_label.grid(row=row, column=0, columnspan=2, padx=15, pady=(20, 10), sticky="w")
         row += 1
 
         # Default start folder
         self.default_start_folder_var = tk.StringVar(value=self.settings.get('app', 'default_start_folder', os.path.expanduser("~")))
-        default_folder_label = tk.Label(inner_frame, text="Default Start Folder:", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        default_folder_label = ttk.Label(inner_frame, text="Default Start Folder:", font=("Arial", 10, "bold"))
         default_folder_label.grid(row=row, column=0, padx=15, pady=8, sticky="w")
         
-        default_folder_frame = tk.Frame(inner_frame, bg=self.colors['bg'])
+        default_folder_frame = ttk.Frame(inner_frame)
         default_folder_frame.grid(row=row, column=1, padx=15, pady=8, sticky="ew")
         
-        self.default_folder_entry = tk.Entry(default_folder_frame, textvariable=self.default_start_folder_var, width=40, bg=self.colors['bg_accent'], fg=self.colors['fg'])
-        self.default_folder_entry.pack(side=tk.LEFT, fill="x", expand=True)
+        self.default_folder_entry = ttk.Entry(default_folder_frame, textvariable=self.default_start_folder_var, width=40)
+        self.default_folder_entry.pack(side=ttk.LEFT, fill="x", expand=True)
         
-        browse_folder_button = tk.Button(default_folder_frame, text="Browse...", command=self._browse_default_folder,
-                                        bg=self.colors['btn_bg'], fg=self.colors['btn_fg'], width=10,
-                                        font=("Arial", 10))
-        browse_folder_button.pack(side=tk.RIGHT, padx=(5, 0))
+        browse_folder_button = ttk.Button(default_folder_frame, text="Browse...", command=self._browse_default_folder, width=10)
+        browse_folder_button.pack(side=ttk.RIGHT, padx=(5, 0))
         row += 1
 
-        extensions_label = tk.Label(inner_frame, text="Text File Extensions:", bg=self.colors['bg'], fg=self.colors['fg'], font=("Arial", 10, "bold"))
+        # Text File Extensions
+        extensions_label = ttk.Label(inner_frame, text="Text File Extensions:", font=("Arial", 10, "bold"))
         extensions_label.grid(row=row, column=0, padx=15, pady=8, sticky="w")
         row += 1
 
         extension_groups = FileHandler.get_extension_groups()
         for group, extensions in extension_groups.items():
-            group_label = tk.Label(inner_frame, text=group, bg=self.colors['bg'], fg=self.colors['header'], font=("Arial", 10, "bold"))
+            group_label = ttk.Label(inner_frame, text=group, font=("Arial", 10, "bold"))
             group_label.grid(row=row, column=0, columnspan=2, padx=25, pady=8, sticky="w")
             row += 1
 
@@ -202,9 +195,7 @@ class SettingsTab(tk.Frame):
             col = 0
             for ext in sorted(extensions):
                 var = tk.IntVar(value=self.settings.get('app', 'text_extensions', {}).get(ext, 1))
-                cb = tk.Checkbutton(inner_frame, text=ext, variable=var,
-                                    bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'],
-                                    font=("Arial", 10))
+                cb = ttk.Checkbutton(inner_frame, text=ext, variable=var)
                 cb.grid(row=ext_row, column=col, padx=25, pady=5, sticky="w")
                 self.extension_checkboxes[ext] = (cb, var)
                 col += 1
@@ -213,13 +204,25 @@ class SettingsTab(tk.Frame):
                     ext_row += 1
             row = ext_row + 1
 
+        # Save button
         save_button = self.gui.create_button(inner_frame, "Save Settings", self.gui.save_app_settings, "Save changes to settings")
         save_button.grid(row=row, column=0, columnspan=2, pady=20)
 
-        high_contrast_checkbox = tk.Checkbutton(inner_frame, text="High Contrast Mode", variable=self.high_contrast_mode,
-                                                command=self.gui.theme_manager.toggle_high_contrast,
-                                                bg=self.colors['bg'], fg=self.colors['fg'], selectcolor=self.colors['bg_accent'])
+        # High contrast mode (now theme switching)
+        high_contrast_checkbox = ttk.Checkbutton(inner_frame, text="High Contrast Mode", variable=self.high_contrast_mode, command=self._toggle_theme)
         high_contrast_checkbox.grid(row=row + 1, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+
+    def _toggle_theme(self):
+        """Toggle between dark and light themes and update styles."""
+        current_theme = self.gui.root.style.theme_name()
+        if current_theme == 'darkly':
+            self.gui.root.style.theme_use('litera')  # Light theme
+        else:
+            self.gui.root.style.theme_use('darkly')  # Dark theme
+        
+        # Update tag colors in structure and content tabs
+        self.gui.structure_tab.update_tag_colors()
+        self.gui.content_tab.update_tag_colors()
 
     def _browse_default_folder(self):
         """Open folder selection dialog for default start folder."""
@@ -235,10 +238,6 @@ class SettingsTab(tk.Frame):
         if folder:
             self.default_start_folder_var.set(folder)
 
-    def reconfigure_colors(self, colors):
-        self.colors = colors
-        # Reconfigure all labels, checkboxes, etc., here if needed
-        # For simplicity, since this tab is rebuilt on refresh, we can skip detailed reconfiguration
 
     def perform_search(self, query, case_sensitive, whole_word):
         return []  # No searchable content in settings tab

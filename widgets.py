@@ -1,5 +1,5 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+import ttkbootstrap as ttk
+from tkinter import filedialog, messagebox
 import os # For path manipulation in FolderDialog
 from constants import TOOLTIP_DELAY, TOOLTIP_WRAP_LENGTH, DIALOG_MIN_WIDTH
 
@@ -37,14 +37,14 @@ class Tooltip:
         x += self.x_offset
         y += self.y_offset
 
-        self.tip_window = tw = tk.Toplevel(self.widget)
+        self.tip_window = tw = ttk.Toplevel(self.widget)
         # Make it borderless and stay on top
         tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
         # Make it appear above other windows (may vary by WM)
         tw.wm_attributes("-topmost", True)
 
-        label = tk.Label(tw, text=self.text, justify='left',
+        label = ttk.Label(tw, text=self.text, justify='left',
                        background=self.tooltip_bg, relief=self.relief, borderwidth=self.borderwidth,
                        wraplength=TOOLTIP_WRAP_LENGTH) # Wrap text if too long
         label.pack(ipadx=5, ipady=3) # Add internal padding
@@ -74,20 +74,20 @@ class Tooltip:
 
 class FolderDialog:
     """ Custom dialog for selecting folders, showing recent folders with a delete option. """
-    def __init__(self, parent, recent_folders, colors, on_delete_callback=None, default_start_folder=None):
+    def __init__(self, parent, recent_folders, on_delete_callback=None, default_start_folder=None):
         self.parent = parent
         self.recent_folders = recent_folders
-        self.colors = colors
+        # Colors now managed by ttkbootstrap theme
         self.on_delete_callback = on_delete_callback
         self.default_start_folder = default_start_folder or os.path.expanduser("~")
         self.selected_folder = None
-        self.dialog = tk.Toplevel(parent)
+        self.dialog = ttk.Toplevel(parent)
         self.dialog.title("Select Repository Folder")
         min_width = DIALOG_MIN_WIDTH
         min_height = 400
         self.dialog.minsize(min_width, min_height)
         self.dialog.geometry(f"{min_width}x{min_height}")
-        self.dialog.configure(bg=self.colors['bg'])
+        # Background color now managed by ttkbootstrap theme
         self.dialog.transient(parent)
         self.dialog.grab_set()
         self.dialog.bind('<Escape>', lambda e: self.dialog.destroy())
@@ -95,23 +95,22 @@ class FolderDialog:
         self.dialog.grid_rowconfigure(1, weight=1)
         self.dialog.grid_columnconfigure(0, weight=1)
 
-        tk.Label(self.dialog, text="Select or Enter Repository Folder", font=("Arial", 12, "bold"),
-                 bg=self.colors['bg'], fg=self.colors['fg']).grid(row=0, column=0, columnspan=2, pady=10, padx=10, sticky="w")
+        ttk.Label(self.dialog, text="Select or Enter Repository Folder", font=("Arial", 12, "bold")).grid(row=0, column=0, columnspan=2, pady=10, padx=10, sticky="w")
 
         # --- Scrollable list area ---
-        canvas_frame = tk.Frame(self.dialog, bg=self.colors['bg_accent'], bd=1, relief="sunken")
+        canvas_frame = ttk.Frame(self.dialog)
         canvas_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
         canvas_frame.grid_rowconfigure(0, weight=1)
         canvas_frame.grid_columnconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(canvas_frame, bg=self.colors['bg_accent'], highlightthickness=0)
+        self.canvas = ttk.Canvas(canvas_frame, highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="nsew")
 
         scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.canvas.configure(yscrollcommand=scrollbar.set)
 
-        self.list_frame = tk.Frame(self.canvas, bg=self.colors['bg_accent'])
+        self.list_frame = ttk.Frame(self.canvas)
         self.canvas.create_window((0, 0), window=self.list_frame, anchor="nw")
 
         self.list_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
@@ -121,31 +120,27 @@ class FolderDialog:
         self.populate_recent_list()
 
         # --- Manual Entry ---
-        entry_frame = tk.Frame(self.dialog, bg=self.colors['bg'])
+        entry_frame = ttk.Frame(self.dialog)
         entry_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
         entry_frame.grid_columnconfigure(0, weight=1)
 
-        self.folder_var = tk.StringVar()
-        self.folder_entry = tk.Entry(entry_frame, textvariable=self.folder_var, width=50,
-                                     bg=self.colors['bg_accent'], fg=self.colors['fg'], insertbackground=self.colors['fg'])
+        self.folder_var = ttk.StringVar()
+        self.folder_entry = ttk.Entry(entry_frame, textvariable=self.folder_var, width=50)
         self.folder_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
         Tooltip(self.folder_entry, "Selected path (or type/paste path here)")
 
-        browse_button = tk.Button(entry_frame, text="Browse...", command=self.browse_folder,
-                                  bg=self.colors['btn_bg'], fg=self.colors['btn_fg'])
+        browse_button = ttk.Button(entry_frame, text="Browse...", command=self.browse_folder, bootstyle="primary")
         browse_button.grid(row=0, column=1)
 
         # --- Action Buttons ---
-        button_frame = tk.Frame(self.dialog, bg=self.colors['bg'])
+        button_frame = ttk.Frame(self.dialog)
         button_frame.grid(row=3, column=0, columnspan=2, pady=10, sticky="e")
 
-        ok_button = tk.Button(button_frame, text="   OK   ", command=self.confirm,
-                              bg=self.colors['btn_bg'], fg=self.colors['btn_fg'])
-        ok_button.pack(side=tk.RIGHT, padx=10)
+        ok_button = ttk.Button(button_frame, text="   OK   ", command=self.confirm, bootstyle="success")
+        ok_button.pack(side=ttk.RIGHT, padx=10)
 
-        cancel_button = tk.Button(button_frame, text=" Cancel ", command=self.dialog.destroy,
-                                  bg=self.colors['btn_bg'], fg=self.colors['btn_fg'])
-        cancel_button.pack(side=tk.RIGHT)
+        cancel_button = ttk.Button(button_frame, text=" Cancel ", command=self.dialog.destroy, bootstyle="secondary")
+        cancel_button.pack(side=ttk.RIGHT)
 
         self.dialog.bind('<Return>', lambda e: self.confirm())
         self.dialog.bind('<KP_Enter>', lambda e: self.confirm())
@@ -159,26 +154,25 @@ class FolderDialog:
             widget.destroy()
 
         if not self.recent_folders:
-            tk.Label(self.list_frame, text="No recent folders.", bg=self.colors['bg_accent'], fg=self.colors['file_nontext']).pack(pady=10)
+            ttk.Label(self.list_frame, text="No recent folders.").pack(pady=10)
         else:
             for folder in self.recent_folders:
                 self._create_list_item(folder)
 
     def _create_list_item(self, folder_path):
-        item_frame = tk.Frame(self.list_frame, bg=self.colors['bg_accent'])
+        item_frame = ttk.Frame(self.list_frame)
         item_frame.pack(fill="x", expand=True)
         
         # Store reference to item frame for highlighting
         item_frame.folder_path = folder_path
 
-        delete_button = tk.Button(item_frame, text="🗑", command=lambda p=folder_path, f=item_frame: self._delete_item(p, f),
-                                  bg=self.colors['btn_bg'], fg=self.colors['status'], relief="flat", activebackground=self.colors['btn_hover'])
-        delete_button.pack(side=tk.LEFT, padx=(5, 10))
+        delete_button = ttk.Button(item_frame, text="🗑", command=lambda p=folder_path, f=item_frame: self._delete_item(p, f),
+                                  bootstyle="danger-outline")
+        delete_button.pack(side=ttk.LEFT, padx=(5, 10))
         Tooltip(delete_button, f"Remove '{folder_path}' from recent list")
 
-        path_label = tk.Label(item_frame, text=folder_path, anchor="w",
-                              bg=self.colors['bg_accent'], fg=self.colors['fg'])
-        path_label.pack(side=tk.LEFT, fill="x", expand=True)
+        path_label = ttk.Label(item_frame, text=folder_path, anchor="w")
+        path_label.pack(side=ttk.LEFT, fill="x", expand=True)
         
         # Store reference to path label for highlighting
         item_frame.path_label = path_label
@@ -201,13 +195,13 @@ class FolderDialog:
         for widget in self.list_frame.winfo_children():
             if hasattr(widget, 'folder_path') and hasattr(widget, 'path_label'):
                 if widget.folder_path == selected_folder_path:
-                    # Highlight selected item
-                    widget.config(bg=self.colors['btn_hover'])
-                    widget.path_label.config(bg=self.colors['btn_hover'], fg=self.colors['fg'])
+                    # Highlight selected item using ttkbootstrap styling
+                    widget.configure(bootstyle="primary")
+                    widget.path_label.configure(bootstyle="primary")
                 else:
                     # Unhighlight other items
-                    widget.config(bg=self.colors['bg_accent'])
-                    widget.path_label.config(bg=self.colors['bg_accent'], fg=self.colors['fg'])
+                    widget.configure(bootstyle="")
+                    widget.path_label.configure(bootstyle="")
 
     def _delete_item(self, folder_path, frame_widget):
         if self.on_delete_callback:
