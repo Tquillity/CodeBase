@@ -28,7 +28,7 @@ TEXT_EXTENSIONS_DEFAULT = {
 FILE_SEPARATOR = "===FILE_SEPARATOR===\n"
 
 # Application version
-VERSION = "4.0"
+VERSION = "5.0"
 
 # Cache configuration
 CACHE_MAX_SIZE = 1000  # Maximum number of cached files
