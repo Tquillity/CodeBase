@@ -45,76 +45,80 @@ class SettingsTab(ttk.Frame):
 
         # Default Tab Selection
         default_tab_label = ttk.Label(inner_frame, text="Default Tab:", font=("Arial", 10, "bold"))
-        default_tab_label.grid(row=0, column=0, padx=15, pady=8, sticky="w")
+        default_tab_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
         default_tab_options = ["Content Preview", "Folder Structure", "Base Prompt", "Settings", "File List Selection"]
-        default_tab_menu = ttk.Combobox(inner_frame, textvariable=self.default_tab_var, values=default_tab_options, state="readonly")
-        default_tab_menu.grid(row=0, column=1, padx=15, pady=8, sticky="w")
+        default_tab_menu = ttk.Combobox(inner_frame, textvariable=self.default_tab_var, values=default_tab_options, state="readonly", width=20)
+        default_tab_menu.grid(row=0, column=1, padx=20, pady=10, sticky="w")
 
         # Expansion Settings
         expansion_label = ttk.Label(inner_frame, text="Initial Expansion:", font=("Arial", 10, "bold"))
-        expansion_label.grid(row=1, column=0, padx=15, pady=8, sticky="w")
+        expansion_label.grid(row=1, column=0, padx=20, pady=10, sticky="w")
         expansion_options = ["Collapsed", "Expanded", "Levels"]
-        expansion_menu = ttk.Combobox(inner_frame, textvariable=self.expansion_var, values=expansion_options, state="readonly")
-        expansion_menu.grid(row=1, column=1, padx=15, pady=8, sticky="w")
+        expansion_menu = ttk.Combobox(inner_frame, textvariable=self.expansion_var, values=expansion_options, state="readonly", width=20)
+        expansion_menu.grid(row=1, column=1, padx=20, pady=10, sticky="w")
 
         # Expansion Levels
         levels_label = ttk.Label(inner_frame, text="Expansion Levels:", font=("Arial", 10, "bold"))
-        levels_label.grid(row=2, column=0, padx=15, pady=8, sticky="w")
-        self.levels_entry = ttk.Entry(inner_frame, textvariable=self.levels_var, width=5)
-        self.levels_entry.grid(row=2, column=1, padx=15, pady=8, sticky="w")
+        levels_label.grid(row=2, column=0, padx=20, pady=10, sticky="w")
+        self.levels_entry = ttk.Entry(inner_frame, textvariable=self.levels_var, width=8)
+        self.levels_entry.grid(row=2, column=1, padx=20, pady=10, sticky="w")
 
+        # File Exclusion Settings
+        exclusion_label = ttk.Label(inner_frame, text="File Exclusion Settings", font=("Arial", 12, "bold"))
+        exclusion_label.grid(row=3, column=0, columnspan=2, padx=20, pady=(15, 10), sticky="w")
+        
         # Exclude node_modules
         exclude_node_modules_checkbox = ttk.Checkbutton(inner_frame, text="Exclude node_modules", variable=self.exclude_node_modules_var)
-        exclude_node_modules_checkbox.grid(row=3, column=0, columnspan=2, padx=15, pady=8, sticky="w")
+        exclude_node_modules_checkbox.grid(row=4, column=0, columnspan=2, padx=25, pady=6, sticky="w")
 
         # Exclude dist/build folders
         exclude_dist_checkbox = ttk.Checkbutton(inner_frame, text="Exclude dist/build folders", variable=self.exclude_dist_var)
-        exclude_dist_checkbox.grid(row=4, column=0, columnspan=2, padx=15, pady=8, sticky="w")
+        exclude_dist_checkbox.grid(row=5, column=0, columnspan=2, padx=25, pady=6, sticky="w")
 
         # Exclude Specific Files
         exclude_files_label = ttk.Label(inner_frame, text="Exclude Specific Files:", font=("Arial", 10, "bold"))
-        exclude_files_label.grid(row=5, column=0, padx=15, pady=8, sticky="w")
+        exclude_files_label.grid(row=6, column=0, columnspan=2, padx=25, pady=(15, 8), sticky="w")
 
         exclude_files = self.settings.get('app', 'exclude_files', {})
-        row = 6
+        row = 7
         for file, value in exclude_files.items():
             var = tk.IntVar(value=value)
             checkbox = ttk.Checkbutton(inner_frame, text=file, variable=var)
-            checkbox.grid(row=row, column=0, columnspan=2, padx=15, pady=8, sticky="w")
+            checkbox.grid(row=row, column=0, columnspan=2, padx=35, pady=4, sticky="w")
             self.exclude_file_vars[file] = var
             row += 1
 
         # Include Icons
         include_icons_checkbox = ttk.Checkbutton(inner_frame, text="Include Icons in Structure", variable=self.include_icons_var)
-        include_icons_checkbox.grid(row=row, column=0, columnspan=2, padx=15, pady=8, sticky="w")
+        include_icons_checkbox.grid(row=row, column=0, columnspan=2, padx=25, pady=8, sticky="w")
         row += 1
 
         # Performance Settings Section
         performance_label = ttk.Label(inner_frame, text="Performance Settings", font=("Arial", 12, "bold"))
-        performance_label.grid(row=row, column=0, columnspan=2, padx=15, pady=(20, 10), sticky="w")
+        performance_label.grid(row=row, column=0, columnspan=2, padx=20, pady=(20, 10), sticky="w")
         row += 1
 
         # Cache settings
         self.cache_max_size_var = tk.StringVar(value=str(self.settings.get('app', 'cache_max_size', 1000)))
         cache_size_label = ttk.Label(inner_frame, text="Cache Max Size:", font=("Arial", 10, "bold"))
-        cache_size_label.grid(row=row, column=0, padx=15, pady=8, sticky="w")
-        cache_size_entry = ttk.Entry(inner_frame, textvariable=self.cache_max_size_var, width=10)
-        cache_size_entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+        cache_size_label.grid(row=row, column=0, padx=25, pady=8, sticky="w")
+        cache_size_entry = ttk.Entry(inner_frame, textvariable=self.cache_max_size_var, width=12)
+        cache_size_entry.grid(row=row, column=1, padx=25, pady=8, sticky="w")
         row += 1
 
         self.cache_max_memory_var = tk.StringVar(value=str(self.settings.get('app', 'cache_max_memory_mb', 100)))
         cache_memory_label = ttk.Label(inner_frame, text="Cache Max Memory (MB):", font=("Arial", 10, "bold"))
-        cache_memory_label.grid(row=row, column=0, padx=15, pady=8, sticky="w")
-        cache_memory_entry = ttk.Entry(inner_frame, textvariable=self.cache_max_memory_var, width=10)
-        cache_memory_entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+        cache_memory_label.grid(row=row, column=0, padx=25, pady=8, sticky="w")
+        cache_memory_entry = ttk.Entry(inner_frame, textvariable=self.cache_max_memory_var, width=12)
+        cache_memory_entry.grid(row=row, column=1, padx=25, pady=8, sticky="w")
         row += 1
 
         # Tree operation settings
         self.tree_max_items_var = tk.StringVar(value=str(self.settings.get('app', 'tree_max_items', 10000)))
         tree_items_label = ttk.Label(inner_frame, text="Tree Max Items:", font=("Arial", 10, "bold"))
-        tree_items_label.grid(row=row, column=0, padx=15, pady=8, sticky="w")
-        tree_items_entry = ttk.Entry(inner_frame, textvariable=self.tree_max_items_var, width=10)
-        tree_items_entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+        tree_items_label.grid(row=row, column=0, padx=25, pady=8, sticky="w")
+        tree_items_entry = ttk.Entry(inner_frame, textvariable=self.tree_max_items_var, width=12)
+        tree_items_entry.grid(row=row, column=1, padx=25, pady=8, sticky="w")
         row += 1
 
         # Security Settings Section
@@ -206,11 +210,11 @@ class SettingsTab(ttk.Frame):
 
         # Save button
         save_button = self.gui.create_button(inner_frame, "Save Settings", self.gui.save_app_settings, "Save changes to settings")
-        save_button.grid(row=row, column=0, columnspan=2, pady=20)
+        save_button.grid(row=row, column=0, columnspan=2, pady=(30, 15), padx=20)
 
         # High contrast mode (now theme switching)
         high_contrast_checkbox = ttk.Checkbutton(inner_frame, text="High Contrast Mode", variable=self.high_contrast_mode, command=self._toggle_theme)
-        high_contrast_checkbox.grid(row=row + 1, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+        high_contrast_checkbox.grid(row=row + 1, column=0, columnspan=2, padx=25, pady=10, sticky="w")
 
     def _toggle_theme(self):
         """Toggle between dark and light themes and update styles."""

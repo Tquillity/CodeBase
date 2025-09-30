@@ -76,6 +76,10 @@ class RepoPromptGUI:
         self.bind_keys()
         self.apply_default_tab()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        
+        # Update test toggle button after UI is fully initialized
+        if hasattr(self, 'test_toggle_button'):
+            self.update_test_toggle_button()
         self.list_selected_files = set()
         self.list_read_errors = []
         
@@ -419,6 +423,62 @@ class RepoPromptGUI:
         except Exception as e:
             logging.warning(f"Error updating cache info: {e}")
             self.cache_info_label.config(text="Cache: Error")
+
+    def toggle_test_files_and_refresh(self):
+        """Toggle test files exclusion and refresh the current repository."""
+        try:
+            if not self.current_repo_path:
+                self.show_status_message("No repository loaded", error=True)
+                return
+                
+            # Toggle the setting
+            current_setting = self.settings.get('app', 'exclude_test_files', 0)
+            new_setting = 1 if current_setting == 0 else 0
+            self.settings.set('app', 'exclude_test_files', new_setting)
+            self.settings.save()
+            
+            # Debug logging
+            logging.info(f"Test files exclusion toggled: {current_setting} -> {new_setting}")
+            logging.info(f"Settings file saved. Reading back: {self.settings.get('app', 'exclude_test_files', 0)}")
+            
+            # Force reload settings to ensure we have the latest value
+            self.settings.settings = self.settings.load_settings()
+            logging.info(f"After reload, setting is: {self.settings.get('app', 'exclude_test_files', 0)}")
+            
+            # Update button appearance
+            self.update_test_toggle_button()
+            
+            # Show status message
+            if new_setting:
+                self.show_status_message("Refreshing repository without test files...")
+            else:
+                self.show_status_message("Refreshing repository with test files...")
+            
+            # Force a complete reload of the repository with the new setting
+            repo_path = self.current_repo_path  # Preserve the path before clearing
+            self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)
+            self.repo_handler.load_repo(repo_path, self.show_status_message, self.repo_handler._handle_load_completion)
+                
+        except Exception as e:
+            logging.error(f"Error toggling test files exclusion: {e}")
+            self.show_status_message("Error updating test files setting", error=True)
+
+    def update_test_toggle_button(self):
+        """Update the test toggle button appearance based on current setting."""
+        try:
+            exclude_tests = self.settings.get('app', 'exclude_test_files', 0)
+            
+            if exclude_tests:
+                # Red button - excluding tests
+                self.test_toggle_button.config(text="No Tests")
+                self.test_toggle_button.configure(bootstyle="danger")
+            else:
+                # Green button - including tests
+                self.test_toggle_button.config(text="With Tests")
+                self.test_toggle_button.configure(bootstyle="success")
+                
+        except Exception as e:
+            logging.error(f"Error updating test toggle button: {e}")
 
     def clear_current(self):
         if self.is_loading: self.show_status_message("Loading...", error=True); return
