@@ -40,9 +40,25 @@ class SettingsTab(ttk.Frame):
         def _on_mousewheel(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
+        def _bind_to_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        def _unbind_from_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+
         inner_frame.bind("<Configure>", _on_configure)
-        canvas.bind("<MouseWheel>", _on_mousewheel)
-        inner_frame.bind("<MouseWheel>", _on_mousewheel)
+        
+        # Store references for later use
+        self.canvas = canvas
+        self.inner_frame = inner_frame
+        
+        # Bind mousewheel events when mouse enters the canvas area
+        canvas.bind('<Enter>', _bind_to_mousewheel)
+        canvas.bind('<Leave>', _unbind_from_mousewheel)
+        
+        # Also bind to the settings tab itself for broader coverage
+        self.bind('<Enter>', _bind_to_mousewheel)
+        self.bind('<Leave>', _unbind_from_mousewheel)
 
         # Default Tab Selection
         default_tab_label = ttk.Label(inner_frame, text="Default Tab:", font=("Arial", 10, "bold"))
@@ -265,3 +281,8 @@ class SettingsTab(ttk.Frame):
 
     def clear(self):
         pass  # Settings tab doesn't need clearing
+    
+    def update_scroll_region(self):
+        """Update the canvas scroll region to ensure proper scrolling."""
+        if hasattr(self, 'canvas') and hasattr(self, 'inner_frame'):
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
