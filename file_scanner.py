@@ -122,6 +122,10 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
             # NEW_LOG
             logging.debug(f"Ignored '{path}' due to dist setting")
             return True
+        if gui.settings.get('app', 'exclude_coverage', 1) == 1 and any(part.lower() in ['coverage', 'htmlcov', 'cov_html'] for part in rel_path_parts):
+            # NEW_LOG
+            logging.debug(f"Ignored '{path}' due to coverage setting")
+            return True
         
         # Check for test file exclusion
         exclude_test_files_setting = gui.settings.get('app', 'exclude_test_files', 0)
@@ -137,6 +141,7 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
          if '.git' in path.split(os.sep): return True
          if gui.settings.get('app', 'exclude_node_modules', 1) == 1 and 'node_modules' in path.split(os.sep): return True
          if gui.settings.get('app', 'exclude_dist', 1) == 1 and 'dist' in path.split(os.sep): return True
+         if gui.settings.get('app', 'exclude_coverage', 1) == 1 and any(part.lower() in ['coverage', 'htmlcov', 'cov_html'] for part in path.split(os.sep)): return True
          if gui.settings.get('app', 'exclude_test_files', 0) == 1 and is_test_file(path, None): return True
     except Exception as e:
         logging.warning(f"Error during is_ignored check for {path}: {e}")

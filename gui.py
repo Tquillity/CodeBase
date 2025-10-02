@@ -529,6 +529,7 @@ class RepoPromptGUI:
                  self.settings.set('app', 'levels', 1)
             self.settings.set('app', 'exclude_node_modules', self.settings_tab.exclude_node_modules_var.get())
             self.settings.set('app', 'exclude_dist', self.settings_tab.exclude_dist_var.get())
+            self.settings.set('app', 'exclude_coverage', self.settings_tab.exclude_coverage_var.get())
             self.settings.set('app', 'exclude_files', {file: var.get() for file, var in self.settings_tab.exclude_file_vars.items()})
             self.settings.set('app', 'search_case_sensitive', self.case_sensitive_var.get())
             self.settings.set('app', 'search_whole_word', self.whole_word_var.get())
