@@ -152,8 +152,8 @@ class RepoPromptGUI:
         if self.current_repo_path:
             self.show_status_message("Updating content preview...")
             # Disable copy buttons while updating
-            self.copy_button.config(state=ttk.DISABLED)
-            self.copy_all_button.config(state=ttk.DISABLED)
+            self.copy_button.config(state=tk.DISABLED)
+            self.copy_all_button.config(state=tk.DISABLED)
             self.file_handler.generate_and_update_preview(None, self.content_tab._handle_preview_completion)
 
     def load_recent_folders(self):
@@ -227,7 +227,7 @@ class RepoPromptGUI:
         self.file_counter = ttk.Label(self.root, text="", font=("Arial", 36, "bold"))
         self._style_file_counter()
 
-    def create_button(self, parent, text, command, tooltip_text=None, state=ttk.NORMAL, bootstyle="primary"):
+    def create_button(self, parent, text, command, tooltip_text=None, state=tk.NORMAL, bootstyle="primary"):
         btn = ttk.Button(parent, text=text, command=command, state=state, bootstyle=bootstyle)
         if tooltip_text:
             Tooltip(btn, tooltip_text)

@@ -1,4 +1,5 @@
 import ttkbootstrap as ttk
+import tkinter as tk
 from tkinter import filedialog, messagebox
 import os # For path manipulation in FolderDialog
 from constants import TOOLTIP_DELAY, TOOLTIP_WRAP_LENGTH, DIALOG_MIN_WIDTH
@@ -137,10 +138,10 @@ class FolderDialog:
         button_frame.grid(row=3, column=0, columnspan=2, pady=10, sticky="e")
 
         ok_button = ttk.Button(button_frame, text="   OK   ", command=self.confirm, bootstyle="success")
-        ok_button.pack(side=ttk.RIGHT, padx=10)
+        ok_button.pack(side=tk.RIGHT, padx=10)
 
         cancel_button = ttk.Button(button_frame, text=" Cancel ", command=self.dialog.destroy, bootstyle="secondary")
-        cancel_button.pack(side=ttk.RIGHT)
+        cancel_button.pack(side=tk.RIGHT)
 
         self.dialog.bind('<Return>', lambda e: self.confirm())
         self.dialog.bind('<KP_Enter>', lambda e: self.confirm())
@@ -166,13 +167,13 @@ class FolderDialog:
         # Store reference to item frame for highlighting
         item_frame.folder_path = folder_path
 
-        delete_button = ttk.Button(item_frame, text="🗑", command=lambda p=folder_path, f=item_frame: self._delete_item(p, f),
-                                  bootstyle="danger-outline")
-        delete_button.pack(side=ttk.LEFT, padx=(5, 10))
+        delete_button = ttk.Button(item_frame, text="×", command=lambda p=folder_path, f=item_frame: self._delete_item(p, f),
+                                  bootstyle="danger-outline", width=3)
+        delete_button.pack(side=tk.LEFT, padx=(5, 10))
         Tooltip(delete_button, f"Remove '{folder_path}' from recent list")
 
         path_label = ttk.Label(item_frame, text=folder_path, anchor="w")
-        path_label.pack(side=ttk.LEFT, fill="x", expand=True)
+        path_label.pack(side=tk.LEFT, fill="x", expand=True)
         
         # Store reference to path label for highlighting
         item_frame.path_label = path_label

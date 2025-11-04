@@ -1,4 +1,5 @@
 import ttkbootstrap as ttk
+import tkinter as tk
 from widgets import Tooltip
 from tabs.content_tab import ContentTab
 from tabs.structure_tab import StructureTab
@@ -14,20 +15,20 @@ class HeaderFrame(ttk.Frame):
 
         # Title and version section
         title_frame = ttk.Frame(self)
-        title_frame.pack(side=ttk.LEFT, fill='y')
+        title_frame.pack(side=tk.LEFT, fill='y')
         
         self.title_label = ttk.Label(title_frame, text=title, font=("Arial", 16, "bold"))
-        self.title_label.pack(side=ttk.LEFT, padx=(0, 8))
+        self.title_label.pack(side=tk.LEFT, padx=(0, 8))
 
         self.version_label = ttk.Label(title_frame, text=f"v{version}", font=("Arial", 10))
-        self.version_label.pack(side=ttk.LEFT, anchor='s')
+        self.version_label.pack(side=tk.LEFT, anchor='s')
 
         # Repository info section
         repo_frame = ttk.Frame(self)
-        repo_frame.pack(side=ttk.LEFT, fill='both', expand=True, padx=(40, 0))
+        repo_frame.pack(side=tk.LEFT, fill='both', expand=True, padx=(40, 0))
         
         self.repo_label = ttk.Label(repo_frame, text="Current Repo: None", font=("Arial", 11))
-        self.repo_label.pack(side=ttk.LEFT, anchor='w')
+        self.repo_label.pack(side=tk.LEFT, anchor='w')
 
         # Separator line
         self.header_separator = ttk.Frame(parent, height=1)
@@ -49,7 +50,7 @@ class LeftPanel(ttk.Frame):
         self.gui.select_button = self.gui.create_button(self, "Select Repo (Ctrl+R)", self.gui.repo_handler.select_repo, "Choose a repository folder")
         self.gui.select_button.pack(pady=(button_pady, button_pady), padx=button_padx, fill='x')
 
-        self.gui.refresh_button = self.gui.create_button(self, "Refresh (Ctrl+F5)", self.gui.repo_handler.refresh_repo, "Refresh current repository", state=ttk.DISABLED)
+        self.gui.refresh_button = self.gui.create_button(self, "Refresh (Ctrl+F5)", self.gui.repo_handler.refresh_repo, "Refresh current repository", state=tk.DISABLED)
         self.gui.refresh_button.pack(pady=(0, button_pady), padx=button_padx, fill='x')
 
         # Info section with better spacing
@@ -69,13 +70,13 @@ class LeftPanel(ttk.Frame):
         copy_label = ttk.Label(copy_section_frame, text="Copy Actions", font=("Arial", 9, "bold"))
         copy_label.pack(pady=(0, 5))
         
-        self.gui.copy_button = self.gui.create_button(copy_section_frame, "Copy Contents (Ctrl+C)", self.gui.copy_handler.copy_contents, "Copy selected file contents", state=ttk.DISABLED)
+        self.gui.copy_button = self.gui.create_button(copy_section_frame, "Copy Contents (Ctrl+C)", self.gui.copy_handler.copy_contents, "Copy selected file contents", state=tk.DISABLED)
         self.gui.copy_button.pack(pady=(0, button_pady), padx=0, fill='x')
 
-        self.gui.copy_structure_button = self.gui.create_button(copy_section_frame, "Copy Structure (Ctrl+S)", self.gui.copy_handler.copy_structure, "Copy folder structure", state=ttk.DISABLED)
+        self.gui.copy_structure_button = self.gui.create_button(copy_section_frame, "Copy Structure (Ctrl+S)", self.gui.copy_handler.copy_structure, "Copy folder structure", state=tk.DISABLED)
         self.gui.copy_structure_button.pack(pady=(0, button_pady), padx=0, fill='x')
 
-        self.gui.copy_all_button = self.gui.create_button(copy_section_frame, "Copy All (Ctrl+A)", self.gui.copy_handler.copy_all, "Copy prompt, contents, & structure", state=ttk.DISABLED)
+        self.gui.copy_all_button = self.gui.create_button(copy_section_frame, "Copy All (Ctrl+A)", self.gui.copy_handler.copy_all, "Copy prompt, contents, & structure", state=tk.DISABLED)
         self.gui.copy_all_button.pack(pady=(0, 0), padx=0, fill='x')
 
         # Options section
@@ -116,7 +117,7 @@ class RightPanel(ttk.Frame):
     def setup_ui(self):
         # Search section with better organization
         search_container = ttk.Frame(self)
-        search_container.pack(side=ttk.TOP, fill='x', pady=(0, 10), padx=8)
+        search_container.pack(side=tk.TOP, fill='x', pady=(0, 10), padx=8)
         
         # Search input row
         search_input_frame = ttk.Frame(search_container)
@@ -125,24 +126,24 @@ class RightPanel(ttk.Frame):
         self.gui.search_var = ttk.StringVar()
         self.gui.search_entry = ttk.Entry(search_input_frame, textvariable=self.gui.search_var, width=35,
                                      font=("Arial", 10))
-        self.gui.search_entry.pack(side=ttk.LEFT, padx=(0, 8), ipady=2, fill='x', expand=True)
+        self.gui.search_entry.pack(side=tk.LEFT, padx=(0, 8), ipady=2, fill='x', expand=True)
         Tooltip(self.gui.search_entry, "Enter text to search (Press Enter to search)")
 
         self.gui.search_button = self.gui.create_button(search_input_frame, "Search", self.gui.search_handler.search_tab, "Search current tab for text")
-        self.gui.search_button.pack(side=ttk.LEFT, padx=(0, 3))
+        self.gui.search_button.pack(side=tk.LEFT, padx=(0, 3))
         
         # Search navigation row
         nav_frame = ttk.Frame(search_container)
         nav_frame.pack(fill='x', pady=(0, 5))
         
         self.gui.next_button = self.gui.create_button(nav_frame, "Next", self.gui.search_handler.next_match, "Go to next search match")
-        self.gui.next_button.pack(side=ttk.LEFT, padx=(0, 3))
+        self.gui.next_button.pack(side=tk.LEFT, padx=(0, 3))
         
         self.gui.prev_button = self.gui.create_button(nav_frame, "Prev", self.gui.search_handler.prev_match, "Go to previous search match")
-        self.gui.prev_button.pack(side=ttk.LEFT, padx=(0, 3))
+        self.gui.prev_button.pack(side=tk.LEFT, padx=(0, 3))
         
         self.gui.find_all_button = self.gui.create_button(nav_frame, "All", self.gui.search_handler.find_all, "Highlight all matches in current tab")
-        self.gui.find_all_button.pack(side=ttk.LEFT, padx=(0, 0))
+        self.gui.find_all_button.pack(side=tk.LEFT, padx=(0, 0))
         
         # Search options row
         options_frame = ttk.Frame(search_container)
@@ -150,12 +151,12 @@ class RightPanel(ttk.Frame):
 
         self.gui.case_sensitive_var = ttk.IntVar(value=self.gui.settings.get('app', 'search_case_sensitive', 0))
         self.gui.case_sensitive_checkbox = ttk.Checkbutton(options_frame, text="Case Sensitive", variable=self.gui.case_sensitive_var)
-        self.gui.case_sensitive_checkbox.pack(side=ttk.LEFT, padx=(0, 8))
+        self.gui.case_sensitive_checkbox.pack(side=tk.LEFT, padx=(0, 8))
         Tooltip(self.gui.case_sensitive_checkbox, "Case Sensitive Search")
 
         self.gui.whole_word_var = ttk.IntVar(value=self.gui.settings.get('app', 'search_whole_word', 0))
         self.gui.whole_word_checkbox = ttk.Checkbutton(options_frame, text="Whole Word", variable=self.gui.whole_word_var)
-        self.gui.whole_word_checkbox.pack(side=ttk.LEFT, padx=(0, 0))
+        self.gui.whole_word_checkbox.pack(side=tk.LEFT, padx=(0, 0))
         Tooltip(self.gui.whole_word_checkbox, "Match Whole Word Only (Note: Uses basic regex matching)")
 
         self.gui.search_entry.bind("<Return>", lambda e: self.gui.search_handler.search_tab())

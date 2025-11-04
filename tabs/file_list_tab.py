@@ -19,7 +19,7 @@ class FileListTab(ttk.Frame):
         self.setup_ui()
 
     def setup_ui(self):
-        self.file_list_text = ScrolledText(self, wrap=ttk.NONE,
+        self.file_list_text = ScrolledText(self, wrap=tk.NONE,
                                                       font=("Arial", 10), bootstyle="dark", height=10)
         self.file_list_text.pack(fill="both", expand=True, padx=5, pady=(5, 10))
         
@@ -39,14 +39,14 @@ class FileListTab(ttk.Frame):
         
         # Button frame for better organization
         button_frame = ttk.Frame(self)
-        button_frame.pack(side=ttk.BOTTOM, fill='x', pady=(0, 5))
+        button_frame.pack(side=tk.BOTTOM, fill='x', pady=(0, 5))
         
         self.load_list_button = self.gui.create_button(button_frame, "Load List", self.load_file_list, "Load pasted file list for selection")
-        self.load_list_button.pack(side=ttk.LEFT, padx=(10, 5), pady=8)
-        self.copy_list_button = self.gui.create_button(button_frame, "Copy from List", self.copy_from_list, "Copy content from listed files", state=ttk.DISABLED)
-        self.copy_list_button.pack(side=ttk.LEFT, padx=5, pady=8)
+        self.load_list_button.pack(side=tk.LEFT, padx=(10, 5), pady=8)
+        self.copy_list_button = self.gui.create_button(button_frame, "Copy from List", self.copy_from_list, "Copy content from listed files", state=tk.DISABLED)
+        self.copy_list_button.pack(side=tk.LEFT, padx=5, pady=8)
         self.clear_list_button = self.gui.create_button(button_frame, "Clear List", self.clear_file_list, "Clear the file list text area")
-        self.clear_list_button.pack(side=ttk.LEFT, padx=5, pady=8)
+        self.clear_list_button.pack(side=tk.LEFT, padx=5, pady=8)
         self.error_label = ttk.Label(self, text="", anchor="w", font=("Arial", 10))
         self.error_label.pack(fill="x", pady=(0, 10))
 

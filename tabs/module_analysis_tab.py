@@ -17,7 +17,7 @@ class ModuleAnalysisTab(ttk.Frame):
         """Setup the module analysis tab UI components."""
         # Main button frame
         self.button_frame = ttk.Frame(self)
-        self.button_frame.pack(side=ttk.TOP, fill='x', pady=5)
+        self.button_frame.pack(side=tk.TOP, fill='x', pady=5)
 
         # Analysis button
         self.analyze_button = self.gui.create_button(
@@ -26,7 +26,7 @@ class ModuleAnalysisTab(ttk.Frame):
             self.start_analysis,
             "Analyze repository for module dependencies and groupings"
         )
-        self.analyze_button.pack(side=ttk.LEFT, padx=10, pady=5)
+        self.analyze_button.pack(side=tk.LEFT, padx=10, pady=5)
 
         # Clear button
         self.clear_button = self.gui.create_button(
@@ -35,7 +35,7 @@ class ModuleAnalysisTab(ttk.Frame):
             self.clear_results,
             "Clear current analysis results"
         )
-        self.clear_button.pack(side=ttk.LEFT, padx=5, pady=5)
+        self.clear_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         # Export button (initially disabled)
         self.export_button = self.gui.create_button(
@@ -45,17 +45,17 @@ class ModuleAnalysisTab(ttk.Frame):
             "Export module analysis results",
             state=tk.DISABLED
         )
-        self.export_button.pack(side=ttk.LEFT, padx=5, pady=5)
+        self.export_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         # Progress frame
         self.progress_frame = ttk.Frame(self)
-        self.progress_frame.pack(side=ttk.TOP, fill='x', pady=5)
+        self.progress_frame.pack(side=tk.TOP, fill='x', pady=5)
 
         self.progress_label = ttk.Label(
             self.progress_frame, 
             text="Ready to analyze"
         )
-        self.progress_label.pack(side=ttk.LEFT, padx=10)
+        self.progress_label.pack(side=tk.LEFT, padx=10)
 
         # Main content area with notebook for different views
         self.content_notebook = ttk.Notebook(self)
@@ -107,9 +107,9 @@ class ModuleAnalysisTab(ttk.Frame):
         """Setup the dependency graph view."""
         self.graph_text = ScrolledText(
             self.graph_frame,
-            wrap=ttk.WORD,
+            wrap=tk.WORD,
             font=("Arial", 10),
-            state=ttk.DISABLED,
+            state=tk.DISABLED,
             bootstyle="dark"
         )
         self.graph_text.pack(fill="both", expand=True, padx=5, pady=5)
@@ -118,9 +118,9 @@ class ModuleAnalysisTab(ttk.Frame):
         """Setup the analysis details view."""
         self.details_text = ScrolledText(
             self.details_frame,
-            wrap=ttk.WORD,
+            wrap=tk.WORD,
             font=("Arial", 10),
-            state=ttk.DISABLED,
+            state=tk.DISABLED,
             bootstyle="dark"
         )
         self.details_text.pack(fill="both", expand=True, padx=5, pady=5)

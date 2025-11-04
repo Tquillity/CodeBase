@@ -21,22 +21,22 @@ class StructureTab(ttk.Frame):
 
     def setup_ui(self):
         self.structure_button_frame = ttk.Frame(self)
-        self.structure_button_frame.pack(side=ttk.TOP, fill='x', pady=(10, 5))
+        self.structure_button_frame.pack(side=tk.TOP, fill='x', pady=(10, 5))
 
         self.expand_collapse_button = self.gui.create_button(self.structure_button_frame, "Expand All", self.toggle_expand_collapse, "Expand/collapse all folders in the tree")
-        self.expand_collapse_button.pack(side=ttk.LEFT, padx=(10, 5), pady=8)
+        self.expand_collapse_button.pack(side=tk.LEFT, padx=(10, 5), pady=8)
 
         self.show_unloaded_checkbox = ttk.Checkbutton(self.structure_button_frame, text="Mark Unselected Files", variable=self.show_unloaded_var,
                                                      command=self.update_tree_strikethrough)
-        self.show_unloaded_checkbox.pack(side=ttk.LEFT, padx=(5, 10), pady=8)
+        self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=(5, 10), pady=8)
         Tooltip(self.show_unloaded_checkbox, "Apply visual marker (strikethrough) to text files currently not selected for inclusion")
 
         # Treeview styling now handled by ttkbootstrap theme
         self.tree = ttk.Treeview(self, columns=("path", "checkbox"), show="tree headings",
                                  selectmode="browse", bootstyle="primary")
         self.tree.column("#0", width=400, anchor='w')
-        self.tree.column("path", width=0, stretch=ttk.NO)
-        self.tree.column("checkbox", width=40, anchor="center", stretch=ttk.NO)
+        self.tree.column("path", width=0, stretch=tk.NO)
+        self.tree.column("checkbox", width=40, anchor="center", stretch=tk.NO)
         self.tree.heading("#0", text="Name", anchor='w')
         self.tree.heading("checkbox", text="Sel")
 

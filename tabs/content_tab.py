@@ -17,11 +17,11 @@ class ContentTab(ttk.Frame):
 
     def setup_ui(self):
         self.content_button_frame = ttk.Frame(self)
-        self.content_button_frame.pack(side=ttk.TOP, fill='x', pady=(10, 5))
+        self.content_button_frame.pack(side=tk.TOP, fill='x', pady=(10, 5))
         self.content_expand_collapse_button = self.gui.create_button(self.content_button_frame, "Expand All", self.toggle_content_all, "Expand/collapse all file content sections")
         self.content_expand_collapse_button.pack(pady=8, padx=10)
 
-        self.content_text = ScrolledText(self, wrap=ttk.WORD,
+        self.content_text = ScrolledText(self, wrap=tk.WORD,
                                                       font=("Arial", 10),
                                                       bootstyle="dark")
         self.content_text.pack(fill="both", expand=True, padx=5, pady=(0, 10))
@@ -104,7 +104,7 @@ class ContentTab(ttk.Frame):
              self.gui.show_status_message(error_msg, error=True, duration=ERROR_MESSAGE_DURATION)
 
         # ttkbootstrap ScrolledText is always editable
-        self.content_text.delete(1.0, ttk.END)
+        self.content_text.delete(1.0, tk.END)
         self.file_states.clear()
 
         if generated_content:
@@ -212,7 +212,7 @@ class ContentTab(ttk.Frame):
 
     def clear(self):
         # ttkbootstrap ScrolledText is always editable
-        self.content_text.delete(1.0, ttk.END)
+        self.content_text.delete(1.0, tk.END)
         self.file_states.clear()
         self.update_content_expand_collapse_button()
 

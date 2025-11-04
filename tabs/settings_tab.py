@@ -24,10 +24,10 @@ class SettingsTab(ttk.Frame):
 
     def setup_ui(self):
         scroll_frame = ttk.Scrollbar(self, orient="vertical")
-        scroll_frame.pack(side=ttk.RIGHT, fill=ttk.Y)
+        scroll_frame.pack(side=tk.RIGHT, fill=tk.Y)
 
         canvas = tk.Canvas(self, yscrollcommand=scroll_frame.set)
-        canvas.pack(side=ttk.LEFT, fill=ttk.BOTH, expand=True)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         scroll_frame.config(command=canvas.yview)
 
@@ -199,10 +199,10 @@ class SettingsTab(ttk.Frame):
         default_folder_frame.grid(row=row, column=1, padx=15, pady=8, sticky="ew")
         
         self.default_folder_entry = ttk.Entry(default_folder_frame, textvariable=self.default_start_folder_var, width=40)
-        self.default_folder_entry.pack(side=ttk.LEFT, fill="x", expand=True)
+        self.default_folder_entry.pack(side=tk.LEFT, fill="x", expand=True)
         
         browse_folder_button = ttk.Button(default_folder_frame, text="Browse...", command=self._browse_default_folder, width=10)
-        browse_folder_button.pack(side=ttk.RIGHT, padx=(5, 0))
+        browse_folder_button.pack(side=tk.RIGHT, padx=(5, 0))
         row += 1
 
         # Text File Extensions
