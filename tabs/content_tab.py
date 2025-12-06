@@ -1,53 +1,47 @@
+import ttkbootstrap as ttk
 import tkinter as tk
-from tkinter import scrolledtext
+from ttkbootstrap.scrolled import ScrolledText
 from widgets import Tooltip
 import logging
 from constants import ERROR_MESSAGE_DURATION
 
-class ContentTab(tk.Frame):
+class ContentTab(ttk.Frame):
     def __init__(self, parent, gui, file_handler):
         super().__init__(parent)
         self.gui = gui
         self.file_handler = file_handler
-        self.colors = gui.colors
+        # Colors now managed by ttkbootstrap theme
         self.file_states = {}
-        self.content_expand_collapse_var = tk.BooleanVar(value=True)
+        self.content_expand_collapse_var = ttk.BooleanVar(value=True)
         self.setup_ui()
 
     def setup_ui(self):
-        self.content_button_frame = tk.Frame(self, bg=self.colors['bg'])
+        self.content_button_frame = ttk.Frame(self)
         self.content_button_frame.pack(side=tk.TOP, fill='x', pady=(10, 5))
         self.content_expand_collapse_button = self.gui.create_button(self.content_button_frame, "Expand All", self.toggle_content_all, "Expand/collapse all file content sections")
         self.content_expand_collapse_button.pack(pady=8, padx=10)
 
-        self.content_text = scrolledtext.ScrolledText(self, wrap=tk.WORD,
-                                                      bg=self.colors['bg_accent'], fg=self.colors['fg'],
-                                                      font=("Arial", 10), state=tk.DISABLED,
-                                                      relief=tk.FLAT, borderwidth=0)
+        self.content_text = ScrolledText(self, wrap=tk.WORD,
+                                                      font=("Arial", 10),
+                                                      bootstyle="dark")
         self.content_text.pack(fill="both", expand=True, padx=5, pady=(0, 10))
 
-        self.content_text.tag_configure("filename", foreground=self.colors['status'], font=('Arial', 10, 'bold'))
-        self.content_text.tag_configure("toggle", foreground=self.colors['file_selected'], underline=True)
-        self.content_text.tag_configure("highlight", background=self.colors['highlight_bg'], foreground=self.colors['highlight_fg'])
-        self.content_text.tag_configure("focused_highlight", background=self.colors['focused_highlight_bg'], foreground=self.colors['focused_highlight_fg'])
+        # Get theme colors from ttkbootstrap
+        style = ttk.Style()
+        colors = style.colors
+        
+        self.content_text.tag_configure("filename", foreground=colors.danger, font=('Arial', 10, 'bold'))
+        self.content_text.tag_configure("toggle", foreground=colors.success, underline=True)
+        self.content_text.tag_configure("highlight", background=colors.warning, foreground=colors.bg)
+        self.content_text.tag_configure("focused_highlight", background=colors.primary, foreground=colors.bg)
 
         self.content_text.tag_bind("toggle", "<Enter>", lambda e: self.content_text.config(cursor="hand2"))
         self.content_text.tag_bind("toggle", "<Leave>", lambda e: self.content_text.config(cursor=""))
 
-    def reconfigure_colors(self, colors):
-        self.colors = colors
-        self.content_button_frame.config(bg=colors['bg'])
-        self.content_expand_collapse_button.config(bg=colors['btn_bg'], fg=colors['btn_fg'])
-        self.content_text.config(bg=colors['bg_accent'], fg=colors['fg'])
-        self.content_text.tag_configure("filename", foreground=colors['status'])
-        self.content_text.tag_configure("toggle", foreground=colors['file_selected'])
-        self.content_text.tag_configure("highlight", background=colors['highlight_bg'], foreground=colors['highlight_fg'])
-        self.content_text.tag_configure("focused_highlight", background=colors['focused_highlight_bg'], foreground=colors['focused_highlight_fg'])
 
     def perform_search(self, query, case_sensitive, whole_word):
         matches = []
-        initial_state = self.content_text.cget('state')
-        self.content_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         start_pos = "1.0"
         while True:
             pos = self.content_text.search(query, start_pos, stopindex=tk.END,
@@ -57,26 +51,21 @@ class ContentTab(tk.Frame):
             end_pos = f"{pos}+{len(query)}c"
             matches.append((pos, end_pos))
             start_pos = end_pos
-        self.content_text.config(state=initial_state)
         return matches
 
     def highlight_all_matches(self, matches):
-        initial_state = self.content_text.cget('state')
-        self.content_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         for match_data in matches:
             pos, end_pos = match_data
             self.content_text.tag_add("highlight", pos, end_pos)
-        self.content_text.config(state=initial_state)
 
     def highlight_match(self, match_data, is_focused=True):
         highlight_tag = "focused_highlight" if is_focused else "highlight"
         other_highlight_tag = "highlight" if is_focused else "focused_highlight"
         pos, end_pos = match_data
-        initial_state = self.content_text.cget('state')
-        self.content_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         self.content_text.tag_remove(other_highlight_tag, pos, end_pos)
         self.content_text.tag_add(highlight_tag, pos, end_pos)
-        self.content_text.config(state=initial_state)
 
     def center_match(self, match_data):
         pos, _ = match_data
@@ -104,11 +93,9 @@ class ContentTab(tk.Frame):
              logging.error(f"Error centering match: {e}")
 
     def clear_highlights(self):
-        initial_state = self.content_text.cget('state')
-        self.content_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         self.content_text.tag_remove("highlight", "1.0", tk.END)
         self.content_text.tag_remove("focused_highlight", "1.0", tk.END)
-        self.content_text.config(state=initial_state)
 
     def _handle_preview_completion(self, generated_content, token_count, errors):
         if errors:
@@ -116,7 +103,7 @@ class ContentTab(tk.Frame):
              if errors: error_msg += f" Files: {'; '.join(errors[:3])}"
              self.gui.show_status_message(error_msg, error=True, duration=ERROR_MESSAGE_DURATION)
 
-        self.content_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         self.content_text.delete(1.0, tk.END)
         self.file_states.clear()
 
@@ -146,7 +133,7 @@ class ContentTab(tk.Frame):
                          logging.error(f"Error parsing generated content section: {e}")
                          self.content_text.insert(tk.END, f"\n--- Error displaying section: {e} ---\n", "error")
 
-        self.content_text.config(state=tk.DISABLED)
+        # ttkbootstrap ScrolledText is always editable
 
         self.gui.current_token_count = token_count
         self.gui.info_label.config(text=f"Tokens (Selected): {self.gui.current_token_count:,}".replace(",", " "))
@@ -167,7 +154,7 @@ class ContentTab(tk.Frame):
 
         new_state_expanded = not self.content_expand_collapse_var.get()
 
-        self.content_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         toggle_symbol = "[-]" if new_state_expanded else "[+]"
         new_button_text = "Collapse All" if new_state_expanded else "Expand All"
 
@@ -184,7 +171,7 @@ class ContentTab(tk.Frame):
 
             self.content_text.tag_configure(content_tag, elide=not new_state_expanded)
 
-        self.content_text.config(state=tk.DISABLED)
+        # ttkbootstrap ScrolledText is always editable
         self.content_expand_collapse_var.set(new_state_expanded)
         self.content_expand_collapse_button.config(text=new_button_text)
         status = "expanded" if new_state_expanded else "collapsed"
@@ -201,14 +188,14 @@ class ContentTab(tk.Frame):
         content_tag = f"content_{file_id}"
         toggle_symbol = "[-]" if new_state_expanded else "[+]"
 
-        self.content_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         ranges = self.content_text.tag_ranges(toggle_tag)
         if ranges:
             start, end = ranges
             self.content_text.delete(start, end)
             self.content_text.insert(start, f" {toggle_symbol} ", ("toggle", toggle_tag))
         self.content_text.tag_configure(content_tag, elide=not new_state_expanded)
-        self.content_text.config(state=tk.DISABLED)
+        # ttkbootstrap ScrolledText is always editable
 
         self.update_content_expand_collapse_button()
 
@@ -224,8 +211,17 @@ class ContentTab(tk.Frame):
         self.content_expand_collapse_button.config(text="Collapse All" if is_expanded else "Expand All")
 
     def clear(self):
-        self.content_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         self.content_text.delete(1.0, tk.END)
-        self.content_text.config(state=tk.DISABLED)
         self.file_states.clear()
         self.update_content_expand_collapse_button()
+
+    def update_tag_colors(self):
+        """Updates text tag colors to match the current theme."""
+        style = ttk.Style()
+        colors = style.colors
+
+        self.content_text.tag_configure("filename", foreground=colors.danger, font=('Arial', 10, 'bold'))
+        self.content_text.tag_configure("toggle", foreground=colors.success, underline=True)
+        self.content_text.tag_configure("highlight", background=colors.warning, foreground=colors.bg)
+        self.content_text.tag_configure("focused_highlight", background=colors.primary, foreground=colors.bg)

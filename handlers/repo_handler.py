@@ -35,7 +35,7 @@ class RepoHandler:
             self.gui.show_status_message("Loading...", error=True)
             return
         default_start_folder = self.gui.settings.get('app', 'default_start_folder', os.path.expanduser("~"))
-        dialog = FolderDialog(self.gui.root, self.gui.recent_folders, self.gui.colors, on_delete_callback=self.gui.delete_recent_folder, default_start_folder=default_start_folder)
+        dialog = FolderDialog(self.gui.root, self.gui.recent_folders, on_delete_callback=self.gui.delete_recent_folder, default_start_folder=default_start_folder)
         folder = dialog.show()
         if folder:
             self.gui.update_recent_folders(folder)
@@ -54,6 +54,7 @@ class RepoHandler:
             self.gui.show_status_message("No repository loaded to refresh.", error=True)
             return
         logging.info("Starting repository refresh...")
+        logging.info(f"Repository path: {self.repo_path}")
         self.gui.show_loading_state(f"Refreshing {os.path.basename(self.repo_path)}...", show_cancel=True)
         # --- PRESERVE STATE ---
         # 1. Save the set of currently selected files
@@ -72,7 +73,8 @@ class RepoHandler:
         # The completion callback will handle restoring the state
         completion_callback = lambda repo_path, ignore_patterns, scanned, loaded, errors: \
             self._handle_refresh_completion(repo_path, ignore_patterns, scanned, errors, previous_selections, expansion_state)
-           
+        
+        logging.info(f"Calling load_repo with path: {self.repo_path}")
         self.load_repo(self.repo_path, self.gui.show_status_message, completion_callback)
 
     def get_tree_expansion_state(self):
@@ -172,6 +174,7 @@ class RepoHandler:
     def _scan_repo_worker(self, folder, progress_callback, completion_callback):
         """Worker function to run in a separate thread with detailed progress."""
         try:
+            logging.info(f"Starting repository scan for {folder}")
             # Check if shutdown was requested
             if self.gui._shutdown_requested:
                 logging.info("Shutdown requested, aborting repository scan")
@@ -226,6 +229,7 @@ class RepoHandler:
         
             end_time = time.time()
             logging.info(f"Scan complete for {repo_path}. Found {len(scanned_files_temp)} text files out of {total_files} total files in {end_time - start_time:.2f} seconds.")
+            logging.info(f"Putting completion callback in queue with {len(scanned_files_temp)} scanned files")
             self.gui.task_queue.put((completion_callback, (repo_path, ignore_patterns, scanned_files_temp, loaded_files_temp, errors)))
         except Exception as e:
             logging.error(f"Error during repo scan worker: {e}", exc_info=True)

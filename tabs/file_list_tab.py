@@ -1,5 +1,6 @@
+import ttkbootstrap as ttk
 import tkinter as tk
-from tkinter import scrolledtext
+from ttkbootstrap.scrolled import ScrolledText
 from widgets import Tooltip
 import logging
 import os
@@ -10,21 +11,20 @@ from exceptions import FileOperationError, SecurityError, UIError
 from error_handler import handle_error, safe_execute
 from constants import ERROR_HANDLING_ENABLED, SECURITY_ENABLED
 from security import validate_file_path, validate_file_size, validate_content_security
-class FileListTab(tk.Frame):
+class FileListTab(ttk.Frame):
     def __init__(self, parent, gui):
         super().__init__(parent)
         self.gui = gui
-        self.colors = gui.colors
+        # Colors now managed by ttkbootstrap theme
         self.setup_ui()
 
     def setup_ui(self):
-        self.file_list_text = scrolledtext.ScrolledText(self, wrap=tk.NONE,
-                                                      bg=self.colors['bg_accent'], fg=self.colors['fg'],
-                                                      font=("Arial", 10), relief=tk.FLAT, borderwidth=0, height=10)
+        self.file_list_text = ScrolledText(self, wrap=tk.NONE,
+                                                      font=("Arial", 10), bootstyle="dark", height=10)
         self.file_list_text.pack(fill="both", expand=True, padx=5, pady=(5, 10))
         
         # Ensure the text widget is always editable for pasting
-        self.file_list_text.config(state=tk.NORMAL)
+        # Note: ttkbootstrap ScrolledText is always editable by default
         
         # Enable keyboard shortcuts for text editing
         self.file_list_text.bind("<Control-v>", self._paste_text)
@@ -38,7 +38,7 @@ class FileListTab(tk.Frame):
         self.file_list_text.bind("<Button-3>", self._show_context_menu)  # Right-click context menu
         
         # Button frame for better organization
-        button_frame = tk.Frame(self, bg=self.colors['bg'])
+        button_frame = ttk.Frame(self)
         button_frame.pack(side=tk.BOTTOM, fill='x', pady=(0, 5))
         
         self.load_list_button = self.gui.create_button(button_frame, "Load List", self.load_file_list, "Load pasted file list for selection")
@@ -47,16 +47,9 @@ class FileListTab(tk.Frame):
         self.copy_list_button.pack(side=tk.LEFT, padx=5, pady=8)
         self.clear_list_button = self.gui.create_button(button_frame, "Clear List", self.clear_file_list, "Clear the file list text area")
         self.clear_list_button.pack(side=tk.LEFT, padx=5, pady=8)
-        self.error_label = tk.Label(self, text="", bg=self.colors['bg'], fg=self.colors['status'], anchor="w", font=("Arial", 10))
+        self.error_label = ttk.Label(self, text="", anchor="w", font=("Arial", 10))
         self.error_label.pack(fill="x", pady=(0, 10))
 
-    def reconfigure_colors(self, colors):
-        self.colors = colors
-        self.file_list_text.config(bg=colors['bg_accent'], fg=colors['fg'])
-        self.load_list_button.config(bg=colors['btn_bg'], fg=colors['btn_fg'])
-        self.copy_list_button.config(bg=colors['btn_bg'], fg=colors['btn_fg'])
-        self.clear_list_button.config(bg=colors['btn_bg'], fg=colors['btn_fg'])
-        self.error_label.config(bg=colors['bg'], fg=colors['status'])
 
     def perform_search(self, query, case_sensitive, whole_word):
         matches = []
@@ -132,7 +125,7 @@ class FileListTab(tk.Frame):
             return
         
         # Ensure text area remains editable
-        self.file_list_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
         text_content = self.file_list_text.get("1.0", tk.END).strip()
         if not text_content:
             self.gui.show_status_message("No file list provided.", error=True)
@@ -192,13 +185,13 @@ class FileListTab(tk.Frame):
             self.error_label.config(text=f"Errors: {'; '.join(self.gui.list_read_errors[:3])}")
         
         # Ensure text area remains editable after loading
-        self.file_list_text.config(state=tk.NORMAL)
+        # ttkbootstrap ScrolledText is always editable
 
     def _paste_text(self, event=None):
         """Handle paste operation for the text widget."""
         try:
             # Ensure the widget is in normal state for editing
-            self.file_list_text.config(state=tk.NORMAL)
+            # ttkbootstrap ScrolledText is always editable
             
             # Get clipboard content
             clipboard_content = self.file_list_text.clipboard_get()
@@ -207,7 +200,7 @@ class FileListTab(tk.Frame):
             self.file_list_text.insert(tk.INSERT, clipboard_content)
             
             # Keep widget editable
-            self.file_list_text.config(state=tk.NORMAL)
+            # ttkbootstrap ScrolledText is always editable
             
         except tk.TclError:
             # Clipboard might be empty or contain non-text data
@@ -218,7 +211,7 @@ class FileListTab(tk.Frame):
     def _show_context_menu(self, event):
         """Show right-click context menu for text editing."""
         try:
-            context_menu = tk.Menu(self, tearoff=0, bg=self.colors['bg'], fg=self.colors['fg'])
+            context_menu = tk.Menu(self, tearoff=0)
             context_menu.add_command(label="Cut", command=self._cut_text)
             context_menu.add_command(label="Copy", command=self._copy_text)
             context_menu.add_command(label="Paste", command=self._paste_text)

@@ -1,4 +1,4 @@
-import tkinter as tk
+import ttkbootstrap as ttk
 import signal
 import sys
 import logging
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    root = tk.Tk()
+    root = ttk.Window(themename="darkly")
     app = RepoPromptGUI(root)
     
     # Store app reference for signal handler

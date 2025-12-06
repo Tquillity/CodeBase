@@ -23,6 +23,8 @@ class SettingsManager:
                 "levels": 1,
                 "exclude_node_modules": 1,
                 "exclude_dist": 1,
+                "exclude_coverage": 1,
+                "exclude_test_files": 0,
                 "exclude_files": {
                     'package-lock.json': 1, 'yarn.lock': 1, 'composer.lock': 1,
                     'Gemfile.lock': 1, 'poetry.lock': 1, 'get-pip.py': 1

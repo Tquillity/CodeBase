@@ -122,12 +122,27 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
             # NEW_LOG
             logging.debug(f"Ignored '{path}' due to dist setting")
             return True
+        if gui.settings.get('app', 'exclude_coverage', 1) == 1 and any(part.lower() in ['coverage', 'htmlcov', 'cov_html'] for part in rel_path_parts):
+            # NEW_LOG
+            logging.debug(f"Ignored '{path}' due to coverage setting")
+            return True
+        
+        # Check for test file exclusion
+        exclude_test_files_setting = gui.settings.get('app', 'exclude_test_files', 0)
+        if exclude_test_files_setting == 1 and is_test_file(path, rel_path):
+            # NEW_LOG
+            logging.info(f"Ignored '{path}' due to test file exclusion setting (exclude_test_files={exclude_test_files_setting})")
+            return True
+        elif exclude_test_files_setting == 0 and is_test_file(path, rel_path):
+            logging.info(f"Including test file '{path}' (exclude_test_files={exclude_test_files_setting})")
 
     except ValueError:
          # This can happen if path is not within repo_root, e.g. a different drive on Windows
          if '.git' in path.split(os.sep): return True
          if gui.settings.get('app', 'exclude_node_modules', 1) == 1 and 'node_modules' in path.split(os.sep): return True
          if gui.settings.get('app', 'exclude_dist', 1) == 1 and 'dist' in path.split(os.sep): return True
+         if gui.settings.get('app', 'exclude_coverage', 1) == 1 and any(part.lower() in ['coverage', 'htmlcov', 'cov_html'] for part in path.split(os.sep)): return True
+         if gui.settings.get('app', 'exclude_test_files', 0) == 1 and is_test_file(path, None): return True
     except Exception as e:
         logging.warning(f"Error during is_ignored check for {path}: {e}")
 
@@ -175,3 +190,38 @@ def is_text_file(file_path, gui):
     # NEW_LOG
     logging.debug(f"Not text: {file_path} (default case)")
     return False
+
+def is_test_file(file_path, rel_path):
+    """Check if a file is a test file based on common test file patterns."""
+    try:
+        filename = os.path.basename(file_path).lower()
+        rel_path_lower = rel_path.lower() if rel_path else ""
+        
+        # Common test file patterns
+        test_patterns = [
+            # Test directories
+            'test', 'tests', 'testing', 'spec', 'specs', '__tests__', 'test_',
+            # Test file prefixes/suffixes
+            'test_', '_test', '.test.', '.spec.', '_spec',
+            # Common test file names
+            'test.py', 'tests.py', 'test.js', 'tests.js', 'test.ts', 'tests.ts',
+            'test.rb', 'tests.rb', 'test.go', 'tests.go', 'test.java', 'tests.java',
+            'test.php', 'tests.php', 'test.c', 'tests.c', 'test.cpp', 'tests.cpp',
+            'test.rs', 'tests.rs', 'test.swift', 'tests.swift', 'test.kt', 'tests.kt',
+            'test.scala', 'tests.scala', 'test.clj', 'tests.clj', 'test.ex', 'tests.ex',
+            'test.exs', 'tests.exs', 'test.erl', 'tests.erl', 'test.hs', 'tests.hs',
+            'test.ml', 'tests.ml', 'test.fs', 'tests.fs', 'test.f90', 'tests.f90',
+            'test.pl', 'tests.pl', 'test.pm', 'tests.pm', 'test.t', 'tests.t',
+            'test.sh', 'tests.sh', 'test.bat', 'tests.bat', 'test.ps1', 'tests.ps1'
+        ]
+        
+        # Check if any part of the path contains test patterns
+        for pattern in test_patterns:
+            if pattern in rel_path_lower or pattern in filename:
+                return True
+                
+        return False
+        
+    except Exception as e:
+        logging.warning(f"Error checking if {file_path} is test file: {e}")
+        return False

@@ -146,7 +146,7 @@ def gui(mock_root):
         yield app
 
 def test_init(gui):
-    assert gui.version == "4.0"
+    assert gui.version == "5.0"
     assert gui.high_contrast_mode.get() == 0
     assert gui.prepend_var.get() == 1
     assert gui.show_unloaded_var.get() == 0
