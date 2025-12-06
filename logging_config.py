@@ -18,7 +18,8 @@ class LoggingConfig:
                      level: str = None, 
                      log_file: str = None, 
                      console_output: bool = True,
-                     format_string: str = None) -> None:
+                     format_string: str = None,
+                     force: bool = False) -> None:
         """
         Setup centralized logging configuration.
         
@@ -27,8 +28,9 @@ class LoggingConfig:
             log_file: Path to log file (optional)
             console_output: Whether to output to console
             format_string: Custom format string (optional)
+            force: Force reconfiguration even if already initialized
         """
-        if cls._initialized:
+        if cls._initialized and not force:
             return
         
         # Default configuration
@@ -185,9 +187,9 @@ class LoggingConfig:
         return root_logger.isEnabledFor(logging.DEBUG)
 
 # Convenience functions
-def setup_logging(level: str = None, log_file: str = None, console_output: bool = True, format_string: str = None) -> None:
+def setup_logging(level: str = None, log_file: str = None, console_output: bool = True, format_string: str = None, force: bool = False) -> None:
     """Convenience function to setup logging."""
-    LoggingConfig.setup_logging(level, log_file, console_output, format_string)
+    LoggingConfig.setup_logging(level, log_file, console_output, format_string, force)
 
 def get_logger(name: str) -> logging.Logger:
     """Convenience function to get a logger."""

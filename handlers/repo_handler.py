@@ -10,7 +10,7 @@ import time # For timing tasks
 from widgets import FolderDialog
 from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION, ERROR_HANDLING_ENABLED
 from lru_cache import ThreadSafeLRUCache
-from file_scanner import parse_gitignore, is_ignored_path
+from file_scanner import parse_gitignore, is_ignored_path, yield_repo_files
 from exceptions import RepositoryError, FileOperationError, SecurityError
 from error_handler import handle_error, safe_execute
 class RepoHandler:
@@ -198,12 +198,8 @@ class RepoHandler:
         
             # --- Collect all non-ignored file paths ---
             file_paths = []
-            for dirpath, dirnames, filenames in os.walk(repo_path, topdown=True):
-                dirnames[:] = [d for d in dirnames if not is_ignored_path(os.path.join(dirpath, d), repo_path, ignore_patterns, self.gui)]
-                for filename in filenames:
-                    file_path_abs = os.path.join(dirpath, filename)
-                    if not is_ignored_path(file_path_abs, repo_path, ignore_patterns, self.gui):
-                        file_paths.append(file_path_abs)
+            for file_path_abs in yield_repo_files(repo_path, ignore_patterns, self.gui):
+                file_paths.append(file_path_abs)
         
             total_files = len(file_paths)
             # Skip progress bar for first pass since it's too fast to be useful

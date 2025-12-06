@@ -97,6 +97,16 @@ class ContentTab(ttk.Frame):
         self.content_text.tag_remove("highlight", "1.0", tk.END)
         self.content_text.tag_remove("focused_highlight", "1.0", tk.END)
 
+    def _insert_content_chunked(self, text, tags):
+        """Insert large text in chunks to avoid UI freeze."""
+        chunk_size = 2000
+        chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+        
+        for i, chunk in enumerate(chunks):
+            self.content_text.insert(tk.END, chunk, tags)
+            if i > 0 and i % 5 == 0:
+                self.update_idletasks()
+
     def _handle_preview_completion(self, generated_content, token_count, errors):
         if errors:
              error_msg = "Errors generating preview content."
@@ -125,7 +135,7 @@ class ContentTab(ttk.Frame):
 
                             self.content_text.insert(tk.END, " [-] ", ("toggle", toggle_tag))
                             self.content_text.insert(tk.END, f"File: {rel_path}\n", "filename")
-                            self.content_text.insert(tk.END, f"{content}\n\n", content_tag)
+                            self._insert_content_chunked(f"{content}\n\n", content_tag)
 
                             self.content_text.tag_bind(toggle_tag, "<Button-1>",
                                                        lambda event, fid=file_id: self.toggle_content(fid))

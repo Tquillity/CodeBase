@@ -29,13 +29,9 @@ from exceptions import UIError, ConfigurationError, ThreadingError
 from error_handler import handle_error, safe_execute, get_error_handler
 from logging_config import setup_logging, get_logger
 
-# Setup centralized logging configuration (will be updated after settings load)
-setup_logging(
-    level=DEFAULT_LOG_LEVEL,
-    log_file=LOG_FILE_PATH if LOG_TO_FILE else None,
-    console_output=LOG_TO_CONSOLE,
-    format_string=LOG_FORMAT
-)
+# Setup centralized logging configuration (moved to main.py)
+# setup_logging(...) removed to prevent double initialization
+
 class RepoPromptGUI:
     def __init__(self, root: ttk.Window) -> None:
         self.root = root
@@ -110,7 +106,8 @@ class RepoPromptGUI:
                 level=log_level,
                 log_file=LOG_FILE_PATH if log_to_file else None,
                 console_output=log_to_console,
-                format_string=LOG_FORMAT
+                format_string=LOG_FORMAT,
+                force=True
             )
             
             self.logger.info(f"Logging configured: level={log_level}, file={log_to_file}, console={log_to_console}")
@@ -242,6 +239,13 @@ class RepoPromptGUI:
         self.status_bar.bind("<Button-3>", self._show_status_context_menu)
         self.status_bar.bind("<Button-2>", self._show_status_context_menu)  # Middle click for Linux
 
+        # Create status bar context menu once
+        self.status_context_menu = tk.Menu(self.root, tearoff=0)
+        self.status_context_menu.add_command(label="Copy", command=self._copy_status_bar)
+        self.status_context_menu.add_command(label="Paste", command=self._paste_to_status_bar)
+        self.status_context_menu.add_separator()
+        self.status_context_menu.add_command(label="Clear", command=self._clear_status_bar)
+
     def show_loading_state(self, message: str, show_cancel: bool = False) -> None:
         print(f"DEBUG: show_loading_state called with message: {message}")
         
@@ -310,17 +314,12 @@ class RepoPromptGUI:
     def _show_status_context_menu(self, event):
         """Show right-click context menu for status bar."""
         try:
-            # Create context menu
-            context_menu = tk.Menu(self.root, tearoff=0)
-            context_menu.add_command(label="Copy", command=self._copy_status_bar)
-            context_menu.add_command(label="Paste", command=self._paste_to_status_bar)
-            context_menu.add_separator()
-            context_menu.add_command(label="Clear", command=self._clear_status_bar)
-            
             # Show context menu at cursor position
-            context_menu.tk_popup(event.x_root, event.y_root)
+            self.status_context_menu.tk_popup(event.x_root, event.y_root)
         except Exception as e:
             logging.error(f"Error showing status context menu: {e}")
+        finally:
+             self.status_context_menu.grab_release()
 
     def _paste_to_status_bar(self):
         """Paste clipboard content to status bar."""

@@ -7,7 +7,8 @@ from constants import TOOLTIP_DELAY, TOOLTIP_WRAP_LENGTH, DIALOG_MIN_WIDTH
 
 class Tooltip:
     """ Creates a tooltip for a given widget. """
-    def __init__(self, widget, text, bg='#ffffe0', delay=TOOLTIP_DELAY, relief="solid", borderwidth=1):
+    # Changed default bg to a dark grey to match the 'darkly' theme
+    def __init__(self, widget, text, bg='#2b2b2b', delay=TOOLTIP_DELAY, relief="solid", borderwidth=1):
         self.widget = widget
         self.text = text
         self.tooltip_bg = bg
@@ -45,8 +46,13 @@ class Tooltip:
         # Make it appear above other windows (may vary by WM)
         tw.wm_attributes("-topmost", True)
 
-        label = ttk.Label(tw, text=self.text, justify='left',
-                       background=self.tooltip_bg, relief=self.relief, borderwidth=self.borderwidth,
+        # FIX: Use tk.Label instead of ttk.Label to strictly enforce colors
+        # Background: Dark Grey (from __init__)
+        # Foreground: White (explicitly set)
+        label = tk.Label(tw, text=self.text, justify='left',
+                       background=self.tooltip_bg, 
+                       foreground="#ffffff", # Force white text
+                       relief=self.relief, borderwidth=self.borderwidth,
                        wraplength=TOOLTIP_WRAP_LENGTH) # Wrap text if too long
         label.pack(ipadx=5, ipady=3) # Add internal padding
 

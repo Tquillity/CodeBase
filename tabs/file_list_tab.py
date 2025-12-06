@@ -37,6 +37,15 @@ class FileListTab(ttk.Frame):
         self.file_list_text.bind("<Control-A>", self._select_all)
         self.file_list_text.bind("<Button-3>", self._show_context_menu)  # Right-click context menu
         
+        # Create context menu once and reuse
+        self.context_menu = tk.Menu(self, tearoff=0)
+        self.context_menu.add_command(label="Cut", command=self._cut_text)
+        self.context_menu.add_command(label="Copy", command=self._copy_text)
+        self.context_menu.add_command(label="Paste", command=self._paste_text)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Select All", command=self._select_all)
+        self.context_menu.add_command(label="Clear", command=self._clear_text)
+        
         # Button frame for better organization
         button_frame = ttk.Frame(self)
         button_frame.pack(side=tk.BOTTOM, fill='x', pady=(0, 5))
@@ -211,18 +220,12 @@ class FileListTab(ttk.Frame):
     def _show_context_menu(self, event):
         """Show right-click context menu for text editing."""
         try:
-            context_menu = tk.Menu(self, tearoff=0)
-            context_menu.add_command(label="Cut", command=self._cut_text)
-            context_menu.add_command(label="Copy", command=self._copy_text)
-            context_menu.add_command(label="Paste", command=self._paste_text)
-            context_menu.add_separator()
-            context_menu.add_command(label="Select All", command=self._select_all)
-            context_menu.add_command(label="Clear", command=self._clear_text)
-            
             # Show context menu at cursor position
-            context_menu.tk_popup(event.x_root, event.y_root)
+            self.context_menu.tk_popup(event.x_root, event.y_root)
         except Exception as e:
             logging.warning(f"Error showing context menu: {e}")
+        finally:
+             self.context_menu.grab_release()
 
     def _cut_text(self):
         """Cut selected text to clipboard."""

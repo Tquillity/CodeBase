@@ -4,6 +4,7 @@
 import threading
 from collections import OrderedDict
 import logging
+import sys
 from constants import CACHE_OVERHEAD_BYTES
 
 class ThreadSafeLRUCache:
@@ -78,14 +79,8 @@ class ThreadSafeLRUCache:
         Returns:
             Estimated memory usage in bytes
         """
-        try:
-            # Rough estimation: key size + value size + overhead
-            key_size = len(str(key).encode('utf-8'))
-            value_size = len(str(value).encode('utf-8'))
-            return key_size + value_size + CACHE_OVERHEAD_BYTES  # Overhead bytes
-        except:
-            # Fallback estimation
-            return 1000
+        # Use sys.getsizeof for a lightweight (albeit approximate) check
+        return sys.getsizeof(key) + sys.getsizeof(value) + CACHE_OVERHEAD_BYTES
     
     def _evict_if_needed(self):
         """

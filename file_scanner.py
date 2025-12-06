@@ -9,6 +9,20 @@ from exceptions import RepositoryError, FileOperationError, SecurityError
 from error_handler import handle_error, safe_execute
 from constants import ERROR_HANDLING_ENABLED
 
+def yield_repo_files(repo_path, ignore_patterns, gui):
+    """
+    Generator that yields all non-ignored file paths in the repository.
+    """
+    for dirpath, dirnames, filenames in os.walk(repo_path, topdown=True):
+        logging.debug(f"Scanning directory: {dirpath} (dirs: {len(dirnames)}, files: {len(filenames)})")
+        # Filter ignored directories early to avoid walking them
+        dirnames[:] = [d for d in dirnames if not is_ignored_path(os.path.join(dirpath, d), repo_path, ignore_patterns, gui)]
+        
+        for filename in filenames:
+            file_path_abs = os.path.join(dirpath, filename)
+            if not is_ignored_path(file_path_abs, repo_path, ignore_patterns, gui):
+                yield file_path_abs
+
 def scan_repo(folder, gui, progress_callback, completion_callback, lock):
     try:
         start_time = time.time()
@@ -25,32 +39,21 @@ def scan_repo(folder, gui, progress_callback, completion_callback, lock):
         errors = []
         file_count = 0
 
-        # Use a single pass with os.walk for responsiveness
-        for dirpath, dirnames, filenames in os.walk(repo_path, topdown=True):
-            logging.debug(f"Scanning directory: {dirpath} (dirs: {len(dirnames)}, files: {len(filenames)})")
-            # Filter ignored directories early to avoid walking them
-            dirnames[:] = [d for d in dirnames if not is_ignored_path(os.path.join(dirpath, d), repo_path, ignore_patterns, gui)]
-            logging.debug(f"After ignore filter: {len(dirnames)} dirs remain")
+        # Use unified generator for file discovery
+        for file_path_abs in yield_repo_files(repo_path, ignore_patterns, gui):
+            file_count += 1
+            # Update progress periodically
+            if file_count % 50 == 0:  # Update every 50 files
+                elapsed = time.time() - start_time
+                message = f"Scanning... {file_count} files ({elapsed:.1f}s)"
+                gui.root.after(0, progress_callback, message)
 
-            for filename in filenames:
-                file_count += 1
-                # Update progress periodically
-                if file_count % 50 == 0:  # Update every 50 files
-                    elapsed = time.time() - start_time
-                    message = f"Scanning... {file_count} files ({elapsed:.1f}s)"
-                    gui.root.after(0, progress_callback, message)
-
-                file_path_abs = os.path.join(dirpath, filename)
-                if is_ignored_path(file_path_abs, repo_path, ignore_patterns, gui):
-                    logging.debug(f"Ignored file: {file_path_abs}")
-                    continue
-                
-                if is_text_file(file_path_abs, gui):
-                    logging.debug(f"Text file found: {file_path_abs}")
-                    scanned_files_temp.add(file_path_abs)
-                    loaded_files_temp.add(file_path_abs)
-                else:
-                    logging.debug(f"Non-text file: {file_path_abs}")
+            if is_text_file(file_path_abs, gui):
+                logging.debug(f"Text file found: {file_path_abs}")
+                scanned_files_temp.add(file_path_abs)
+                loaded_files_temp.add(file_path_abs)
+            else:
+                logging.debug(f"Non-text file: {file_path_abs}")
 
         end_time = time.time()
         logging.info(f"Scan summary: {file_count} total files, {len(scanned_files_temp)} text files, {len(errors)} errors")
@@ -156,6 +159,14 @@ def is_text_file(file_path, gui):
         from file_handler import FileHandler
         text_extensions_settings = gui.settings.get('app', 'text_extensions', {ext: 1 for ext in FileHandler.text_extensions_default})
         
+        # Helper for null byte check
+        def has_null_bytes(path):
+            try:
+                with open(path, 'rb') as f:
+                    return b'\x00' in f.read(1024)
+            except Exception:
+                return False
+
         if ext in text_extensions_settings and text_extensions_settings[ext] == 1:
              filename = os.path.basename(file_path)
              exclude_files_settings = gui.settings.get('app', 'exclude_files', {})
@@ -163,6 +174,12 @@ def is_text_file(file_path, gui):
                  # NEW_LOG
                  logging.debug(f"Not text: '{file_path}' is in exclude_files setting")
                  return False
+             
+             # Null byte check
+             if has_null_bytes(file_path):
+                 logging.debug(f"Not text: '{file_path}' contains null bytes (binary)")
+                 return False
+
              # NEW_LOG
              logging.debug(f"Text by extension setting: {ext}")
              return True
@@ -180,6 +197,12 @@ def is_text_file(file_path, gui):
                  # NEW_LOG
                  logging.debug(f"Not text: '{file_path}' (MIME: {mime_type}) is in exclude_files setting")
                  return False
+             
+             # Null byte check
+             if has_null_bytes(file_path):
+                 logging.debug(f"Not text: '{file_path}' contains null bytes (binary)")
+                 return False
+
              # NEW_LOG
              logging.debug(f"Text by MIME: {mime_type}")
              return True
