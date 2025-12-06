@@ -268,11 +268,24 @@ class FileHandler:
 
         return content_changed_flag
 
-    def generate_and_update_preview(self, _, completion_callback):
+    def generate_and_update_preview(self, _, completion_callback=None):
+        """
+        Generates the combined content preview and updates the UI.
+        """
+        # If no completion callback is provided, default to updating the content tab
+        if completion_callback is None:
+            completion_callback = self.gui.content_tab._handle_preview_completion
+            
+        # NEW_LOG
         with self.lock:
             files_to_include = set(self.loaded_files)
+        
         logging.info(f"Generating preview for {len(files_to_include)} files")
         self.gui.show_loading_state("Generating content preview...")
+        
+        # Get the currently selected template format from the settings/UI
+        current_format = self.gui.settings.get('app', 'copy_format', "Markdown (Grok)")
+        
         def update_progress(processed, total, elapsed):
             if processed > 5:
                 avg = elapsed / processed
@@ -291,7 +304,7 @@ class FileHandler:
         def wrapped_completion(content, token_count, errors):
             self.gui.task_queue.put((completion_callback, (content, token_count, errors)))
             self.gui.task_queue.put((self.gui.hide_loading_state, ()))
-        thread = threading.Thread(target=generate_content, args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui), daemon=True)
+        thread = threading.Thread(target=generate_content, args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui, current_format), daemon=True)
         thread.start()
 
     def expand_all(self, item: str = "", max_depth: int = None) -> None:

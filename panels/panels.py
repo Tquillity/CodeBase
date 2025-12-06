@@ -6,7 +6,7 @@ from tabs.structure_tab import StructureTab
 from tabs.base_prompt_tab import BasePromptTab
 from tabs.settings_tab import SettingsTab
 from tabs.file_list_tab import FileListTab
-from constants import VERSION, LEFT_PANEL_WIDTH
+from constants import VERSION, LEFT_PANEL_WIDTH, TEMPLATE_MARKDOWN, TEMPLATE_XML
 
 class HeaderFrame(ttk.Frame):
     def __init__(self, parent, title="CodeBase", version=VERSION):
@@ -77,7 +77,11 @@ class LeftPanel(ttk.Frame):
         self.gui.copy_structure_button.pack(pady=(0, button_pady), padx=0, fill='x')
 
         self.gui.copy_all_button = self.gui.create_button(copy_section_frame, "Copy All (Ctrl+A)", self.gui.copy_handler.copy_all, "Copy prompt, contents, & structure", state=tk.DISABLED)
-        self.gui.copy_all_button.pack(pady=(0, 0), padx=0, fill='x')
+        self.gui.copy_all_button.pack(pady=(0, button_pady), padx=0, fill='x')
+
+        # Git Actions
+        self.gui.copy_diff_button = self.gui.create_button(copy_section_frame, "Copy Git Diff", self.gui.git_handler.copy_diff, "Copy changes (git diff HEAD)")
+        self.gui.copy_diff_button.pack(pady=(0, 0), padx=0, fill='x')
 
         # Options section
         options_frame = ttk.Frame(self)
@@ -86,6 +90,19 @@ class LeftPanel(ttk.Frame):
         options_label = ttk.Label(options_frame, text="Options", font=("Arial", 9, "bold"))
         options_label.pack(pady=(0, 5))
         
+        # Format Selection Combobox
+        format_frame = ttk.Frame(options_frame)
+        format_frame.pack(fill='x', pady=(0, 8))
+        
+        format_label = ttk.Label(format_frame, text="Format:")
+        format_label.pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.gui.format_var = tk.StringVar(value=self.gui.settings.get('app', 'copy_format', TEMPLATE_MARKDOWN))
+        self.gui.format_combo = ttk.Combobox(format_frame, textvariable=self.gui.format_var, values=[TEMPLATE_MARKDOWN, TEMPLATE_XML], state="readonly")
+        self.gui.format_combo.pack(side=tk.LEFT, fill='x', expand=True)
+        self.gui.format_combo.bind("<<ComboboxSelected>>", self.on_format_change)
+        Tooltip(self.gui.format_combo, "Select output format for copied content")
+
         self.gui.prepend_checkbox = ttk.Checkbutton(options_frame, text="Prepend Base Prompt", variable=self.gui.prepend_var)
         self.gui.prepend_checkbox.pack(pady=(0, 8), padx=0, fill='x')
         Tooltip(self.gui.prepend_checkbox, "Include Base Prompt text when copying content or 'Copy All'")
@@ -106,6 +123,13 @@ class LeftPanel(ttk.Frame):
 
         self.gui.clear_all_button = self.gui.create_button(self.gui.clear_button_frame, "Clear All", self.gui.clear_all, "Clear all loaded data and selections")
         self.gui.clear_all_button.pack(pady=(0, 0), padx=0, fill='x')
+
+    def on_format_change(self, event):
+        """Handle format selection change."""
+        new_format = self.gui.format_var.get()
+        self.gui.settings.set('app', 'copy_format', new_format)
+        self.gui.settings.save()
+        self.gui.trigger_preview_update()
 
 class RightPanel(ttk.Frame):
     def __init__(self, parent, gui):

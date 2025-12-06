@@ -21,6 +21,7 @@ from file_list_handler import generate_list_content
 from handlers.search_handler import SearchHandler
 from handlers.copy_handler import CopyHandler
 from handlers.repo_handler import RepoHandler
+from handlers.git_handler import GitHandler
 # ThemeManager removed - using ttkbootstrap instead
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
 import queue  # FIX: Added for thread-safe Tkinter callbacks
@@ -68,6 +69,7 @@ class RepoPromptGUI:
         self.search_handler = SearchHandler(self)
         self.copy_handler = CopyHandler(self)
         self.repo_handler = RepoHandler(self)
+        self.git_handler = GitHandler(self)
         self.setup_ui()
         self.bind_keys()
         self.apply_default_tab()

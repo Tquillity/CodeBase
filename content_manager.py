@@ -2,8 +2,16 @@ import os
 import time
 import threading
 import logging
+import tiktoken
 from typing import Optional, List, Any, Callable
-from constants import FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED, SECURITY_ENABLED
+from constants import FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED, SECURITY_ENABLED, TEMPLATE_XML
+
+# Initialize tokenizer
+try:
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+except Exception as e:
+    logging.warning(f"Failed to initialize tiktoken: {e}. Falling back to approximate token counting.")
+    tokenizer = None
 from lru_cache import ThreadSafeLRUCache
 from path_utils import normalize_for_cache, get_relative_path
 from exceptions import FileOperationError, RepositoryError
@@ -94,7 +102,7 @@ def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: th
 
     return None
 
-def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock, completion_callback: Callable, content_cache: ThreadSafeLRUCache, read_errors: List[str], progress_callback: Optional[Callable] = None, gui: Optional[Any] = None) -> None:
+def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock, completion_callback: Callable, content_cache: ThreadSafeLRUCache, read_errors: List[str], progress_callback: Optional[Callable] = None, gui: Optional[Any] = None, template_format: str = "Markdown (Grok)") -> None:
     try:
         start_time = time.time()
         content_parts = []
@@ -161,8 +169,13 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
         
         if file_content is not None:
             rel_path = get_relative_path(file_path, repo_path) or file_path
-            ext = os.path.splitext(rel_path)[1].lstrip('.')
-            content_parts.append(f"File: {rel_path}\nContent:\n```{ext}\n{file_content}\n```\n")
+            
+            if template_format == TEMPLATE_XML:
+                content_parts.append(f'<file path="{rel_path}">\n<![CDATA[\n{file_content}\n]]>\n</file>\n')
+            else:
+                # Default to Markdown
+                ext = os.path.splitext(rel_path)[1].lstrip('.')
+                content_parts.append(f"File: {rel_path}\nContent:\n```{ext}\n{file_content}\n```\n")
 
         processed_count += 1
         elapsed = time.time() - start_time
@@ -170,7 +183,16 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
             progress_callback(processed_count, total_files, elapsed)
 
     final_content = FILE_SEPARATOR.join(content_parts)
-    token_count = len(final_content.split())
+    
+    if tokenizer:
+        try:
+            token_count = len(tokenizer.encode(final_content))
+        except Exception as e:
+            logging.error(f"Error counting tokens with tiktoken: {e}")
+            token_count = len(final_content.split())
+    else:
+        token_count = len(final_content.split())
+        
     end_time = time.time()
     logging.info(f"Content generation complete for {len(files_to_include)} files in {end_time - start_time:.2f} seconds. Tokens: {token_count}")
 

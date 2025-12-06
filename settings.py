@@ -34,6 +34,7 @@ class SettingsManager:
                 "search_case_sensitive": 0,
                 "search_whole_word": 0,
                 "default_base_prompt": "",
+                "copy_format": "Markdown (Grok)",
                 "log_level": "INFO",
                 "log_to_file": 1,
                 "log_to_console": 1,

@@ -34,6 +34,10 @@ VERSION = "5.0"
 CACHE_MAX_SIZE = 1000  # Maximum number of cached files
 CACHE_MAX_MEMORY_MB = 100  # Maximum memory usage in MB
 
+# Template formats
+TEMPLATE_MARKDOWN = "Markdown (Grok)"
+TEMPLATE_XML = "XML (Gemini)"
+
 # Path normalization settings
 PATH_NORMALIZATION_ENABLED = True  # Enable consistent path normalization
 CROSS_PLATFORM_PATHS = True  # Use forward slashes for cross-platform compatibility
