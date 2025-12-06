@@ -7,3 +7,4 @@ appdirs
 ttkbootstrap
 tiktoken
 pygments>=2.15.0
+tkinterdnd2

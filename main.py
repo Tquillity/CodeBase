@@ -2,9 +2,15 @@ import ttkbootstrap as ttk
 import signal
 import sys
 import logging
+from tkinterdnd2 import TkinterDnD, DND_FILES
 from gui import RepoPromptGUI
 from logging_config import setup_logging
 from constants import DEFAULT_LOG_LEVEL, LOG_FILE_PATH, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FORMAT
+
+class DnDWindow(ttk.Window, TkinterDnD.DnDWrapper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.TkdndVersion = TkinterDnD._require(self)
 
 def signal_handler(signum, frame):
     """Handle shutdown signals gracefully."""
@@ -26,7 +32,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    root = ttk.Window(themename="darkly")
+    root = DnDWindow(themename="darkly")
     app = RepoPromptGUI(root)
     
     # Store app reference for signal handler

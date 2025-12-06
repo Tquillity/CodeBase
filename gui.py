@@ -25,6 +25,7 @@ from handlers.git_handler import GitHandler
 # ThemeManager removed - using ttkbootstrap instead
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
 import queue  # FIX: Added for thread-safe Tkinter callbacks
+from tkinterdnd2 import DND_FILES
 from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION, ERROR_HANDLING_ENABLED, DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT
 from exceptions import UIError, ConfigurationError, ThreadingError
 from error_handler import handle_error, safe_execute, get_error_handler
@@ -72,6 +73,14 @@ class RepoPromptGUI:
         self.git_handler = GitHandler(self)
         self.setup_ui()
         self.bind_keys()
+        
+        # Register drag and drop
+        try:
+            self.root.drop_target_register(DND_FILES)
+            self.root.dnd_bind('<<Drop>>', self._on_drop)
+        except Exception as e:
+            self.logger.warning(f"Drag and drop registration failed: {e}")
+            
         self.apply_default_tab()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         
@@ -92,6 +101,40 @@ class RepoPromptGUI:
         self._update_logging_config()
         
         self._poll_queue()
+
+    def _on_drop(self, event):
+        """Handle file/folder drop events."""
+        try:
+            path = event.data
+            if not path: return
+            
+            # Clean up path (Tcl/Tk wraps paths with spaces in curly braces)
+            if path.startswith('{') and path.endswith('}'):
+                path = path[1:-1]
+            
+            # Handle multiple files drop - take the first one if space separated
+            # This is a simplified approach; robust regex parsing is better for complex cases
+            # but tkinterdnd2 usually handles single file drops well.
+            # If multiple paths are wrapped in {}, we might need regex.
+            # For now, let's assume single folder drop for simplicity or take first.
+            
+            # Verify path exists
+            if not os.path.exists(path):
+                self.show_status_message(f"Invalid path dropped: {path}", error=True)
+                return
+                
+            if os.path.isdir(path):
+                self.show_status_message(f"Loading dropped repository: {path}")
+                self.update_recent_folders(path)
+                self.repo_handler._clear_internal_state(clear_ui=True)
+                self.show_loading_state(f"Scanning {os.path.basename(path)}...", show_cancel=True)
+                self.repo_handler.load_repo(path, self.show_status_message, self.repo_handler._handle_load_completion)
+            else:
+                self.show_status_message("Please drop a folder, not a file.", error=True)
+                
+        except Exception as e:
+            self.logger.error(f"Error handling drop event: {e}")
+            self.show_status_message("Error processing dropped item.", error=True)
 
     def _update_logging_config(self):
         """Update logging configuration based on user settings."""
