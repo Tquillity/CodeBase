@@ -31,6 +31,17 @@ class StructureTab(ttk.Frame):
         self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=(5, 10), pady=8)
         Tooltip(self.show_unloaded_checkbox, "Apply visual marker (strikethrough) to text files currently not selected for inclusion")
 
+        # Filter/Search Bar
+        filter_frame = ttk.Frame(self)
+        filter_frame.pack(side=tk.TOP, fill='x', padx=10, pady=(0, 5))
+        
+        ttk.Label(filter_frame, text="Filter Files:").pack(side=tk.LEFT, padx=(0, 5))
+        self.filter_var = tk.StringVar()
+        self.filter_entry = ttk.Entry(filter_frame, textvariable=self.filter_var)
+        self.filter_entry.pack(side=tk.LEFT, fill='x', expand=True)
+        self.filter_entry.bind('<KeyRelease>', self._on_filter_change)
+        Tooltip(self.filter_entry, "Type to filter file tree (shows parent folders of matches)")
+
         # Treeview styling now handled by ttkbootstrap theme
         self.tree = ttk.Treeview(self, columns=("path", "checkbox"), show="tree headings",
                                  selectmode="browse", bootstyle="primary")
@@ -64,6 +75,18 @@ class StructureTab(ttk.Frame):
         self.tree.bind('<Button-1>', self.handle_tree_click)
         self.tree.bind('<Double-1>', self.handle_tree_double_click)
         self.tree.bind('<<TreeviewOpen>>', self.handle_tree_open)
+        
+        self.filter_timer = None
+
+    def _on_filter_change(self, event):
+        """Debounce filter input."""
+        if self.filter_timer:
+            self.after_cancel(self.filter_timer)
+        self.filter_timer = self.after(300, self._apply_filter)
+        
+    def _apply_filter(self):
+        query = self.filter_var.get().strip()
+        self.file_handler.apply_filter(query)
 
 
     def populate_tree(self, root_dir):

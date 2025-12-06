@@ -4,6 +4,10 @@ from ttkbootstrap.scrolled import ScrolledText
 from widgets import Tooltip
 import logging
 from constants import ERROR_MESSAGE_DURATION
+import pygments
+from pygments.lexers import get_lexer_for_filename, TextLexer
+from pygments.styles import get_style_by_name
+from pygments.token import Token
 
 class ContentTab(ttk.Frame):
     def __init__(self, parent, gui, file_handler):
@@ -97,6 +101,34 @@ class ContentTab(ttk.Frame):
         self.content_text.tag_remove("highlight", "1.0", tk.END)
         self.content_text.tag_remove("focused_highlight", "1.0", tk.END)
 
+    def _get_syntax_tags(self):
+        """Map Pygments tokens to ttkbootstrap theme colors."""
+        style = ttk.Style()
+        colors = style.colors
+        
+        # Basic mapping - can be refined
+        return {
+            Token.Keyword: colors.primary,
+            Token.Name: colors.info,
+            Token.String: colors.success,
+            Token.Number: colors.warning,
+            Token.Comment: colors.secondary,
+            Token.Operator: colors.danger,
+            Token.Punctuation: colors.fg,
+            Token.Text: colors.fg,
+            Token.Error: colors.danger
+        }
+
+    def _highlight_code(self, content, filename):
+        """Highlight code using Pygments."""
+        try:
+            lexer = get_lexer_for_filename(filename)
+        except pygments.util.ClassNotFound:
+            lexer = TextLexer()
+            
+        tokens = pygments.lex(content, lexer)
+        return tokens
+
     def _insert_content_chunked(self, text, tags):
         """Insert large text in chunks to avoid UI freeze."""
         chunk_size = 2000
@@ -116,6 +148,11 @@ class ContentTab(ttk.Frame):
         # ttkbootstrap ScrolledText is always editable
         self.content_text.delete(1.0, tk.END)
         self.file_states.clear()
+        
+        # Setup syntax tags
+        syntax_colors = self._get_syntax_tags()
+        for token_type, color in syntax_colors.items():
+            self.content_text.tag_configure(str(token_type), foreground=color)
 
         if generated_content:
             sections = generated_content.split(self.file_handler.FILE_SEPARATOR)
@@ -126,7 +163,17 @@ class ContentTab(ttk.Frame):
                         header_end = section.find("\nContent:\n")
                         if header_end != -1:
                             rel_path = section[6:header_end].strip()
-                            content = section[header_end + 10:]
+                            content_block = section[header_end + 10:]
+                            
+                            # Clean up markdown code blocks if present
+                            if content_block.startswith("```"):
+                                first_newline = content_block.find("\n")
+                                if first_newline != -1:
+                                    content_block = content_block[first_newline+1:]
+                            if content_block.endswith("```"):
+                                content_block = content_block[:-3]
+                                
+                            content = content_block.strip()
                             file_id = rel_path
 
                             self.file_states[file_id] = True
@@ -135,7 +182,31 @@ class ContentTab(ttk.Frame):
 
                             self.content_text.insert(tk.END, " [-] ", ("toggle", toggle_tag))
                             self.content_text.insert(tk.END, f"File: {rel_path}\n", "filename")
-                            self._insert_content_chunked(f"{content}\n\n", content_tag)
+                            
+                            # Syntax Highlighting Logic
+                            # Cap at 500KB for highlighting to prevent freeze
+                            if len(content) < 500 * 1024:
+                                tokens = self._highlight_code(content, rel_path)
+                                for token_type, token_text in tokens:
+                                    # Map specific token types to generic ones if needed
+                                    tag = str(token_type)
+                                    while tag not in syntax_colors and token_type.parent:
+                                        token_type = token_type.parent
+                                        tag = str(token_type)
+                                    
+                                    if tag not in syntax_colors:
+                                        tag = str(Token.Text)
+                                        
+                                    self.content_text.insert(tk.END, token_text, (content_tag, tag))
+                                    
+                                    # Periodic update for responsiveness
+                                    if len(token_text) > 1000:
+                                        self.update_idletasks()
+                            else:
+                                # Fallback for large files
+                                self._insert_content_chunked(content, content_tag)
+                                
+                            self.content_text.insert(tk.END, "\n\n", content_tag)
 
                             self.content_text.tag_bind(toggle_tag, "<Button-1>",
                                                        lambda event, fid=file_id: self.toggle_content(fid))

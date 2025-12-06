@@ -6,3 +6,4 @@ pyperclip
 appdirs
 ttkbootstrap
 tiktoken
+pygments>=2.15.0

@@ -49,6 +49,92 @@ class FileHandler:
             groups["Other"].extend(sorted(other_extensions))
         return groups
 
+    def apply_filter(self, query):
+        """
+        Filters the file tree based on the query.
+        If query is empty, restores the normal tree.
+        If query exists, builds a filtered tree showing only matches and their parents.
+        """
+        if not self.repo_path: return
+        
+        if not query:
+            # Restore normal view
+            self.populate_tree(self.repo_path)
+            return
+            
+        tree = self.gui.structure_tab.tree
+        tree.delete(*tree.get_children())
+        
+        query = query.lower()
+        matches = []
+        
+        # 1. Find all matching files
+        # Use scanned_text_files as the source of truth
+        # Also include non-text files if they are in the tree? 
+        # For now, let's scan strictly what we know about + maybe walk again if needed?
+        # Better to rely on what we've scanned.
+        
+        # We need to walk the repo to find all files, not just text ones, if we want a full search.
+        # But for performance, searching scanned_text_files is instant.
+        # Let's start with scanned_text_files + loaded_files.
+        
+        search_pool = self.scanned_text_files.union(self.loaded_files)
+        
+        # Filter
+        for file_path in search_pool:
+            if query in os.path.basename(file_path).lower():
+                matches.append(file_path)
+                
+        if not matches:
+            tree.insert("", "end", text="No matches found", tags=('empty',))
+            return
+            
+        # 2. Build the tree with matches
+        # We need to create folders as we go.
+        created_items = {} # path -> item_id
+        
+        root_basename = os.path.basename(self.repo_path)
+        root_id = tree.insert("", "end", text=f"📁 {root_basename} (Filtered)", 
+                             values=(self.repo_path, "☑"), open=True, tags=('folder',))
+        created_items[self.repo_path] = root_id
+        
+        for file_path in sorted(matches):
+            # Ensure parents exist
+            parent_path = os.path.dirname(file_path)
+            
+            # We need to build the chain from repo_path down to parent_path
+            # Get relative path parts
+            try:
+                rel_path = os.path.relpath(file_path, self.repo_path)
+            except ValueError:
+                continue # Should not happen if file is in repo
+                
+            parts = rel_path.split(os.sep)
+            current_path = self.repo_path
+            parent_id = root_id
+            
+            # Create folders
+            for part in parts[:-1]: # All except filename
+                current_path = os.path.join(current_path, part)
+                if current_path not in created_items:
+                    # Create folder
+                    folder_id = tree.insert(parent_id, "end", text=f"📁 {part}",
+                                           values=(current_path, "☐"), open=True, tags=('folder',))
+                    created_items[current_path] = folder_id
+                    parent_id = folder_id
+                else:
+                    parent_id = created_items[current_path]
+            
+            # Insert file
+            filename = parts[-1]
+            item_path_norm = normalize_for_cache(file_path)
+            is_selected = item_path_norm in self.loaded_files
+            checkbox_state = "☑" if is_selected else "☐"
+            tags = ['file_selected'] if is_selected else ['file_default']
+            
+            tree.insert(parent_id, "end", text=f"📄 {filename}",
+                       values=(file_path, checkbox_state), tags=tuple(tags))
+
     def populate_tree(self, root_dir):
         tree = self.gui.structure_tab.tree
         logging.info(f"Populating tree for root: {root_dir}")
