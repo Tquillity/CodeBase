@@ -109,17 +109,24 @@ class StructureTab(ttk.Frame):
         expansion_mode = self.settings.get('app', 'expansion', 'Collapsed')
         root_item = self.tree.get_children("")[0]
 
-        if expansion_mode == 'Expanded':
-            self.file_handler.expand_all()
-        elif expansion_mode == 'Levels':
-            try:
-                levels = int(self.settings.get('app', 'levels', '1'))
-                self.file_handler.expand_levels(levels, root_item)
-            except ValueError:
-                self.file_handler.expand_levels(1, root_item)
-        else:
-             self.file_handler.collapse_all()
+        # FIX: Ensure root is always populated immediately so children exist for expansion logic
+        self.file_handler.expand_folder(root_item)
+
+        if expansion_mode == 'Collapsed':
              self.tree.item(root_item, open=False)
+        else:
+             # For 'Expanded' or 'Levels', the root must be visibly open
+             self.tree.item(root_item, open=True)
+
+             if expansion_mode == 'Expanded':
+                 # Pass root_item to ensure we start traversing from there
+                 self.file_handler.expand_all(root_item)
+             elif expansion_mode == 'Levels':
+                 try:
+                     levels = int(self.settings.get('app', 'levels', '1'))
+                     self.file_handler.expand_levels(levels, root_item)
+                 except ValueError:
+                     self.file_handler.expand_levels(1, root_item)
 
         self.update_expand_collapse_button()
 
