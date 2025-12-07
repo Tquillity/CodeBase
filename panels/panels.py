@@ -138,6 +138,11 @@ class RightPanel(ttk.Frame):
         self.grid(row=2, column=2, padx=(0, 10), pady=10, sticky="nsew")
         self.setup_ui()
 
+    def on_tab_changed(self, event):
+        """Handle tab change event."""
+        if hasattr(self.gui, 'search_count_label'):
+            self.gui.search_count_label.config(text="")
+
     def setup_ui(self):
         # Search section with better organization
         search_container = ttk.Frame(self)
@@ -168,6 +173,9 @@ class RightPanel(ttk.Frame):
         
         self.gui.find_all_button = self.gui.create_button(nav_frame, "All", self.gui.search_handler.find_all, "Highlight all matches in current tab")
         self.gui.find_all_button.pack(side=tk.LEFT, padx=(0, 0))
+
+        self.gui.search_count_label = ttk.Label(nav_frame, text="")
+        self.gui.search_count_label.pack(side=tk.LEFT, padx=(10, 0))
         
         # Search options row
         options_frame = ttk.Frame(search_container)
@@ -189,6 +197,7 @@ class RightPanel(ttk.Frame):
         # Notebook styling now handled by ttkbootstrap theme
         self.gui.notebook = ttk.Notebook(self)
         self.gui.notebook.pack(fill="both", expand=True, pady=(0,5))
+        self.gui.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
 
         self.gui.content_tab = ContentTab(self.gui.notebook, self.gui, self.gui.file_handler)
         self.gui.notebook.add(self.gui.content_tab, text="Content Preview")

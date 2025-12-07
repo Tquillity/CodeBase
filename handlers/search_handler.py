@@ -23,8 +23,10 @@ class SearchHandler:
             self._highlight_match(current_index, 0, is_focused=True)
             tab.center_match(matches[0])
             self.gui.show_status_message(f"Found {len(matches)} match(es).")
+            self.gui.search_count_label.config(text=f"1/{len(matches)}")
         else:
             self.gui.show_status_message("Search found nothing.")
+            self.gui.search_count_label.config(text="0 matches")
 
     def next_match(self):
         current_index = self.gui.notebook.index(self.gui.notebook.select())
@@ -41,6 +43,7 @@ class SearchHandler:
             tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
             tab = tab_instances[current_index]
             tab.center_match(matches[new_index])
+            self.gui.search_count_label.config(text=f"{new_index + 1}/{len(matches)}")
 
     def prev_match(self):
         current_index = self.gui.notebook.index(self.gui.notebook.select())
@@ -57,6 +60,7 @@ class SearchHandler:
             tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
             tab = tab_instances[current_index]
             tab.center_match(matches[new_index])
+            self.gui.search_count_label.config(text=f"{new_index + 1}/{len(matches)}")
 
     def find_all(self):
         query = self.gui.search_var.get()
@@ -76,13 +80,17 @@ class SearchHandler:
         self.gui.current_match_index[current_index] = -1
         if matches:
             self.gui.show_status_message(f"Highlighted {len(matches)} match(es).")
+            self.gui.search_count_label.config(text=f"{len(matches)} matches")
         else:
             self.gui.show_status_message("No matches found.")
+            self.gui.search_count_label.config(text="0 matches")
 
     def _clear_search_highlights(self, tab_index):
         tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
         tab = tab_instances[tab_index]
         tab.clear_highlights()
+        if hasattr(self.gui, 'search_count_label'):
+            self.gui.search_count_label.config(text="")
 
     def _highlight_match(self, tab_index, match_index, is_focused=True):
         matches = self.gui.match_positions.get(tab_index, [])
