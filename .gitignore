@@ -29,6 +29,10 @@ MANIFEST
 #  Usually these files are created by a PyInstaller build process
 *.spec
 
+# Installer Builders
+build_staging/
+*.iss
+
 # Pytest
 .pytest_cache/
 .coverage
