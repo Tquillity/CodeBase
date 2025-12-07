@@ -10,7 +10,7 @@ import time # For timing tasks
 from widgets import FolderDialog
 from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION, ERROR_HANDLING_ENABLED
 from lru_cache import ThreadSafeLRUCache
-from file_scanner import parse_gitignore, is_ignored_path, yield_repo_files
+from file_scanner import parse_gitignore, is_ignored_path, yield_repo_files, is_text_file
 from exceptions import RepositoryError, FileOperationError, SecurityError
 from error_handler import handle_error, safe_execute
 class RepoHandler:
@@ -213,7 +213,7 @@ class RepoHandler:
             for file_path_abs in file_paths:
                 processed_count += 1
             
-                if self.is_text_file(file_path_abs):
+                if is_text_file(file_path_abs, self.gui):
                     scanned_files_temp.add(file_path_abs)
                     loaded_files_temp.add(file_path_abs)
             
@@ -239,29 +239,6 @@ class RepoHandler:
         self.gui.register_background_thread(thread)
         thread.start()
 
-
-    def is_text_file(self, file_path):
-        try:
-            ext = os.path.splitext(file_path)[1].lower()
-            text_extensions_settings = self.gui.settings.get('app', 'text_extensions', {ext: 1 for ext in self.text_extensions_default})
-            if ext in text_extensions_settings and text_extensions_settings[ext] == 1:
-                 filename = os.path.basename(file_path)
-                 exclude_files_settings = self.gui.settings.get('app', 'exclude_files', {})
-                 if filename in exclude_files_settings and exclude_files_settings[filename] == 1:
-                     return False
-                 return True
-            if ext in text_extensions_settings and text_extensions_settings[ext] == 0:
-                 return False
-            mime_type, encoding = mimetypes.guess_type(file_path)
-            if mime_type and mime_type.startswith('text/'):
-                 filename = os.path.basename(file_path)
-                 exclude_files_settings = self.gui.settings.get('app', 'exclude_files', {})
-                 if filename in exclude_files_settings and exclude_files_settings[filename] == 1:
-                     return False
-                 return True
-        except Exception as e:
-            logging.warning(f"Could not determine if {file_path} is text: {e}")
-        return False
 
     def _handle_load_completion(self, repo_path, ignore_patterns, scanned_files, loaded_files, errors):
         """Callback for the *initial* repo load."""

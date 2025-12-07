@@ -158,6 +158,14 @@ class ContentTab(ttk.Frame):
             sections = generated_content.split(self.file_handler.FILE_SEPARATOR)
             for section in sections:
                 section = section.strip()
+                if not section: continue
+
+                rel_path = None
+                content = None
+                
+                # --- Parsing Logic ---
+                
+                # Case 1: Standard Markdown (Grok/Default)
                 if section.startswith("File: "):
                     try:
                         header_end = section.find("\nContent:\n")
@@ -172,49 +180,77 @@ class ContentTab(ttk.Frame):
                                     content_block = content_block[first_newline+1:]
                             if content_block.endswith("```"):
                                 content_block = content_block[:-3]
-                                
-                            content = content_block.strip()
-                            file_id = rel_path
-
-                            self.file_states[file_id] = True
-                            toggle_tag = f"toggle_{file_id}"
-                            content_tag = f"content_{file_id}"
-
-                            self.content_text.insert(tk.END, " [-] ", ("toggle", toggle_tag))
-                            self.content_text.insert(tk.END, f"File: {rel_path}\n", "filename")
                             
-                            # Syntax Highlighting Logic
-                            # Cap at 500KB for highlighting to prevent freeze
-                            if len(content) < 500 * 1024:
-                                tokens = self._highlight_code(content, rel_path)
-                                for token_type, token_text in tokens:
-                                    # Map specific token types to generic ones if needed
-                                    tag = str(token_type)
-                                    while tag not in syntax_colors and token_type.parent:
-                                        token_type = token_type.parent
-                                        tag = str(token_type)
-                                    
-                                    if tag not in syntax_colors:
-                                        tag = str(Token.Text)
-                                        
-                                    self.content_text.insert(tk.END, token_text, (content_tag, tag))
-                                    
-                                    # Periodic update for responsiveness
-                                    if len(token_text) > 1000:
-                                        self.update_idletasks()
-                            else:
-                                # Fallback for large files
-                                self._insert_content_chunked(content, content_tag)
-                                
-                            self.content_text.insert(tk.END, "\n\n", content_tag)
-
-                            self.content_text.tag_bind(toggle_tag, "<Button-1>",
-                                                       lambda event, fid=file_id: self.toggle_content(fid))
+                            content = content_block.strip()
                     except Exception as e:
-                         logging.error(f"Error parsing generated content section: {e}")
-                         self.content_text.insert(tk.END, f"\n--- Error displaying section: {e} ---\n", "error")
+                         logging.error(f"Error parsing Markdown section: {e}")
 
-        # ttkbootstrap ScrolledText is always editable
+                # Case 2: XML Format (Gemini)
+                elif section.startswith("<file"):
+                    try:
+                        # Simple string parsing to extract path and content
+                        # Expected format: <file path="...">\n<![CDATA[\n CONTENT \n]]>\n</file>
+                        
+                        # Extract Path
+                        path_start = section.find('path="')
+                        if path_start != -1:
+                            path_start += 6
+                            path_end = section.find('"', path_start)
+                            if path_end != -1:
+                                rel_path = section[path_start:path_end]
+                        
+                        # Extract Content (CDATA)
+                        cdata_start = section.find('<![CDATA[')
+                        if cdata_start != -1:
+                            cdata_start += 9
+                            cdata_end = section.rfind(']]>')
+                            if cdata_end != -1:
+                                content = section[cdata_start:cdata_end].strip()
+                    except Exception as e:
+                         logging.error(f"Error parsing XML section: {e}")
+
+                # --- Rendering Logic ---
+                if rel_path and content is not None:
+                    file_id = rel_path
+                    self.file_states[file_id] = True
+                    toggle_tag = f"toggle_{file_id}"
+                    content_tag = f"content_{file_id}"
+
+                    self.content_text.insert(tk.END, " [-] ", ("toggle", toggle_tag))
+                    self.content_text.insert(tk.END, f"File: {rel_path}\n", "filename")
+                    
+                    # Syntax Highlighting Logic
+                    # Cap at 500KB for highlighting to prevent freeze
+                    if len(content) < 500 * 1024:
+                        tokens = self._highlight_code(content, rel_path)
+                        for token_type, token_text in tokens:
+                            # Map specific token types to generic ones if needed
+                            tag = str(token_type)
+                            while tag not in syntax_colors and token_type.parent:
+                                token_type = token_type.parent
+                                tag = str(token_type)
+                            
+                            if tag not in syntax_colors:
+                                tag = str(Token.Text)
+                                
+                            self.content_text.insert(tk.END, token_text, (content_tag, tag))
+                            
+                            # Periodic update for responsiveness
+                            if len(token_text) > 1000:
+                                self.update_idletasks()
+                    else:
+                        # Fallback for large files
+                        self._insert_content_chunked(content, content_tag)
+                        
+                    self.content_text.insert(tk.END, "\n\n", content_tag)
+
+                    self.content_text.tag_bind(toggle_tag, "<Button-1>",
+                                                lambda event, fid=file_id: self.toggle_content(fid))
+                else:
+                    # Fallback for unparsable sections (e.g. raw text or errors)
+                    # We only display if it's not an empty artifact of splitting
+                    if len(section) > 5:
+                         self.content_text.insert(tk.END, f"{section}\n\n")
 
         self.gui.current_token_count = token_count
         self.gui.info_label.config(text=f"Tokens (Selected): {self.gui.current_token_count:,}".replace(",", " "))

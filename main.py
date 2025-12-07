@@ -2,6 +2,7 @@ import ttkbootstrap as ttk
 import signal
 import sys
 import logging
+import tkinter as tk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from gui import RepoPromptGUI
 from logging_config import setup_logging
@@ -10,7 +11,11 @@ from constants import DEFAULT_LOG_LEVEL, LOG_FILE_PATH, LOG_TO_FILE, LOG_TO_CONS
 class DnDWindow(ttk.Window, TkinterDnD.DnDWrapper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.TkdndVersion = TkinterDnD._require(self)
+        self.TkdndVersion = None
+        try:
+            self.TkdndVersion = TkinterDnD._require(self)
+        except (RuntimeError, tk.TclError) as e:
+            logging.warning(f"Drag and drop library could not be loaded: {e}")
 
 def signal_handler(signum, frame):
     """Handle shutdown signals gracefully."""
@@ -32,7 +37,15 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    root = DnDWindow(themename="darkly")
+    # Try to initialize with DnD support
+    try:
+        root = DnDWindow(themename="darkly")
+        if not getattr(root, 'TkdndVersion', None):
+            logging.warning("System Tcl version incompatible with TkinterDnD. Drag & Drop disabled.")
+    except Exception as e:
+        logging.error(f"Critical DnD initialization failure: {e}. Falling back to standard window.")
+        root = ttk.Window(themename="darkly")
+
     app = RepoPromptGUI(root)
     
     # Store app reference for signal handler

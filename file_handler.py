@@ -9,7 +9,7 @@ import logging
 import time
 from typing import Set, List, Optional, Any, Dict
 
-from file_scanner import scan_repo, parse_gitignore, is_ignored_path, is_text_file
+from file_scanner import parse_gitignore, is_ignored_path, is_text_file
 from content_manager import get_file_content, generate_content
 from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED, TREE_MAX_ITEMS, TREE_UI_UPDATE_INTERVAL, TREE_SAFETY_LIMIT
 from lru_cache import ThreadSafeLRUCache
