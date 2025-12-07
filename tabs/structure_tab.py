@@ -109,17 +109,16 @@ class StructureTab(ttk.Frame):
         expansion_mode = self.settings.get('app', 'expansion', 'Collapsed')
         root_item = self.tree.get_children("")[0]
 
-        # FIX: Ensure root is always populated immediately so children exist for expansion logic
+        # FIX: Explicitly populate root children before traversing
         self.file_handler.expand_folder(root_item)
 
         if expansion_mode == 'Collapsed':
              self.tree.item(root_item, open=False)
         else:
-             # For 'Expanded' or 'Levels', the root must be visibly open
+             # Root must be open for children to be visible
              self.tree.item(root_item, open=True)
 
              if expansion_mode == 'Expanded':
-                 # Pass root_item to ensure we start traversing from there
                  self.file_handler.expand_all(root_item)
              elif expansion_mode == 'Levels':
                  try:
