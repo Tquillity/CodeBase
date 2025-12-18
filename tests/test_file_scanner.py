@@ -137,8 +137,6 @@ def test_is_text_file_binary_extensions():
     with patch('os.path.getsize', return_value=100):
         # These should be rejected even if text_extensions says they are text, or if they bypass MIME check
         assert is_text_file("binary.so", gui) == False
-        assert is_text_file("library.dll", gui) == False
-        assert is_text_file("app.exe", gui) == False
         assert is_text_file("data.bin", gui) == False
         assert is_text_file("lib.dylib", gui) == False
 
@@ -201,9 +199,9 @@ def test_scan_repo_success(caplog, temp_repo, monkeypatch):
     assert args[0] == os.path.abspath(temp_dir)  # repo_path
     assert '.git' in args[1]  # ignore_patterns
     scanned = args[2]
-    assert os.path.normcase(file1_path) in scanned
-    assert os.path.normcase(file2_path) in scanned
-    assert os.path.normcase(nontext_path) not in scanned
+    assert os.path.normpath(file1_path) in scanned
+    assert os.path.normpath(file2_path) in scanned
+    assert os.path.normpath(nontext_path) not in scanned
     loaded = args[3]
     assert scanned == loaded  # All text files loaded initially
     assert args[4] == []  # No errors

@@ -99,19 +99,19 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
             return False
         # NEW_LOG
         logging.debug(f"Checking if ignored: {path} (rel: {rel_path})")
-        rel_path_parts = rel_path.replace('\\', '/').split('/')
+        rel_path_parts = rel_path.split('/')
         path_basename = os.path.basename(path)
 
         for pattern in ignore_list:
-            if fnmatch.fnmatch(path_basename, pattern) or fnmatch.fnmatch(rel_path.replace('\\', '/'), pattern):
+            if fnmatch.fnmatch(path_basename, pattern) or fnmatch.fnmatch(rel_path, pattern):
                 # NEW_LOG
                 logging.debug(f"Ignored '{path}' due to pattern: {pattern}")
                 return True
-            if pattern.endswith('/') and os.path.isdir(path) and fnmatch.fnmatch(rel_path.replace('\\', '/') + '/', pattern):
+            if pattern.endswith('/') and os.path.isdir(path) and fnmatch.fnmatch(rel_path + '/', pattern):
                 # NEW_LOG
                 logging.debug(f"Ignored directory '{path}' due to pattern: {pattern}")
                 return True
-            if pattern.endswith('/') and fnmatch.fnmatch(rel_path.replace('\\', '/'), pattern.rstrip('/')):
+            if pattern.endswith('/') and fnmatch.fnmatch(rel_path, pattern.rstrip('/')):
                  if os.path.isfile(path):
                       # NEW_LOG
                       logging.debug(f"Ignored file-as-dir '{path}' due to pattern: {pattern}")
@@ -145,7 +145,7 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
             logging.info(f"Including test file '{path}' (exclude_test_files={exclude_test_files_setting})")
 
     except ValueError:
-         # This can happen if path is not within repo_root, e.g. a different drive on Windows
+         # This can happen if path is not within repo_root
          if '.git' in path.split(os.sep): return True
          if gui.settings.get('app', 'exclude_node_modules', 1) == 1 and 'node_modules' in path.split(os.sep): return True
          if gui.settings.get('app', 'exclude_dist', 1) == 1 and 'dist' in path.split(os.sep): return True
@@ -167,8 +167,8 @@ def is_text_file(file_path, gui):
             return False
 
         ext = os.path.splitext(file_path)[1].lower()
-        # Explicitly skip known binary extensions that might bypass other checks
-        if ext in ['.so', '.dll', '.exe', '.bin', '.dylib', '.pyc', '.pyo']:
+        # Explicitly skip known binary extensions
+        if ext in ['.so', '.bin', '.dylib', '.pyc', '.pyo']:
              logging.debug(f"Not text: '{file_path}' has binary extension")
              return False
 

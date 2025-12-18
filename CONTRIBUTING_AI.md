@@ -9,7 +9,7 @@ This document outlines the architectural standards, coding conventions, and rule
 *   **UI Framework:** `ttkbootstrap` (Theme: `darkly` by default). Do not use standard `tkinter` widgets unless strictly necessary for functionality not present in `ttkbootstrap`.
 *   **Threading:** `threading` module. **Never** run file I/O or heavy processing on the main UI thread. Use the `gui.task_queue` pattern or `gui.register_background_thread`.
 *   **Icons/DnD:** `tkinterdnd2` for drag-and-drop.
-*   **Build System:** PyInstaller + FPM (Linux) / Inno Setup (Windows).
+*   **Build System:** PyInstaller + FPM (Linux).
 
 ## 3. Architecture & File Structure
 *   **`main.py`**: Entry point. Handles signal trapping and global exception logging.
@@ -37,11 +37,10 @@ This document outlines the architectural standards, coding conventions, and rule
 
 ### Path Handling
 *   **Always** use `os.path.join` or `path_utils.normalize_path`.
-*   Assume cross-platform compatibility (Windows/Linux/macOS).
+*   **Environment:** CodeBase is Linux-exclusive. Assume POSIX-compliant paths.
 
 ## 5. Build & Release
 *   **Linux:** Use `build_linux.py`. Requires `fpm`.
-*   **Windows:** Use `build_windows.py`. Requires `ISCC.exe` (Inno Setup).
 *   **Versioning:** When updating the application version, update `constants.py`.
 
 ## 6. Testing

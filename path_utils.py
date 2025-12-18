@@ -1,5 +1,5 @@
 # path_utils.py
-# Centralized path normalization utilities for cross-platform compatibility
+# Centralized path normalization utilities for Linux-exclusive environment
 
 import os
 import logging
@@ -7,7 +7,7 @@ from typing import Union, Optional
 
 def normalize_path(path: Union[str, os.PathLike]) -> str:
     """
-    Normalize a file path for consistent cross-platform handling.
+    Normalize a file path for Linux.
     
     Args:
         path: File path to normalize
@@ -18,19 +18,12 @@ def normalize_path(path: Union[str, os.PathLike]) -> str:
     if not path:
         return ""
     
-    # Convert to string and normalize
-    path_str = str(path)
-    
     # Use normpath to resolve .. and . components
-    normalized = os.path.normpath(path_str)
-    
-    # Use normcase for case-insensitive filesystems (Windows)
-    return os.path.normcase(normalized)
+    return os.path.normpath(str(path))
 
 def normalize_for_cache(path: Union[str, os.PathLike]) -> str:
     """
     Normalize a path specifically for cache keys.
-    Uses normcase for consistent cache lookups across platforms.
     
     Args:
         path: File path to normalize for caching
@@ -41,7 +34,7 @@ def normalize_for_cache(path: Union[str, os.PathLike]) -> str:
     if not path:
         return ""
     
-    return os.path.normcase(str(path))
+    return os.path.normpath(str(path))
 
 def safe_join(base_path: Union[str, os.PathLike], *paths: Union[str, os.PathLike]) -> str:
     """
@@ -57,8 +50,8 @@ def safe_join(base_path: Union[str, os.PathLike], *paths: Union[str, os.PathLike
     if not base_path:
         return ""
     
-    # Start with normalized base path
-    result = normalize_path(base_path)
+    # Start with base path
+    result = str(base_path)
     
     # Join additional paths
     for path in paths:
@@ -69,7 +62,7 @@ def safe_join(base_path: Union[str, os.PathLike], *paths: Union[str, os.PathLike
 
 def get_relative_path(file_path: Union[str, os.PathLike], base_path: Union[str, os.PathLike]) -> Optional[str]:
     """
-    Get relative path from base to file, with proper error handling.
+    Get relative path from base to file.
     
     Args:
         file_path: Target file path
@@ -82,7 +75,7 @@ def get_relative_path(file_path: Union[str, os.PathLike], base_path: Union[str, 
         file_norm = normalize_path(file_path)
         base_norm = normalize_path(base_path)
         return os.path.relpath(file_norm, base_norm)
-    except ValueError as e:
+    except (ValueError, OSError) as e:
         logging.warning(f"Could not get relative path from {base_path} to {file_path}: {e}")
         return None
 
@@ -132,7 +125,7 @@ def ensure_absolute_path(path: Union[str, os.PathLike], base_path: Optional[Unio
 
 def get_path_components(path: Union[str, os.PathLike]) -> list:
     """
-    Get path components as a list, normalized for cross-platform use.
+    Get path components as a list.
     
     Args:
         path: File path
@@ -144,7 +137,7 @@ def get_path_components(path: Union[str, os.PathLike]) -> list:
         return []
     
     normalized = normalize_path(path)
-    return normalized.replace('\\', '/').split('/')
+    return normalized.split('/')
 
 def is_same_path(path1: Union[str, os.PathLike], path2: Union[str, os.PathLike]) -> bool:
     """

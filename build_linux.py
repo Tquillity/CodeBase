@@ -3,10 +3,13 @@ import shutil
 import subprocess
 import sys
 
+# Import version from constants.py
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from constants import VERSION
+
 # --- CONFIGURATION ---
 APP_NAME = "CodeBase"
-# Ideally read this from constants.py, but hardcoded for the build script is fine too
-VERSION = "6.1" 
+# VERSION now read from constants.py
 DESCRIPTION = "CodeBase Repository Manager"
 MAINTAINER = "Your Name <you@example.com>"
 URL = "https://yourwebsite.com"
