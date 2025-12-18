@@ -109,6 +109,22 @@ def test_handle_load_completion_success(repo_handler, mock_gui):
     mock_gui.trigger_preview_update.assert_called_once()
     mock_gui.show_status_message.assert_called_with("Loaded repo successfully.", duration=5000)
 
+def test_handle_refresh_completion_success(repo_handler, mock_gui):
+    from path_utils import normalize_for_cache
+    scanned = set(["/repo/file1", "/repo/file2", "/repo/new_file"])
+    previous = set(["/repo/file1"])
+    expansion = set(["/repo/dir"])
+    
+    repo_handler._handle_refresh_completion("/repo", [".git"], scanned, [], previous, expansion)
+    
+    mock_gui.hide_loading_state.assert_called_once()
+    # Should now select ALL scanned files, normalized
+    expected_loaded = {normalize_for_cache(f) for f in scanned}
+    assert mock_gui.file_handler.loaded_files == expected_loaded
+    mock_gui.structure_tab.populate_tree.assert_called_with("/repo")
+    mock_gui.trigger_preview_update.assert_called_once()
+    mock_gui.header_frame.repo_name_label.config.assert_called_with(foreground=LEGENDARY_GOLD)
+
 def test_handle_load_completion_errors(repo_handler, mock_gui):
     with patch('tkinter.messagebox.showerror') as mock_error:
         repo_handler._handle_load_completion(None, None, set(), set(), ["error1"])

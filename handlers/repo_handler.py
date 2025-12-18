@@ -11,6 +11,7 @@ from widgets import FolderDialog
 from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION, ERROR_HANDLING_ENABLED
 from lru_cache import ThreadSafeLRUCache
 from file_scanner import parse_gitignore, is_ignored_path, yield_repo_files, is_text_file
+from path_utils import normalize_for_cache
 from exceptions import RepositoryError, FileOperationError, SecurityError
 from error_handler import handle_error, safe_execute
 class RepoHandler:
@@ -214,8 +215,10 @@ class RepoHandler:
                 processed_count += 1
             
                 if is_text_file(file_path_abs, self.gui):
-                    scanned_files_temp.add(file_path_abs)
-                    loaded_files_temp.add(file_path_abs)
+                    # Always normalize paths for consistent internal storage
+                    normalized_path = normalize_for_cache(file_path_abs)
+                    scanned_files_temp.add(normalized_path)
+                    loaded_files_temp.add(normalized_path)
             
                 # Skip progress updates for first pass since it's too fast to be useful
                 # Just log occasionally for debugging
@@ -296,18 +299,28 @@ class RepoHandler:
         file_handler = self.gui.file_handler
         file_handler.ignore_patterns = ignore_patterns or []
         file_handler.scanned_text_files = scanned_files or set()
-        # --- RESTORE STATE ---
-        # 1. Restore selections by intersecting old selections with newly scanned files
+
+        # --- THE FIX: Path Normalization & Selection Alignment ---
         with file_handler.lock:
-            newly_selected_files = previous_selections.intersection(scanned_files)
-            file_handler.loaded_files = newly_selected_files
-            logging.debug(f"Restored {len(newly_selected_files)} selections.")
+            # Normalize all scanned files for reliable comparison
+            normalized_scanned = {normalize_for_cache(p) for p in scanned_files}
+            
+            # Select ALL scanned files, just like _handle_load_completion does
+            # This ensures new files are auto-selected on refresh
+            file_handler.loaded_files = normalized_scanned
+            logging.debug(f"Aligned {len(normalized_scanned)} files after refresh.")
+
         # 2. Repopulate the tree, which is necessary to show new/deleted files
         self.gui.structure_tab.populate_tree(repo_path)
        
         # 3. Restore the expansion state of the tree
         self.apply_tree_expansion_state(expansion_state)
        
+        # Re-apply the personalized color
+        repo_settings = self.gui.settings.get('repo', repo_path, {})
+        saved_color = repo_settings.get('color', self.gui.header_frame.LEGENDARY_GOLD)
+        self.gui.header_frame.repo_name_label.config(foreground=saved_color)
+
         # --- FINALIZE ---
         self.gui.trigger_preview_update()
         self.gui.show_status_message(f"Refreshed {os.path.basename(repo_path)} successfully.", duration=STATUS_MESSAGE_DURATION)

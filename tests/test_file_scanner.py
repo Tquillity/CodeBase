@@ -100,10 +100,11 @@ def test_is_text_file_extensions():
     gui = MagicMock()
     gui.settings.get.side_effect = lambda sec, key, default: {'exclude_files': {}} if key == 'exclude_files' else {'.txt': 1, '.py': 1, '.bin': 0}
 
-    assert is_text_file("file.txt", gui) == True
-    assert is_text_file("code.py", gui) == True
-    assert is_text_file("data.bin", gui) == False  # Explicitly disabled
-    assert is_text_file("image.png", gui) == False  # Not in text extensions
+    with patch('os.path.getsize', return_value=100):
+        assert is_text_file("file.txt", gui) == True
+        assert is_text_file("code.py", gui) == True
+        assert is_text_file("data.bin", gui) == False  # Explicitly disabled
+        assert is_text_file("image.png", gui) == False  # Not in text extensions
 
 def test_is_text_file_mime_type(monkeypatch):
     gui = MagicMock()
@@ -116,15 +117,52 @@ def test_is_text_file_mime_type(monkeypatch):
 
     monkeypatch.setattr("mimetypes.guess_type", mock_guess_type)
 
-    assert is_text_file("readme.md", gui) == True
-    assert is_text_file("image.jpg", gui) == False
+    with patch('os.path.getsize', return_value=100):
+        assert is_text_file("readme.md", gui) == True
+        assert is_text_file("image.jpg", gui) == False
 
 def test_is_text_file_exclude_files():
     gui = MagicMock()
     gui.settings.get.side_effect = lambda sec, key, default: {'.txt': 1} if key == 'text_extensions' else {'package-lock.json': 1} if key == 'exclude_files' else default
 
-    assert is_text_file("package-lock.json", gui) == False  # Excluded by name
-    assert is_text_file("notes.txt", gui) == True
+    with patch('os.path.getsize', return_value=100):
+        assert is_text_file("package-lock.json", gui) == False  # Excluded by name
+        assert is_text_file("notes.txt", gui) == True
+
+def test_is_text_file_binary_extensions():
+    gui = MagicMock()
+    # Mock settings.get to return an empty dict for text_extensions so it falls through to ext check
+    gui.settings.get.side_effect = lambda sec, key, default: {} if key == 'text_extensions' else {'exclude_files': {}}
+    
+    with patch('os.path.getsize', return_value=100):
+        # These should be rejected even if text_extensions says they are text, or if they bypass MIME check
+        assert is_text_file("binary.so", gui) == False
+        assert is_text_file("library.dll", gui) == False
+        assert is_text_file("app.exe", gui) == False
+        assert is_text_file("data.bin", gui) == False
+        assert is_text_file("lib.dylib", gui) == False
+
+def test_is_text_file_size_limit():
+    from constants import MAX_FILE_SIZE
+    gui = MagicMock()
+    gui.settings.get.side_effect = lambda sec, key, default: {'.txt': 1} if key == 'text_extensions' else {'exclude_files': {}}
+    
+    with patch('os.path.getsize', return_value=MAX_FILE_SIZE + 1):
+        assert is_text_file("large.txt", gui) == False
+    
+    with patch('os.path.getsize', return_value=MAX_FILE_SIZE - 1):
+        assert is_text_file("small.txt", gui) == True
+
+def test_is_ignored_path_venv(monkeypatch):
+    repo_root = "/repo"
+    ignore_list = []
+    gui = MagicMock()
+    gui.settings.get.side_effect = lambda sec, key, default: 0 # Disable other ignores
+    
+    assert is_ignored_path("/repo/venv/lib/python.py", repo_root, ignore_list, gui) == True
+    assert is_ignored_path("/repo/env/bin/activate", repo_root, ignore_list, gui) == True
+    assert is_ignored_path("/repo/ENV/settings.ini", repo_root, ignore_list, gui) == True
+    assert is_ignored_path("/repo/src/main.py", repo_root, ignore_list, gui) == False
 
 def test_scan_repo_success(caplog, temp_repo, monkeypatch):
     caplog.set_level(logging.INFO)
@@ -207,4 +245,4 @@ def test_scan_repo_exception(caplog):
         scan_repo("/fake", gui, MagicMock(), completion_callback, threading.Lock())
 
     completion_callback.assert_called_with(None, None, set(), set(), [ANY])  # Unexpected error
-    assert "Unexpected scan error" in caplog.text
+    assert "Unexpected error during repository scan" in caplog.text

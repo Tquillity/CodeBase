@@ -128,33 +128,10 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
             handle_error(error, "generate_content", show_ui=True)
         return
 
-    # Filter out problematic files before processing
-    filtered_files = set()
-    for file_path in files_to_include:
-        # Skip files in virtual environments
-        if '/venv/' in file_path or '/env/' in file_path or '/ENV/' in file_path:
-            logging.debug(f"Skipping virtual environment file: {file_path}")
-            continue
-        # Skip binary files with common extensions
-        if file_path.endswith(('.so', '.dll', '.exe', '.bin', '.dylib')):
-            logging.debug(f"Skipping binary file: {file_path}")
-            continue
-        # Skip very large files (>10MB)
-        try:
-            if os.path.getsize(file_path) > 10 * 1024 * 1024:  # 10MB
-                logging.debug(f"Skipping large file: {file_path}")
-                continue
-        except OSError:
-            pass  # Skip if we can't get file size
-        filtered_files.add(file_path)
-    
-    sorted_files = sorted(list(filtered_files))
+    sorted_files = sorted(list(files_to_include))
     total_files = len(sorted_files)
     processed_count = 0
     
-    if len(filtered_files) != len(files_to_include):
-        logging.info(f"Filtered out {len(files_to_include) - len(filtered_files)} problematic files")
-
     for file_path in sorted_files:
         # Check for shutdown during processing
         if gui and hasattr(gui, '_shutdown_requested') and gui._shutdown_requested:

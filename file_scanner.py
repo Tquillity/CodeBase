@@ -7,7 +7,7 @@ import logging
 from path_utils import normalize_path, get_relative_path
 from exceptions import RepositoryError, FileOperationError, SecurityError
 from error_handler import handle_error, safe_execute
-from constants import ERROR_HANDLING_ENABLED
+from constants import ERROR_HANDLING_ENABLED, MAX_FILE_SIZE
 
 def yield_repo_files(repo_path, ignore_patterns, gui):
     """
@@ -130,6 +130,11 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
             logging.debug(f"Ignored '{path}' due to coverage setting")
             return True
         
+        # Virtual environment check
+        if any(part in rel_path_parts for part in ['venv', 'env', 'ENV']):
+            logging.debug(f"Ignored '{path}' (virtual environment)")
+            return True
+        
         # Check for test file exclusion
         exclude_test_files_setting = gui.settings.get('app', 'exclude_test_files', 0)
         if exclude_test_files_setting == 1 and is_test_file(path, rel_path):
@@ -153,7 +158,20 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
 
 def is_text_file(file_path, gui):
     try:
+        # Check file size first
+        try:
+            if os.path.getsize(file_path) > MAX_FILE_SIZE:
+                logging.debug(f"Not text: '{file_path}' exceeds MAX_FILE_SIZE")
+                return False
+        except OSError:
+            return False
+
         ext = os.path.splitext(file_path)[1].lower()
+        # Explicitly skip known binary extensions that might bypass other checks
+        if ext in ['.so', '.dll', '.exe', '.bin', '.dylib', '.pyc', '.pyo']:
+             logging.debug(f"Not text: '{file_path}' has binary extension")
+             return False
+
         # NEW_LOG
         logging.debug(f"Determining if text: {file_path} (ext: {ext})")
         from file_handler import FileHandler
