@@ -141,7 +141,7 @@ class RepoHandler:
 
     def _update_ui_for_no_repo(self):
         """Resets the UI to its initial state when no repo is loaded."""
-        self.gui.header_frame.repo_label.config(text="Current Repo: None")
+        self.gui.header_frame.repo_name_label.config(text="None", foreground=self.gui.header_frame.LEGENDARY_GOLD)
         self.gui.info_label.config(text="Token Count: 0")
         self.gui.cache_info_label.config(text="Cache: 0 items (0 MB)")
         self.gui.structure_tab.clear()
@@ -267,7 +267,9 @@ class RepoHandler:
             file_handler.read_errors.clear()
         # Update GUI elements
         repo_name = os.path.basename(repo_path)
-        self.gui.header_frame.repo_label.config(text=f"Current Repo: {repo_name}")
+        repo_settings = self.gui.settings.get('repo', repo_path, {})
+        saved_color = repo_settings.get('color', self.gui.header_frame.LEGENDARY_GOLD)
+        self.gui.header_frame.repo_name_label.config(text=repo_name, foreground=saved_color)
         self.gui.refresh_button.config(state=tk.NORMAL)
        
         self.gui.structure_tab.populate_tree(repo_path)

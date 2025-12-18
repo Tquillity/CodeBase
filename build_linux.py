@@ -6,7 +6,7 @@ import sys
 # --- CONFIGURATION ---
 APP_NAME = "CodeBase"
 # Ideally read this from constants.py, but hardcoded for the build script is fine too
-VERSION = "6.0" 
+VERSION = "6.1" 
 DESCRIPTION = "CodeBase Repository Manager"
 MAINTAINER = "Your Name <you@example.com>"
 URL = "https://yourwebsite.com"
@@ -45,12 +45,20 @@ def build_binary():
 
     # Build command using python -m PyInstaller
     cmd = [
-        sys.executable, "-m", "PyInstaller", # <--- FIX: Run as python module
+        sys.executable, "-m", "PyInstaller",
         "--noconsole",
         "--onefile",
         "--name", APP_NAME,
         "--icon", os.path.join(ASSETS_DIR, "icon.png"),
-        "--add-data", f"codebase-icon.svg{os.pathsep}.", 
+        "--add-data", f"codebase-icon.svg{os.pathsep}.",
+        
+        # --- CRITICAL FIXES FOR MISSING MODULES ---
+        "--collect-all", "tkinterdnd2",   # Fixes Drag and Drop
+        "--collect-all", "ttkbootstrap",  # Fixes UI Themes/Icons
+        "--collect-all", "PIL",           # Fixes Image Rendering (The crash cause)
+        "--collect-all", "tiktoken",      # Fixes Tokenizer warning
+        # ------------------------------------------
+        
         "main.py"
     ]
     run_command(cmd)

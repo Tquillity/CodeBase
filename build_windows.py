@@ -6,7 +6,7 @@ import sys
 # --- CONFIGURATION ---
 APP_NAME = "CodeBase"
 # Ideally read this from constants.py
-VERSION = "6.0" 
+VERSION = "6.1" 
 PUBLISHER = "Your Name"
 URL = "https://yourwebsite.com"
 EXE_NAME = "CodeBase.exe"

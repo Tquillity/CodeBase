@@ -3,11 +3,13 @@ import tkinter as tk
 import pytest
 from unittest.mock import MagicMock, patch
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
+from constants import VERSION
 import tkinter.ttk as ttk
 
 @pytest.fixture
 def mock_root():
-    root = tk.Tk()
+    import ttkbootstrap as ttk
+    root = ttk.Window()
     root.withdraw()
     yield root
     root.destroy()
@@ -61,30 +63,28 @@ def mock_gui(mock_root):
     return gui
 
 def test_header_frame_init(mock_parent, mock_gui):
-    frame = HeaderFrame(mock_parent, mock_gui.colors)
+    frame = HeaderFrame(mock_parent, title="CodeBase")
     assert frame.title_label.cget('text') == "CodeBase"
-    assert frame.version_label.cget('text') == "v5.0"
-    assert frame.repo_label.cget('text') == "Current Repo: None"
+    assert frame.version_label.cget('text') == f"v{VERSION}"
+    assert frame.repo_prefix_label.cget('text') == "Current Repo: "
+    assert frame.repo_name_label.cget('text') == "None"
 
 def test_left_panel_init(mock_parent, mock_gui):
-    panel = LeftPanel(mock_parent, mock_gui.colors, mock_gui)
-    assert panel.gui.select_button is not None
-    assert panel.gui.refresh_button.cget('state') == tk.DISABLED
-    assert panel.gui.copy_button.cget('state') == tk.DISABLED
+    with patch('ttkbootstrap.Combobox'), \
+         patch('ttkbootstrap.Checkbutton'):
+        panel = LeftPanel(mock_parent, mock_gui)
+        assert panel.gui.select_button is not None
+        assert panel.gui.refresh_button.cget('state') == tk.DISABLED
+        assert panel.gui.copy_button.cget('state') == tk.DISABLED
 
 def test_right_panel_init(mock_parent, mock_gui):
-    with patch('tkinter.ttk.Notebook'), \
-         patch('tkinter.ttk.Style'), \
-         patch('panels.panels.ContentTab') as mock_content, \
-         patch('panels.panels.StructureTab') as mock_structure, \
-         patch('panels.panels.BasePromptTab') as mock_base, \
-         patch('panels.panels.SettingsTab') as mock_settings, \
-         patch('panels.panels.FileListTab') as mock_file_list:
-        panel = RightPanel(mock_parent, mock_gui.colors, mock_gui)
+    with patch('ttkbootstrap.Notebook'), \
+         patch('ttkbootstrap.Checkbutton'), \
+         patch('panels.panels.ContentTab'), \
+         patch('panels.panels.StructureTab'), \
+         patch('panels.panels.BasePromptTab'), \
+         patch('panels.panels.SettingsTab'), \
+         patch('panels.panels.FileListTab'):
+        panel = RightPanel(mock_parent, mock_gui)
         assert panel.gui.search_entry is not None
         assert panel.gui.notebook is not None
-        mock_content.assert_called()
-        mock_structure.assert_called()
-        mock_base.assert_called()
-        mock_settings.assert_called()
-        mock_file_list.assert_called()

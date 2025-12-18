@@ -2,7 +2,7 @@
 import os
 import ttkbootstrap as ttk
 import tkinter as tk
-from tkinter import messagebox, filedialog, Toplevel, BooleanVar, IntVar, StringVar
+from tkinter import messagebox, filedialog, Toplevel, BooleanVar, IntVar, StringVar, colorchooser
 from typing import Dict, List, Set, Optional, Any, Callable
 from tabs.content_tab import ContentTab
 from tabs.structure_tab import StructureTab
@@ -41,6 +41,14 @@ class RepoPromptGUI:
         self.settings = SettingsManager()
         self.logger = get_logger(__name__)
         self.high_contrast_mode = BooleanVar(value=self.settings.get('app', 'high_contrast', 0))
+        
+        # --- FIX: FORCE ROOT BACKGROUND COLOR ---
+        # Get the theme's background color and force the root window to use it
+        # This covers the gray gaps caused by padding
+        style = ttk.Style()
+        self.root.configure(background=style.colors.bg)
+        # ----------------------------------------
+        
         # Theme management now handled by ttkbootstrap
         self.root.title(f"CodeBase v{self.version}")
         self.root.geometry(self.settings.get('app', 'window_geometry', DEFAULT_WINDOW_SIZE))
@@ -260,6 +268,7 @@ class RepoPromptGUI:
         self.root.grid_rowconfigure(2, weight=1)
         self.root.grid_columnconfigure(2, weight=1)
         self.header_frame = HeaderFrame(self.root, title="CodeBase", version=self.version)
+        self.header_frame.repo_name_label.bind("<Button-1>", self.change_repo_color)
         self.left_frame = LeftPanel(self.root, self)
         self.left_separator = ttk.Frame(self.root, width=2)
         self.left_separator.grid(row=2, column=1, padx=8, pady=15, sticky="ns")
@@ -647,6 +656,19 @@ class RepoPromptGUI:
                             "Developed by Mikael Sundh.\n"
                             "License: MIT (To be finalized)\n"
                             "© 2024-2025")
+
+    def change_repo_color(self, event=None):
+        if not self.current_repo_path:
+            return
+        current_color = self.header_frame.repo_name_label.cget("foreground")
+        _, color_code = colorchooser.askcolor(title="Choose Repo Color", initialcolor=current_color)
+        if color_code:
+            self.header_frame.repo_name_label.config(foreground=color_code)
+            repo_data = self.settings.get('repo', self.current_repo_path, {})
+            repo_data['color'] = color_code
+            self.settings.set('repo', self.current_repo_path, repo_data)
+            self.settings.save()
+            self.show_status_message(f"Repository color updated to {color_code}")
 
     def on_close(self):
         """Handle application shutdown with proper resource cleanup."""

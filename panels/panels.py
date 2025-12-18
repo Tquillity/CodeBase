@@ -6,7 +6,7 @@ from tabs.structure_tab import StructureTab
 from tabs.base_prompt_tab import BasePromptTab
 from tabs.settings_tab import SettingsTab
 from tabs.file_list_tab import FileListTab
-from constants import VERSION, LEFT_PANEL_WIDTH, TEMPLATE_MARKDOWN, TEMPLATE_XML
+from constants import VERSION, LEFT_PANEL_WIDTH, TEMPLATE_MARKDOWN, TEMPLATE_XML, LEGENDARY_GOLD
 
 class HeaderFrame(ttk.Frame):
     def __init__(self, parent, title="CodeBase", version=VERSION):
@@ -27,8 +27,26 @@ class HeaderFrame(ttk.Frame):
         repo_frame = ttk.Frame(self)
         repo_frame.pack(side=tk.LEFT, fill='both', expand=True, padx=(40, 0))
         
-        self.repo_label = ttk.Label(repo_frame, text="Current Repo: None", font=("Arial", 11))
-        self.repo_label.pack(side=tk.LEFT, anchor='w')
+        self.LEGENDARY_GOLD = LEGENDARY_GOLD
+        
+        self.repo_prefix_label = ttk.Label(
+            repo_frame, 
+            text="Current Repo: ", 
+            font=("Arial", 16, "italic"),
+            foreground=self.LEGENDARY_GOLD
+        )
+        self.repo_prefix_label.pack(side=tk.LEFT, anchor='w')
+        
+        self.repo_name_label = ttk.Label(
+            repo_frame, 
+            text="None", 
+            font=("Arial", 16, "italic"),
+            foreground=self.LEGENDARY_GOLD,
+            cursor="hand2"
+        )
+        self.repo_name_label.pack(side=tk.LEFT, anchor='w')
+        
+        Tooltip(self.repo_name_label, "Click to change this repository's color")
 
         # Separator line
         self.header_separator = ttk.Frame(parent, height=1)

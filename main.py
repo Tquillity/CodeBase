@@ -10,6 +10,10 @@ from constants import DEFAULT_LOG_LEVEL, LOG_FILE_PATH, LOG_TO_FILE, LOG_TO_CONS
 
 class DnDWindow(ttk.Window, TkinterDnD.DnDWrapper):
     def __init__(self, *args, **kwargs):
+        # FIX: Explicitly set the window class name to match the .desktop file
+        # This fixes the missing icon in Dash and enables pinning
+        if 'className' not in kwargs:
+            kwargs['className'] = 'CodeBase'
         super().__init__(*args, **kwargs)
         self.TkdndVersion = None
         try:
@@ -39,12 +43,14 @@ if __name__ == "__main__":
     
     # Try to initialize with DnD support
     try:
+        # FIX: Ensure className is passed here
         root = DnDWindow(themename="darkly")
         if not getattr(root, 'TkdndVersion', None):
             logging.warning("System Tcl version incompatible with TkinterDnD. Drag & Drop disabled.")
     except Exception as e:
         logging.error(f"Critical DnD initialization failure: {e}. Falling back to standard window.")
-        root = ttk.Window(themename="darkly")
+        # FIX: Ensure className is passed here for the fallback as well
+        root = ttk.Window(themename="darkly", className="CodeBase")
 
     app = RepoPromptGUI(root)
     

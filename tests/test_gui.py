@@ -6,6 +6,7 @@ import pytest
 import tempfile
 from unittest.mock import MagicMock, patch, mock_open, ANY
 from gui import RepoPromptGUI
+from constants import VERSION, DEFAULT_WINDOW_SIZE
 from colors import COLOR_BG, COLOR_FG, COLOR_HC_BG, COLOR_HC_FG
 from tabs.content_tab import ContentTab
 from tabs.structure_tab import StructureTab
@@ -117,7 +118,8 @@ def gui(mock_root):
         app = RepoPromptGUI(mock_root)
 
         app.header_frame = mock_header_cls.return_value
-        app.header_frame.repo_label = MagicMock()
+        app.header_frame.repo_prefix_label = MagicMock()
+        app.header_frame.repo_name_label = MagicMock()
         app.header_separator = MagicMock()
         app.left_frame = mock_left_cls.return_value
         app.right_frame = mock_right_cls.return_value
@@ -146,7 +148,7 @@ def gui(mock_root):
         yield app
 
 def test_init(gui):
-    assert gui.version == "5.0"
+    assert gui.version == VERSION
     assert gui.high_contrast_mode.get() == 0
     assert gui.prepend_var.get() == 1
     assert gui.show_unloaded_var.get() == 0

@@ -28,7 +28,7 @@ TEXT_EXTENSIONS_DEFAULT = {
 FILE_SEPARATOR = "===FILE_SEPARATOR===\n"
 
 # Application version
-VERSION = "6.0"
+VERSION = "6.1"
 
 # Cache configuration
 CACHE_MAX_SIZE = 1000  # Maximum number of cached files
@@ -68,6 +68,7 @@ TREE_UI_UPDATE_INTERVAL = 100  # Update UI every N items to prevent blocking
 TREE_SAFETY_LIMIT = 10000  # Safety limit to prevent infinite loops
 
 # UI Configuration
+LEGENDARY_GOLD = "#FFD700"
 DEFAULT_WINDOW_SIZE = "1200x800"
 DEFAULT_WINDOW_POSITION = "+100+100"
 STATUS_MESSAGE_DURATION = 5000  # 5 seconds
