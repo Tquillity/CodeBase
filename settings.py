@@ -60,9 +60,8 @@ class SettingsManager:
                 "cross_platform_paths": 1,
                 # Folder selection settings
                 "default_start_folder": os.path.expanduser("~")
-                # Add default for text_extensions if needed, though FileHandler provides it
             },
-            "repo": {} # For future repo-specific settings if needed
+            "repo": {}
         }
 
         if os.path.exists(self.settings_file):

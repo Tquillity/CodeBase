@@ -1,12 +1,9 @@
 import os
-import pyperclip
-import fnmatch
-import mimetypes
 import tkinter as tk
 from tkinter import messagebox
 import threading
 import logging
-import time # For timing tasks
+import time
 from widgets import FolderDialog
 from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION, ERROR_HANDLING_ENABLED
 from lru_cache import ThreadSafeLRUCache
@@ -21,14 +18,13 @@ class RepoHandler:
     def __init__(self, gui):
         self.gui = gui
         self.repo_path = None
-        self.loaded_files = set() # Files *selected* for inclusion
-        self.scanned_text_files = set() # All text files found during scan
+        self.loaded_files = set()
+        self.scanned_text_files = set()
         self.ignore_patterns = []
-        # Ensure recent folders are loaded correctly via gui method
         self.recent_folders = gui.load_recent_folders()
         self.content_cache = ThreadSafeLRUCache(CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB)
-        self.lock = threading.Lock() # Lock for accessing shared resources like loaded_files, cache
-        self.read_errors = [] # Collect errors during read operations
+        self.lock = threading.Lock()
+        self.read_errors = []
 
     def select_repo(self):
         """Opens a dialog to select a repository and loads it."""
@@ -57,11 +53,12 @@ class RepoHandler:
         logging.info("Starting repository refresh...")
         logging.info(f"Repository path: {self.repo_path}")
         self.gui.show_loading_state(f"Refreshing {os.path.basename(self.repo_path)}...", show_cancel=True)
-        # --- PRESERVE STATE ---
+        
         # 1. Save the set of currently selected files
         with self.gui.file_handler.lock:
             previous_selections = self.gui.file_handler.loaded_files.copy()
         logging.debug(f"Preserving {len(previous_selections)} selected files.")
+        
         # 2. Save the expansion state of the TreeView
         expansion_state = self.get_tree_expansion_state()
         logging.debug(f"Preserving {len(expansion_state)} expanded folders.")
@@ -70,7 +67,6 @@ class RepoHandler:
         with self.gui.file_handler.lock:
             self.gui.file_handler.content_cache.clear()
        
-        # --- RESCAN ---
         # The completion callback will handle restoring the state
         completion_callback = lambda repo_path, ignore_patterns, scanned, loaded, errors: \
             self._handle_refresh_completion(repo_path, ignore_patterns, scanned, errors, previous_selections, expansion_state)
@@ -203,8 +199,6 @@ class RepoHandler:
                 file_paths.append(file_path_abs)
         
             total_files = len(file_paths)
-            # Skip progress bar for first pass since it's too fast to be useful
-            print(f"DEBUG: Found {total_files} files, skipping progress bar for fast scan")
         
             # --- Process files ---
             processed_count = 0
@@ -220,11 +214,9 @@ class RepoHandler:
                     scanned_files_temp.add(normalized_path)
                     loaded_files_temp.add(normalized_path)
             
-                # Skip progress updates for first pass since it's too fast to be useful
                 # Just log occasionally for debugging
                 if processed_count % 50 == 0 or processed_count == total_files:
                     elapsed = time.time() - scan_start_time
-                    print(f"DEBUG: Processed {processed_count}/{total_files} files in {elapsed:.1f}s")
         
             end_time = time.time()
             logging.info(f"Scan complete for {repo_path}. Found {len(scanned_files_temp)} text files out of {total_files} total files in {end_time - start_time:.2f} seconds.")
@@ -268,6 +260,7 @@ class RepoHandler:
             file_handler.loaded_files = loaded_files or set()
             file_handler.content_cache.clear()
             file_handler.read_errors.clear()
+        
         # Update GUI elements
         repo_name = os.path.basename(repo_path)
         repo_settings = self.gui.settings.get('repo', repo_path, {})
@@ -300,7 +293,7 @@ class RepoHandler:
         file_handler.ignore_patterns = ignore_patterns or []
         file_handler.scanned_text_files = scanned_files or set()
 
-        # --- THE FIX: Path Normalization & Selection Alignment ---
+        # Path Normalization & Selection Alignment
         with file_handler.lock:
             # Normalize all scanned files for reliable comparison
             normalized_scanned = {normalize_for_cache(p) for p in scanned_files}
@@ -321,6 +314,5 @@ class RepoHandler:
         saved_color = repo_settings.get('color', self.gui.header_frame.LEGENDARY_GOLD)
         self.gui.header_frame.repo_name_label.config(foreground=saved_color)
 
-        # --- FINALIZE ---
         self.gui.trigger_preview_update()
         self.gui.show_status_message(f"Refreshed {os.path.basename(repo_path)} successfully.", duration=STATUS_MESSAGE_DURATION)

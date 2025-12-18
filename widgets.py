@@ -45,10 +45,8 @@ class Tooltip:
         tw.wm_geometry(f"+{x}+{y}")
         # Make it appear above other windows (may vary by WM)
         tw.wm_attributes("-topmost", True)
-
-        # FIX: Use tk.Label instead of ttk.Label to strictly enforce colors
-        # Background: Dark Grey (from __init__)
-        # Foreground: White (explicitly set)
+        
+        # Use tk.Label for tooltips to strictly control background/foreground colors
         label = tk.Label(tw, text=self.text, justify='left',
                        background=self.tooltip_bg, 
                        foreground="#ffffff", # Force white text
@@ -214,7 +212,7 @@ class FolderDialog:
         if self.on_delete_callback:
             self.on_delete_callback(folder_path)
         
-        # Also remove from the local list for immediate UI update
+        # Remove from local list for immediate UI update
         if folder_path in self.recent_folders:
             self.recent_folders.remove(folder_path)
         

@@ -34,12 +34,12 @@ setup_logging(
 
 class RestartHandler(FileSystemEventHandler):
     def __init__(self, script_to_watch, script_to_run):
-        self.script_to_watch = script_to_watch # The script whose changes trigger restart
-        self.script_to_run = script_to_run     # The script to execute (e.g., main.py)
+        self.script_to_watch = script_to_watch
+        self.script_to_run = script_to_run
         self.process = None
         self.logger = get_logger(__name__)
         self.last_restart_time = 0
-        self.debounce_delay = 2  # 2 seconds delay to avoid rapid restarts
+        self.debounce_delay = 2
         self.start_script()
         
     def should_ignore_file(self, file_path):
@@ -51,10 +51,10 @@ class RestartHandler(FileSystemEventHandler):
         return False
 
     def start_script(self):
-        self.stop_script() # Ensure previous process is stopped
+        self.stop_script()
         try:
             logging.info(f"Starting {self.script_to_run}...")
-            # Use python3 strictly as the project is now Linux-exclusive
+            # Use python3 strictly for Linux environment
             self.process = subprocess.Popen(["python3", self.script_to_run])
             logging.info(f"Started process {self.process.pid}")
         except FileNotFoundError:
@@ -65,20 +65,19 @@ class RestartHandler(FileSystemEventHandler):
             sys.exit(1)
 
     def stop_script(self):
-        if self.process and self.process.poll() is None: # Check if process exists and is running
+        if self.process and self.process.poll() is None:
             logging.info(f"Attempting to terminate process {self.process.pid}...")
             try:
-                # Try SIGTERM first (graceful shutdown)
+                # Graceful shutdown with SIGTERM
                 self.process.terminate()
                 try:
-                    # Wait a short time for termination
                     self.process.wait(timeout=2)
                     logging.info(f"Process {self.process.pid} terminated gracefully.")
                 except subprocess.TimeoutExpired:
-                    # If terminate didn't work, force kill
+                    # Force kill if SIGTERM fails
                     logging.warning(f"Process {self.process.pid} did not terminate, killing...")
                     self.process.kill()
-                    self.process.wait() # Wait for kill to complete
+                    self.process.wait()
                     logging.info(f"Process {self.process.pid} killed.")
             except ProcessLookupError:
                 logging.warning(f"Process {self.process.pid} lookup failed, likely already stopped.")
@@ -88,13 +87,11 @@ class RestartHandler(FileSystemEventHandler):
                 self.process = None
 
     def on_modified(self, event):
-        # Only act on file modifications, ignore directories
         if not event.is_directory:
-            # Check if the file should be ignored
             if self.should_ignore_file(event.src_path):
                 return
                 
-            # Check if the modified file is a Python file or important config file
+            # Restart on changes to source or configuration files
             if (event.src_path.endswith(".py") or 
                 event.src_path.endswith(".txt") or 
                 event.src_path.endswith(".json") or
@@ -102,7 +99,7 @@ class RestartHandler(FileSystemEventHandler):
                 event.src_path.endswith(".yml")):
                 
                 current_time = time.time()
-                # Debounce: Only restart if enough time has passed since the last restart
+                # Use debounce to prevent rapid restart loops
                 if current_time - self.last_restart_time >= self.debounce_delay:
                     logging.info(f"🔄 Detected change in {event.src_path}. Restarting {self.script_to_run}...")
                     self.start_script()
@@ -113,11 +110,7 @@ class RestartHandler(FileSystemEventHandler):
                 logging.debug(f"📁 Ignoring non-Python file change: {event.src_path}")
 
 if __name__ == "__main__":
-    # Configuration
-    script_to_run = "main.py"  # The main application script
-    # Determine the directory containing the script_to_run to watch
-    # Watch the directory of *this* script (live_reload.py) by default,
-    # assuming main.py and others are siblings or in subdirs. Adjust if needed.
+    script_to_run = "main.py"
     watch_dir = os.path.dirname(os.path.abspath(__file__))
 
     print("🚀 CodeBase Live Reload Development Server")
@@ -132,13 +125,11 @@ if __name__ == "__main__":
     print("=" * 50)
 
     logging.info(f"Watching directory: {watch_dir} for changes to trigger restart of {script_to_run}")
-    logging.info(f"Monitoring script: {script_to_run}") # Log which script is being run
     logging.info("CodeBase Live Reload Development Server started with ttkbootstrap support")
 
-    event_handler = RestartHandler(script_to_watch=None, script_to_run=script_to_run) # Pass both params
+    event_handler = RestartHandler(script_to_watch=None, script_to_run=script_to_run)
 
     observer = Observer()
-    # Watch recursively for changes in any .py files within the directory
     observer.schedule(event_handler, path=watch_dir, recursive=True)
     observer.start()
 
@@ -149,12 +140,12 @@ if __name__ == "__main__":
         print("\n🛑 KeyboardInterrupt received, stopping development server...")
         logging.info("KeyboardInterrupt received, stopping observer and script...")
         observer.stop()
-        event_handler.stop_script() # Ensure the child process is stopped on exit
+        event_handler.stop_script()
     except Exception as e:
         print(f"\n❌ An unexpected error occurred: {e}")
         logging.error(f"An unexpected error occurred: {e}")
         observer.stop()
-        event_handler.stop_script() # Ensure the child process is stopped on exit
+        event_handler.stop_script()
 
     observer.join()
     print("✅ CodeBase Live Reload Development Server stopped.")

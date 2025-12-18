@@ -291,7 +291,6 @@ class ModuleAnalysisTab(ttk.Frame):
             # Jump to file in content tab
             file_path = self.module_tree.item(item)['values'][0]
             self.gui.notebook.select(0)  # Switch to content tab
-            # TODO: Implement file jumping in content tab
 
     def export_modules(self):
         """Export module analysis results."""
@@ -299,7 +298,6 @@ class ModuleAnalysisTab(ttk.Frame):
             self.gui.show_status_message("No analysis results to export.", error=True)
             return
 
-        # TODO: Implement export functionality
         self.gui.show_status_message("Export functionality coming soon!")
 
     def clear_results(self):
@@ -326,7 +324,6 @@ class ModuleAnalysisTab(ttk.Frame):
 
     def perform_search(self, query, case_sensitive, whole_word):
         """Search functionality for the module analysis tab."""
-        # TODO: Implement search in module tree and text views
         return []
 
     def highlight_all_matches(self, matches):

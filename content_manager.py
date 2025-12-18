@@ -37,7 +37,7 @@ def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: th
             return None
 
     try:
-        # FIX: Use the original, case-sensitive file_path for opening the file.
+        # Use original case-sensitive file_path for OS file operations
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
             content = file.read()
             
@@ -138,10 +138,8 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
             logging.info("Shutdown requested during content generation, aborting")
             return
         
-        # Log which file we're processing to help debug hanging issues
         logging.debug(f"Processing file: {file_path}")
         
-        # The get_file_content function will append to the shared read_errors list
         file_content = get_file_content(file_path, content_cache, lock, read_errors)
         
         if file_content is not None:
@@ -173,5 +171,4 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
     end_time = time.time()
     logging.info(f"Content generation complete for {len(files_to_include)} files in {end_time - start_time:.2f} seconds. Tokens: {token_count}")
 
-    # Pass the collected errors from this run to the callback
     completion_callback(final_content, token_count, read_errors)

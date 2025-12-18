@@ -1,12 +1,8 @@
 import os
-import pyperclip
-import fnmatch
-import mimetypes
 import tkinter as tk
 from tkinter import messagebox
 import threading
 import logging
-import time
 from typing import Set, List, Optional, Any, Dict
 
 from file_scanner import parse_gitignore, is_ignored_path, is_text_file
@@ -68,19 +64,9 @@ class FileHandler:
         query = query.lower()
         matches = []
         
-        # 1. Find all matching files
-        # Use scanned_text_files as the source of truth
-        # Also include non-text files if they are in the tree? 
-        # For now, let's scan strictly what we know about + maybe walk again if needed?
-        # Better to rely on what we've scanned.
-        
-        # We need to walk the repo to find all files, not just text ones, if we want a full search.
-        # But for performance, searching scanned_text_files is instant.
-        # Let's start with scanned_text_files + loaded_files.
-        
+        # Find matching files in scanned list
         search_pool = self.scanned_text_files.union(self.loaded_files)
         
-        # Filter
         for file_path in search_pool:
             if query in os.path.basename(file_path).lower():
                 matches.append(file_path)
@@ -113,11 +99,10 @@ class FileHandler:
             current_path = self.repo_path
             parent_id = root_id
             
-            # Create folders
-            for part in parts[:-1]: # All except filename
+            # Create directory structure in tree
+            for part in parts[:-1]:
                 current_path = os.path.join(current_path, part)
                 if current_path not in created_items:
-                    # Create folder
                     folder_id = tree.insert(parent_id, "end", text=f"📁 {part}",
                                            values=(current_path, "☐"), open=True, tags=('folder',))
                     created_items[current_path] = folder_id
@@ -236,9 +221,8 @@ class FileHandler:
             logging.info(f"Received expand request for item_id: '{item_id}'")
             children = tree.get_children(item_id)
 
-            # *** THE FIX IS HERE ***
             # Only build the level if the children list is not empty AND the first child has the 'dummy' tag.
-            # This is the only state where we need to populate the folder.
+            # This ensures we only populate folders that have not been loaded yet.
             if children and 'dummy' in tree.item(children[0])['tags']:
                 logging.debug(f"Item '{item_id}' has a dummy child. Proceeding to build level.")
                 
@@ -362,7 +346,6 @@ class FileHandler:
         if completion_callback is None:
             completion_callback = self.gui.content_tab._handle_preview_completion
             
-        # NEW_LOG
         with self.lock:
             files_to_include = set(self.loaded_files)
         

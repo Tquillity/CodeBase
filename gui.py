@@ -22,9 +22,9 @@ from handlers.search_handler import SearchHandler
 from handlers.copy_handler import CopyHandler
 from handlers.repo_handler import RepoHandler
 from handlers.git_handler import GitHandler
-# ThemeManager removed - using ttkbootstrap instead
+# Support for thread-safe Tkinter callbacks from background threads
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
-import queue  # FIX: Added for thread-safe Tkinter callbacks
+import queue
 from tkinterdnd2 import DND_FILES
 from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION, ERROR_HANDLING_ENABLED, DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT
 from exceptions import UIError, ConfigurationError, ThreadingError
@@ -42,9 +42,8 @@ class RepoPromptGUI:
         self.logger = get_logger(__name__)
         self.high_contrast_mode = BooleanVar(value=self.settings.get('app', 'high_contrast', 0))
         
-        # --- FIX: FORCE ROOT BACKGROUND COLOR ---
-        # Get the theme's background color and force the root window to use it
-        # This covers the gray gaps caused by padding
+        # --- FORCE ROOT BACKGROUND COLOR ---
+        # Set root window background to match theme to prevent flickering during padding adjustments
         style = ttk.Style()
         self.root.configure(background=style.colors.bg)
         # ----------------------------------------
@@ -98,11 +97,11 @@ class RepoPromptGUI:
         self.list_selected_files = set()
         self.list_read_errors = []
         
-        # Resource cleanup tracking (must be before _poll_queue)
+        # Resource cleanup tracking
         self._shutdown_requested = False
         self._background_threads = []
         
-        # FIX: Added queue for thread-safe Tkinter callbacks from background threads
+        # Queue for thread-safe Tkinter callbacks from background threads
         self.task_queue = queue.Queue()
         
         # Update logging configuration based on settings
@@ -119,12 +118,6 @@ class RepoPromptGUI:
             # Clean up path (Tcl/Tk wraps paths with spaces in curly braces)
             if path.startswith('{') and path.endswith('}'):
                 path = path[1:-1]
-            
-            # Handle multiple files drop - take the first one if space separated
-            # This is a simplified approach; robust regex parsing is better for complex cases
-            # but tkinterdnd2 usually handles single file drops well.
-            # If multiple paths are wrapped in {}, we might need regex.
-            # For now, let's assume single folder drop for simplicity or take first.
             
             # Verify path exists
             if not os.path.exists(path):
@@ -168,7 +161,7 @@ class RepoPromptGUI:
         except Exception as e:
             self.logger.error(f"Failed to update logging configuration: {e}")
 
-    # FIX: Polling method to process queued tasks in the main thread
+    # Polling method to process queued tasks in the main thread
     def _poll_queue(self):
         # Stop polling if shutdown requested
         if self._shutdown_requested:
@@ -195,7 +188,6 @@ class RepoPromptGUI:
 
     def trigger_preview_update(self):
         """Triggers the generation of the content preview tab."""
-        # NEW_LOG
         logging.info("Triggering preview update")
         if self.is_loading:
             return
@@ -301,16 +293,11 @@ class RepoPromptGUI:
         self.status_context_menu.add_command(label="Clear", command=self._clear_status_bar)
 
     def show_loading_state(self, message: str, show_cancel: bool = False) -> None:
-        print(f"DEBUG: show_loading_state called with message: {message}")
-        
         # Show file counter in center of screen
-        print("DEBUG: Showing file counter")
         self.file_counter.grid(row=2, column=0, columnspan=3, padx=30, pady=30)
         
-        # Initialize file counter (don't show "0" initially)
-        print("DEBUG: Initializing file counter")
+        # Initialize file counter
         self.file_counter.config(text="")
-        print(f"DEBUG: File counter initialized - text: {self.file_counter.cget('text')}")
         
         self.show_status_message(message, duration=ERROR_MESSAGE_DURATION)
         self.is_loading = True
@@ -429,35 +416,25 @@ class RepoPromptGUI:
         """Update the file counter display."""
         try:
             percentage = max(0, min(100, percentage))  # Clamp between 0-100
-            print(f"DEBUG: update_progress called with percentage={percentage}, message={message}, file_count={file_count}")
             
             # Check if file counter exists
             if not hasattr(self, 'file_counter'):
-                print("DEBUG: File counter not found!")
                 return
                 
             # Show file count if available, otherwise percentage
             if file_count:
                 # Show the full "X/Y files" format
                 self.file_counter.config(text=file_count)
-                print(f"DEBUG: File counter set to: {file_count}")
             else:
                 self.file_counter.config(text=f"{percentage}%")
-                print(f"DEBUG: File counter set to percentage: {percentage}%")
                 
-            print(f"DEBUG: File counter text set to {self.file_counter.cget('text')}")
-            
             if message:
-                print(f"DEBUG: Showing status message: {message}")
                 self.show_status_message(message, duration=1000)
             
             # Force immediate UI update
-            print("DEBUG: Forcing UI update")
             self.root.update_idletasks()
             self.root.update()
-            print("DEBUG: UI update completed")
         except Exception as e:
-            print(f"DEBUG: Error updating progress: {e}")
             logging.warning(f"Error updating progress: {e}")
 
     def set_progress_max(self, max_value: int):

@@ -9,7 +9,6 @@ from constants import VERSION
 
 # --- CONFIGURATION ---
 APP_NAME = "CodeBase"
-# VERSION now read from constants.py
 DESCRIPTION = "CodeBase Repository Manager"
 MAINTAINER = "Your Name <you@example.com>"
 URL = "https://yourwebsite.com"
@@ -18,7 +17,7 @@ ARCH = "x86_64"
 # Paths
 ASSETS_DIR = "assets"
 DIST_DIR = "dist"
-BUILD_DIR = "build_staging" # Temporary folder to assemble the RPM structure
+BUILD_DIR = "build_staging"  # Assembly directory for RPM structure
 
 def run_command(command):
     print(f"Running: {' '.join(command)}")
@@ -55,12 +54,11 @@ def build_binary():
         "--icon", os.path.join(ASSETS_DIR, "icon.png"),
         "--add-data", f"codebase-icon.svg{os.pathsep}.",
         
-        # --- CRITICAL FIXES FOR MISSING MODULES ---
-        "--collect-all", "tkinterdnd2",   # Fixes Drag and Drop
-        "--collect-all", "ttkbootstrap",  # Fixes UI Themes/Icons
-        "--collect-all", "PIL",           # Fixes Image Rendering (The crash cause)
-        "--collect-all", "tiktoken",      # Fixes Tokenizer warning
-        # ------------------------------------------
+        # Collect necessary modules for standalone execution
+        "--collect-all", "tkinterdnd2",
+        "--collect-all", "ttkbootstrap",
+        "--collect-all", "PIL",
+        "--collect-all", "tiktoken",
         
         "main.py"
     ]
@@ -106,7 +104,6 @@ StartupWMClass={APP_NAME}
 
 def build_rpm():
     print("Packaging RPM...")
-    # fpm -s dir -t rpm ...
     cmd = [
         "fpm",
         "-s", "dir",
@@ -119,8 +116,8 @@ def build_rpm():
         "--url", URL,
         "--license", "MIT",
         "--rpm-os", "linux",
-        "-C", BUILD_DIR, # Change to build directory
-        "." # Package everything in build directory
+        "-C", BUILD_DIR,
+        "."
     ]
     run_command(cmd)
     

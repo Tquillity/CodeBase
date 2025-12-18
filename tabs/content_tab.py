@@ -247,8 +247,6 @@ class ContentTab(ttk.Frame):
                     self.content_text.tag_bind(toggle_tag, "<Button-1>",
                                                 lambda event, fid=file_id: self.toggle_content(fid))
                 else:
-                    # Fallback for unparsable sections (e.g. raw text or errors)
-                    # We only display if it's not an empty artifact of splitting
                     if len(section) > 5:
                          self.content_text.insert(tk.END, f"{section}\n\n")
 

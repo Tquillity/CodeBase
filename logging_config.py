@@ -70,8 +70,8 @@ class LoggingConfig:
                 file_handler.setLevel(numeric_level)
                 file_handler.setFormatter(formatter)
                 root_logger.addHandler(file_handler)
-            except Exception as e:
-                print(f"Warning: Could not setup file logging: {e}")
+            except Exception:
+                pass
         
         cls._initialized = True
         logging.info(f"Logging configured: level={default_level}, file={log_file}, console={console_output}")
