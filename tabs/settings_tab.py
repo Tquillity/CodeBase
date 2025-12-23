@@ -51,6 +51,12 @@ class SettingsTab(ttk.Frame):
 
         inner_frame.bind("<Configure>", _on_configure)
         
+        # Linux/X11: mouse wheel events may arrive as Button-4/Button-5
+        canvas.bind('<Button-4>', lambda e: canvas.yview_scroll(-1, "units"))
+        canvas.bind('<Button-5>', lambda e: canvas.yview_scroll(1, "units"))
+        inner_frame.bind('<Button-4>', lambda e: canvas.yview_scroll(-1, "units"))
+        inner_frame.bind('<Button-5>', lambda e: canvas.yview_scroll(1, "units"))
+        
         # Store references for later use
         self.canvas = canvas
         self.inner_frame = inner_frame

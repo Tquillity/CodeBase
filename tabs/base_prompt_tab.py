@@ -1,6 +1,6 @@
 import ttkbootstrap as ttk
 import tkinter as tk
-from ttkbootstrap.scrolled import ScrolledText
+from ttkbootstrap.widgets.scrolled import ScrolledText
 from tkinter import filedialog, messagebox
 import os
 import logging

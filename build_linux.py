@@ -10,8 +10,8 @@ from constants import VERSION
 # --- CONFIGURATION ---
 APP_NAME = "CodeBase"
 DESCRIPTION = "CodeBase Repository Manager"
-MAINTAINER = "Your Name <you@example.com>"
-URL = "https://yourwebsite.com"
+MAINTAINER = "Mikael Sundh <mikael.sundh@gmail.com>"
+URL = "https://www.mikaelsundh.com"
 ARCH = "x86_64"
 
 # Paths

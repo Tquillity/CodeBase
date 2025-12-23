@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import messagebox
 import threading
 import logging
+from collections import deque
 from typing import Set, List, Optional, Any, Dict
 
 from file_scanner import parse_gitignore, is_ignored_path, is_text_file
@@ -388,11 +389,11 @@ class FileHandler:
         
         # Use a queue for iterative processing instead of recursion
         # Each item in queue is (item_id, depth)
-        items_to_process = [(item, 0)]
+        items_to_process = deque([(item, 0)])
         processed_count = 0
         
         while items_to_process and processed_count < TREE_SAFETY_LIMIT:
-            current_item, depth = items_to_process.pop(0)
+            current_item, depth = items_to_process.popleft()
             processed_count += 1
             
             # Skip if we've reached max depth
@@ -474,11 +475,11 @@ class FileHandler:
         tree = self.gui.structure_tab.tree
         
         # Use a queue for iterative processing instead of recursion
-        items_to_process = [item]
+        items_to_process = deque([item])
         processed_count = 0
         
         while items_to_process and processed_count < TREE_SAFETY_LIMIT:
-            current_item = items_to_process.pop(0)
+            current_item = items_to_process.popleft()
             processed_count += 1
             
             # Get children of current item
@@ -537,11 +538,11 @@ class FileHandler:
         tree = self.gui.structure_tab.tree
         
         # Use a queue for iterative processing instead of recursion
-        items_to_check = [item]
+        items_to_check = deque([item])
         processed_count = 0
         
         while items_to_check and processed_count < TREE_SAFETY_LIMIT:
-            current_item = items_to_check.pop(0)
+            current_item = items_to_check.popleft()
             processed_count += 1
             
             # Get children of current item
@@ -566,11 +567,11 @@ class FileHandler:
         tree = self.gui.structure_tab.tree
         
         # Use a queue for iterative processing with level tracking
-        items_to_process = [(item, current_level)]
+        items_to_process = deque([(item, current_level)])
         processed_count = 0
         
         while items_to_process and processed_count < TREE_SAFETY_LIMIT:
-            current_item, level = items_to_process.pop(0)
+            current_item, level = items_to_process.popleft()
             processed_count += 1
             
             # Stop if we've reached the desired level

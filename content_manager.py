@@ -16,7 +16,7 @@ from lru_cache import ThreadSafeLRUCache
 from path_utils import normalize_for_cache, get_relative_path
 from exceptions import FileOperationError, RepositoryError
 from error_handler import handle_error, safe_execute
-from security import validate_file_path, validate_file_size, validate_content_security
+from security import validate_file_size, validate_content_security
 
 def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: threading.Lock, read_errors: List[str]) -> Optional[str]:
     # Use normalized path for cache keys for cross-platform consistency
@@ -106,8 +106,6 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
     try:
         start_time = time.time()
         content_parts = []
-        # Create a local list for errors found during this specific generation
-        local_read_errors = []
         
         # Check if shutdown was requested
         if gui and hasattr(gui, '_shutdown_requested') and gui._shutdown_requested:

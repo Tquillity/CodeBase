@@ -71,13 +71,18 @@ class SecurityValidator:
             normalized_path = normalize_path(file_path)
             
             # Check for directory traversal attempts
-            if '..' in normalized_path or normalized_path.startswith('/'):
+            if '..' in normalized_path:
                 if base_path:
                     base_normalized = normalize_path(base_path)
                     if not is_path_within_base(normalized_path, base_normalized):
                         return False, f"Path traversal attempt detected: {file_path}"
                 else:
-                    return False, f"Absolute path not allowed: {file_path}"
+                    return False, f"Path traversal attempt detected: {file_path}"
+            
+            if base_path:
+                base_normalized = normalize_path(base_path)
+                if not is_path_within_base(normalized_path, base_normalized):
+                    return False, f"Path traversal attempt detected: {file_path}"
             
             # Check for dangerous characters
             dangerous_chars = ['<', '>', '|', '&', ';', '`', '$', '(', ')', '{', '}']

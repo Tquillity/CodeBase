@@ -27,6 +27,8 @@ def mock_gui():
     gui.current_repo_path = "/repo"
     gui.file_handler.content_cache = {}
     gui.file_handler.read_errors = []
+    gui.settings = MagicMock()
+    gui.settings.get.return_value = "Markdown (Grok)"
     return gui
 
 @pytest.fixture
@@ -36,7 +38,7 @@ def copy_handler(mock_gui):
 def test_copy_contents_success(copy_handler, mock_gui):
     with patch('handlers.copy_handler.generate_content') as mock_gen:
         copy_handler.copy_contents()
-        mock_gen.assert_called_with(set(["file1"]), "/repo", ANY, ANY, {}, [], None, ANY)
+        mock_gen.assert_called_with(set(["file1"]), "/repo", ANY, ANY, {}, [], None, mock_gui, "Markdown (Grok)")
 
 def test_copy_contents_no_files(copy_handler, mock_gui):
     mock_gui.file_handler.loaded_files = set()
@@ -57,7 +59,7 @@ def test_copy_structure_empty(copy_handler, mock_gui):
 def test_copy_all_success(copy_handler, mock_gui):
     with patch('handlers.copy_handler.generate_content') as mock_gen:
         copy_handler.copy_all()
-        mock_gen.assert_called_with(set(["file1"]), "/repo", ANY, ANY, {}, [], None, ANY)
+        mock_gen.assert_called_with(set(["file1"]), "/repo", ANY, ANY, {}, [], None, mock_gui, "Markdown (Grok)")
 
 def test_copy_all_no_content(copy_handler, mock_gui):
     mock_gui.file_handler.loaded_files = set()

@@ -26,7 +26,7 @@ from handlers.git_handler import GitHandler
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
 import queue
 from tkinterdnd2 import DND_FILES
-from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION, ERROR_HANDLING_ENABLED, DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT
+from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION, ERROR_HANDLING_ENABLED, DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT, MAX_RECENT_FOLDERS
 from exceptions import UIError, ConfigurationError, ThreadingError
 from error_handler import handle_error, safe_execute, get_error_handler
 from logging_config import setup_logging, get_logger
@@ -166,15 +166,23 @@ class RepoPromptGUI:
         # Stop polling if shutdown requested
         if self._shutdown_requested:
             return
+        
+        if not self.root.winfo_exists():
+            return
             
         try:
             # Process all available tasks in the queue
             while True:
-                task = self.task_queue.get_nowait()
+                try:
+                    task = self.task_queue.get_nowait()
+                except tk.TclError:
+                    return
                 if isinstance(task, tuple) and len(task) == 2:
                     func, args = task
                     try:
                         func(*args)
+                    except tk.TclError:
+                        return
                     except Exception as e:
                         logging.error(f"Error executing queued task: {e}")
         except queue.Empty:
@@ -183,7 +191,7 @@ class RepoPromptGUI:
             logging.error(f"Error in queue polling: {e}")
         finally:
             # Schedule next poll only if not shutting down
-            if not self._shutdown_requested:
+            if not self._shutdown_requested and self.root.winfo_exists():
                 self.root.after(50, self._poll_queue)  # Poll every 50ms for better responsiveness
 
     def trigger_preview_update(self):
@@ -229,8 +237,7 @@ class RepoPromptGUI:
         if abs_path in self.recent_folders:
             self.recent_folders.remove(abs_path)
         self.recent_folders.insert(0, abs_path)
-        max_recent = 20
-        self.recent_folders = self.recent_folders[:max_recent]
+        self.recent_folders = self.recent_folders[:MAX_RECENT_FOLDERS]
         self.save_recent_folders()
 
     def delete_recent_folder(self, folder_to_delete):
@@ -433,7 +440,6 @@ class RepoPromptGUI:
             
             # Force immediate UI update
             self.root.update_idletasks()
-            self.root.update()
         except Exception as e:
             logging.warning(f"Error updating progress: {e}")
 

@@ -1,6 +1,6 @@
 import ttkbootstrap as ttk
 import tkinter as tk
-from ttkbootstrap.scrolled import ScrolledText
+from ttkbootstrap.widgets.scrolled import ScrolledText
 import logging
 from widgets import Tooltip
 from constants import ERROR_MESSAGE_DURATION

@@ -2,16 +2,16 @@
 # These are only needed for development, testing, and live reloading
 
 # Testing framework
-pytest>=7.0.0
+pytest==9.0.1
 
 # Live reloading for development
-watchdog>=3.0.0
+watchdog==6.0.0
 
 # Type checking (optional but recommended)
-mypy>=1.0.0
+mypy==1.18.2
 
 # Code formatting (optional but recommended)
-black>=23.0.0
+black==25.11.0
 
 # Linting (optional but recommended)
-flake8>=6.0.0
+flake8==7.3.0

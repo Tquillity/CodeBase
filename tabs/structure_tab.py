@@ -90,7 +90,6 @@ class StructureTab(ttk.Frame):
 
 
     def populate_tree(self, root_dir):
-        # NEW_LOG
         logging.info(f"StructureTab: Populating tree with root: {root_dir}")
         self.tree.delete(*self.tree.get_children())
         if not root_dir or not os.path.exists(root_dir):
@@ -109,7 +108,6 @@ class StructureTab(ttk.Frame):
         expansion_mode = self.settings.get('app', 'expansion', 'Collapsed')
         root_item = self.tree.get_children("")[0]
 
-        # FIX: Explicitly populate root children before traversing
         self.file_handler.expand_folder(root_item)
 
         if expansion_mode == 'Collapsed':
@@ -157,7 +155,6 @@ class StructureTab(ttk.Frame):
 
     def handle_tree_open(self, event):
         item_id = self.tree.focus()
-        # NEW_LOG
         logging.debug(f"Tree open event for {item_id}")
         if item_id and 'folder' in self.tree.item(item_id)['tags']:
             self.file_handler.expand_folder(item_id)
@@ -211,7 +208,7 @@ class StructureTab(ttk.Frame):
         else:
             self.gui.show_status_message("Expanding folders (may take time)...")
             self.gui.root.config(cursor="watch")
-            self.gui.root.update()
+            self.gui.root.update_idletasks()
             self.file_handler.expand_all()
             self.gui.root.config(cursor="")
             self.expand_collapse_button.config(text="Collapse All")
@@ -222,7 +219,6 @@ class StructureTab(ttk.Frame):
         if not root_items:
             return ""
 
-        # NEW_LOG
         logging.info("Generating folder structure text")
         include_icons = self.settings.get('app', 'include_icons', 1) == 1
 
@@ -245,7 +241,6 @@ class StructureTab(ttk.Frame):
             else:
                  display_text = item_text_raw
             
-            # NEW_LOG
             logging.debug(f"Traversing item: {item_id}, text: {display_text}")
 
             structure_lines.append(f"{indent}{prefix}{display_text}")

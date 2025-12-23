@@ -56,7 +56,7 @@ LOG_FILE_PATH = "codebase_debug.log"  # Default log file path
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"  # Log format string
 
 # Security configuration
-SECURITY_ENABLED = True  # Enable security validation for repository operations
+SECURITY_ENABLED = False  # Enable via settings for stricter behavior
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file size
 MAX_TEMPLATE_SIZE = 1024 * 1024   # 1MB max template size
 MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max content length
@@ -78,4 +78,5 @@ LEFT_PANEL_WIDTH = 200
 TOOLTIP_DELAY = 500
 TOOLTIP_WRAP_LENGTH = 300
 DIALOG_MIN_WIDTH = 500
+MAX_RECENT_FOLDERS = 20
 CACHE_OVERHEAD_BYTES = 100
