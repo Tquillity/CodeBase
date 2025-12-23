@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+# Node / JS tooling (not used; keep repo clean if ever added locally)
+node_modules/
+
 # Distribution / packaging
 .Python
 build/
@@ -28,6 +31,10 @@ MANIFEST
 # PyInstaller
 #  Usually these files are created by a PyInstaller build process
 *.spec
+
+# Installer Builders
+build_staging/
+*.iss
 
 # Pytest
 .pytest_cache/

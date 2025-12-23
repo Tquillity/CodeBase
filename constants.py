@@ -28,11 +28,15 @@ TEXT_EXTENSIONS_DEFAULT = {
 FILE_SEPARATOR = "===FILE_SEPARATOR===\n"
 
 # Application version
-VERSION = "5.0"
+VERSION = "6.1"
 
 # Cache configuration
 CACHE_MAX_SIZE = 1000  # Maximum number of cached files
 CACHE_MAX_MEMORY_MB = 100  # Maximum memory usage in MB
+
+# Template formats
+TEMPLATE_MARKDOWN = "Markdown (Grok)"
+TEMPLATE_XML = "XML (Gemini)"
 
 # Path normalization settings
 PATH_NORMALIZATION_ENABLED = True  # Enable consistent path normalization
@@ -52,7 +56,7 @@ LOG_FILE_PATH = "codebase_debug.log"  # Default log file path
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"  # Log format string
 
 # Security configuration
-SECURITY_ENABLED = False  # Disable security validation for now
+SECURITY_ENABLED = False  # Enable via settings for stricter behavior
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file size
 MAX_TEMPLATE_SIZE = 1024 * 1024   # 1MB max template size
 MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max content length
@@ -64,6 +68,7 @@ TREE_UI_UPDATE_INTERVAL = 100  # Update UI every N items to prevent blocking
 TREE_SAFETY_LIMIT = 10000  # Safety limit to prevent infinite loops
 
 # UI Configuration
+LEGENDARY_GOLD = "#FFD700"
 DEFAULT_WINDOW_SIZE = "1200x800"
 DEFAULT_WINDOW_POSITION = "+100+100"
 STATUS_MESSAGE_DURATION = 5000  # 5 seconds
@@ -73,4 +78,5 @@ LEFT_PANEL_WIDTH = 200
 TOOLTIP_DELAY = 500
 TOOLTIP_WRAP_LENGTH = 300
 DIALOG_MIN_WIDTH = 500
+MAX_RECENT_FOLDERS = 20
 CACHE_OVERHEAD_BYTES = 100

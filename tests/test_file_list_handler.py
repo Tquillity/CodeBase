@@ -11,6 +11,9 @@ from file_list_handler import generate_list_content
 def mock_gui():
     gui = MagicMock()
     gui.task_queue = MagicMock()
+    gui.settings = MagicMock()
+    gui.settings.get.return_value = "Markdown (Grok)"
+    gui._shutdown_requested = False
     # Make the task_queue.put method call the callback directly for testing
     def mock_put(task):
         if isinstance(task, tuple) and len(task) == 2:
@@ -18,7 +21,7 @@ def mock_gui():
             func(*args)
     gui.task_queue.put = mock_put
     return gui
-from content_manager import FILE_SEPARATOR
+from constants import FILE_SEPARATOR
 
 @pytest.fixture
 def temp_repo():

@@ -2,13 +2,21 @@ import os
 import time
 import threading
 import logging
+import tiktoken
 from typing import Optional, List, Any, Callable
-from constants import FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED, SECURITY_ENABLED
+from constants import FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED, SECURITY_ENABLED, TEMPLATE_XML
+
+# Initialize tokenizer
+try:
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+except Exception as e:
+    logging.warning(f"Failed to initialize tiktoken: {e}. Falling back to approximate token counting.")
+    tokenizer = None
 from lru_cache import ThreadSafeLRUCache
 from path_utils import normalize_for_cache, get_relative_path
 from exceptions import FileOperationError, RepositoryError
 from error_handler import handle_error, safe_execute
-from security import validate_file_path, validate_file_size, validate_content_security
+from security import validate_file_size, validate_content_security
 
 def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: threading.Lock, read_errors: List[str]) -> Optional[str]:
     # Use normalized path for cache keys for cross-platform consistency
@@ -29,7 +37,7 @@ def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: th
             return None
 
     try:
-        # FIX: Use the original, case-sensitive file_path for opening the file.
+        # Use original case-sensitive file_path for OS file operations
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
             content = file.read()
             
@@ -94,12 +102,10 @@ def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: th
 
     return None
 
-def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock, completion_callback: Callable, content_cache: ThreadSafeLRUCache, read_errors: List[str], progress_callback: Optional[Callable] = None, gui: Optional[Any] = None) -> None:
+def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock, completion_callback: Callable, content_cache: ThreadSafeLRUCache, read_errors: List[str], progress_callback: Optional[Callable] = None, gui: Optional[Any] = None, template_format: str = "Markdown (Grok)") -> None:
     try:
         start_time = time.time()
         content_parts = []
-        # Create a local list for errors found during this specific generation
-        local_read_errors = []
         
         # Check if shutdown was requested
         if gui and hasattr(gui, '_shutdown_requested') and gui._shutdown_requested:
@@ -120,49 +126,29 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
             handle_error(error, "generate_content", show_ui=True)
         return
 
-    # Filter out problematic files before processing
-    filtered_files = set()
-    for file_path in files_to_include:
-        # Skip files in virtual environments
-        if '/venv/' in file_path or '/env/' in file_path or '/ENV/' in file_path:
-            logging.debug(f"Skipping virtual environment file: {file_path}")
-            continue
-        # Skip binary files with common extensions
-        if file_path.endswith(('.so', '.dll', '.exe', '.bin', '.dylib')):
-            logging.debug(f"Skipping binary file: {file_path}")
-            continue
-        # Skip very large files (>10MB)
-        try:
-            if os.path.getsize(file_path) > 10 * 1024 * 1024:  # 10MB
-                logging.debug(f"Skipping large file: {file_path}")
-                continue
-        except OSError:
-            pass  # Skip if we can't get file size
-        filtered_files.add(file_path)
-    
-    sorted_files = sorted(list(filtered_files))
+    sorted_files = sorted(list(files_to_include))
     total_files = len(sorted_files)
     processed_count = 0
     
-    if len(filtered_files) != len(files_to_include):
-        logging.info(f"Filtered out {len(files_to_include) - len(filtered_files)} problematic files")
-
     for file_path in sorted_files:
         # Check for shutdown during processing
         if gui and hasattr(gui, '_shutdown_requested') and gui._shutdown_requested:
             logging.info("Shutdown requested during content generation, aborting")
             return
         
-        # Log which file we're processing to help debug hanging issues
         logging.debug(f"Processing file: {file_path}")
         
-        # The get_file_content function will append to the shared read_errors list
         file_content = get_file_content(file_path, content_cache, lock, read_errors)
         
         if file_content is not None:
             rel_path = get_relative_path(file_path, repo_path) or file_path
-            ext = os.path.splitext(rel_path)[1].lstrip('.')
-            content_parts.append(f"File: {rel_path}\nContent:\n```{ext}\n{file_content}\n```\n")
+            
+            if template_format == TEMPLATE_XML:
+                content_parts.append(f'<file path="{rel_path}">\n<![CDATA[\n{file_content}\n]]>\n</file>\n')
+            else:
+                # Default to Markdown
+                ext = os.path.splitext(rel_path)[1].lstrip('.')
+                content_parts.append(f"File: {rel_path}\nContent:\n```{ext}\n{file_content}\n```\n")
 
         processed_count += 1
         elapsed = time.time() - start_time
@@ -170,9 +156,17 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
             progress_callback(processed_count, total_files, elapsed)
 
     final_content = FILE_SEPARATOR.join(content_parts)
-    token_count = len(final_content.split())
+    
+    if tokenizer:
+        try:
+            token_count = len(tokenizer.encode(final_content))
+        except Exception as e:
+            logging.error(f"Error counting tokens with tiktoken: {e}")
+            token_count = len(final_content.split())
+    else:
+        token_count = len(final_content.split())
+        
     end_time = time.time()
     logging.info(f"Content generation complete for {len(files_to_include)} files in {end_time - start_time:.2f} seconds. Tokens: {token_count}")
 
-    # Pass the collected errors from this run to the callback
     completion_callback(final_content, token_count, read_errors)

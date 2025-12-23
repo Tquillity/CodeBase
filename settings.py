@@ -34,6 +34,7 @@ class SettingsManager:
                 "search_case_sensitive": 0,
                 "search_whole_word": 0,
                 "default_base_prompt": "",
+                "copy_format": "Markdown (Grok)",
                 "log_level": "INFO",
                 "log_to_file": 1,
                 "log_to_console": 1,
@@ -59,9 +60,8 @@ class SettingsManager:
                 "cross_platform_paths": 1,
                 # Folder selection settings
                 "default_start_folder": os.path.expanduser("~")
-                # Add default for text_extensions if needed, though FileHandler provides it
             },
-            "repo": {} # For future repo-specific settings if needed
+            "repo": {}
         }
 
         if os.path.exists(self.settings_file):

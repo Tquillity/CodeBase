@@ -143,8 +143,7 @@ if [ "$INSTALL_DESKTOP" = true ]; then
     # Replace placeholders in the .desktop file
     # Use @ as delimiter for sed to avoid issues with slashes in paths
     EXEC_DEST_ESCAPED=$(printf '%s\n' "$WRAPPER_SCRIPT_DEST" | sed 's@[&/@\]@\\&@g')
-    ICON_DEST_ESCAPED=$(printf '%s\n' "$APP_NAME" | sed 's@[&/@\]@\\&@g') # Use App Name, system finds icon
-    # ICON_DEST_ESCAPED=$(printf '%s\n' "$ICON_DEST" | sed 's@[&/@\]@\\&@g') # Alternative: full path
+    ICON_DEST_ESCAPED=$(printf '%s\n' "$APP_NAME" | sed 's@[&/@\]@\\&@g')
 
     sed -i "s@^Exec=.*@Exec=$EXEC_DEST_ESCAPED@" "$DESKTOP_DEST"
     sed -i "s@^Icon=.*@Icon=$ICON_DEST_ESCAPED@" "$DESKTOP_DEST"

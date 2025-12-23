@@ -31,6 +31,17 @@ class StructureTab(ttk.Frame):
         self.show_unloaded_checkbox.pack(side=tk.LEFT, padx=(5, 10), pady=8)
         Tooltip(self.show_unloaded_checkbox, "Apply visual marker (strikethrough) to text files currently not selected for inclusion")
 
+        # Filter/Search Bar
+        filter_frame = ttk.Frame(self)
+        filter_frame.pack(side=tk.TOP, fill='x', padx=10, pady=(0, 5))
+        
+        ttk.Label(filter_frame, text="Filter Files:").pack(side=tk.LEFT, padx=(0, 5))
+        self.filter_var = tk.StringVar()
+        self.filter_entry = ttk.Entry(filter_frame, textvariable=self.filter_var)
+        self.filter_entry.pack(side=tk.LEFT, fill='x', expand=True)
+        self.filter_entry.bind('<KeyRelease>', self._on_filter_change)
+        Tooltip(self.filter_entry, "Type to filter file tree (shows parent folders of matches)")
+
         # Treeview styling now handled by ttkbootstrap theme
         self.tree = ttk.Treeview(self, columns=("path", "checkbox"), show="tree headings",
                                  selectmode="browse", bootstyle="primary")
@@ -64,10 +75,21 @@ class StructureTab(ttk.Frame):
         self.tree.bind('<Button-1>', self.handle_tree_click)
         self.tree.bind('<Double-1>', self.handle_tree_double_click)
         self.tree.bind('<<TreeviewOpen>>', self.handle_tree_open)
+        
+        self.filter_timer = None
+
+    def _on_filter_change(self, event):
+        """Debounce filter input."""
+        if self.filter_timer:
+            self.after_cancel(self.filter_timer)
+        self.filter_timer = self.after(300, self._apply_filter)
+        
+    def _apply_filter(self):
+        query = self.filter_var.get().strip()
+        self.file_handler.apply_filter(query)
 
 
     def populate_tree(self, root_dir):
-        # NEW_LOG
         logging.info(f"StructureTab: Populating tree with root: {root_dir}")
         self.tree.delete(*self.tree.get_children())
         if not root_dir or not os.path.exists(root_dir):
@@ -86,17 +108,22 @@ class StructureTab(ttk.Frame):
         expansion_mode = self.settings.get('app', 'expansion', 'Collapsed')
         root_item = self.tree.get_children("")[0]
 
-        if expansion_mode == 'Expanded':
-            self.file_handler.expand_all()
-        elif expansion_mode == 'Levels':
-            try:
-                levels = int(self.settings.get('app', 'levels', '1'))
-                self.file_handler.expand_levels(levels, root_item)
-            except ValueError:
-                self.file_handler.expand_levels(1, root_item)
-        else:
-             self.file_handler.collapse_all()
+        self.file_handler.expand_folder(root_item)
+
+        if expansion_mode == 'Collapsed':
              self.tree.item(root_item, open=False)
+        else:
+             # Root must be open for children to be visible
+             self.tree.item(root_item, open=True)
+
+             if expansion_mode == 'Expanded':
+                 self.file_handler.expand_all(root_item)
+             elif expansion_mode == 'Levels':
+                 try:
+                     levels = int(self.settings.get('app', 'levels', '1'))
+                     self.file_handler.expand_levels(levels, root_item)
+                 except ValueError:
+                     self.file_handler.expand_levels(1, root_item)
 
         self.update_expand_collapse_button()
 
@@ -128,7 +155,6 @@ class StructureTab(ttk.Frame):
 
     def handle_tree_open(self, event):
         item_id = self.tree.focus()
-        # NEW_LOG
         logging.debug(f"Tree open event for {item_id}")
         if item_id and 'folder' in self.tree.item(item_id)['tags']:
             self.file_handler.expand_folder(item_id)
@@ -182,7 +208,7 @@ class StructureTab(ttk.Frame):
         else:
             self.gui.show_status_message("Expanding folders (may take time)...")
             self.gui.root.config(cursor="watch")
-            self.gui.root.update()
+            self.gui.root.update_idletasks()
             self.file_handler.expand_all()
             self.gui.root.config(cursor="")
             self.expand_collapse_button.config(text="Collapse All")
@@ -193,7 +219,6 @@ class StructureTab(ttk.Frame):
         if not root_items:
             return ""
 
-        # NEW_LOG
         logging.info("Generating folder structure text")
         include_icons = self.settings.get('app', 'include_icons', 1) == 1
 
@@ -216,7 +241,6 @@ class StructureTab(ttk.Frame):
             else:
                  display_text = item_text_raw
             
-            # NEW_LOG
             logging.debug(f"Traversing item: {item_id}, text: {display_text}")
 
             structure_lines.append(f"{indent}{prefix}{display_text}")

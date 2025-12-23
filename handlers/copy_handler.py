@@ -17,6 +17,10 @@ class CopyHandler:
 
         self.gui.show_loading_state("Preparing content for clipboard...")
         prompt = self.gui.base_prompt_tab.base_prompt_text.get("1.0", tk.END).strip() if self.gui.prepend_var.get() else ""
+        
+        # FIX: Get current format
+        current_format = self.gui.settings.get('app', 'copy_format', "Markdown (Grok)")
+        
         with self.gui.file_handler.lock:
             files_to_copy = set(self.gui.file_handler.loaded_files)
 
@@ -28,7 +32,8 @@ class CopyHandler:
             status_message="Copied selected file contents" if not errors else "Copy failed with errors"
         )
 
-        generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors, None, self.gui)
+        # FIX: Pass current_format as the last argument
+        generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors, None, self.gui, current_format)
 
     def copy_structure(self):
         if self.gui.is_loading: self.gui.show_status_message("Loading...", error=True); return
@@ -61,6 +66,10 @@ class CopyHandler:
 
         prompt = self.gui.base_prompt_tab.base_prompt_text.get("1.0", tk.END).strip()
         structure = self.gui.structure_tab.generate_folder_structure_text() if not no_structure else ""
+        
+        # FIX: Get current format
+        current_format = self.gui.settings.get('app', 'copy_format', "Markdown (Grok)")
+
         with self.gui.file_handler.lock:
              files_to_copy = set(self.gui.file_handler.loaded_files) if not no_files else set()
 
@@ -73,7 +82,8 @@ class CopyHandler:
         )
 
         if files_to_copy:
-            generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors, None, self.gui)
+            # FIX: Pass current_format as the last argument
+            generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors, None, self.gui, current_format)
         else:
             self._handle_copy_completion_final(prompt=prompt, content="", structure=structure, errors=[], status_message="Copied All (Prompt, Structure)")
 

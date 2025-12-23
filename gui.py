@@ -2,7 +2,7 @@
 import os
 import ttkbootstrap as ttk
 import tkinter as tk
-from tkinter import messagebox, filedialog, Toplevel, BooleanVar, IntVar, StringVar
+from tkinter import messagebox, filedialog, Toplevel, BooleanVar, IntVar, StringVar, colorchooser
 from typing import Dict, List, Set, Optional, Any, Callable
 from tabs.content_tab import ContentTab
 from tabs.structure_tab import StructureTab
@@ -21,10 +21,12 @@ from file_list_handler import generate_list_content
 from handlers.search_handler import SearchHandler
 from handlers.copy_handler import CopyHandler
 from handlers.repo_handler import RepoHandler
-# ThemeManager removed - using ttkbootstrap instead
+from handlers.git_handler import GitHandler
+# Support for thread-safe Tkinter callbacks from background threads
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
-import queue  # FIX: Added for thread-safe Tkinter callbacks
-from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION, ERROR_HANDLING_ENABLED, DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT
+import queue
+from tkinterdnd2 import DND_FILES
+from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION, ERROR_HANDLING_ENABLED, DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT, MAX_RECENT_FOLDERS
 from exceptions import UIError, ConfigurationError, ThreadingError
 from error_handler import handle_error, safe_execute, get_error_handler
 from logging_config import setup_logging, get_logger
@@ -39,6 +41,13 @@ class RepoPromptGUI:
         self.settings = SettingsManager()
         self.logger = get_logger(__name__)
         self.high_contrast_mode = BooleanVar(value=self.settings.get('app', 'high_contrast', 0))
+        
+        # --- FORCE ROOT BACKGROUND COLOR ---
+        # Set root window background to match theme to prevent flickering during padding adjustments
+        style = ttk.Style()
+        self.root.configure(background=style.colors.bg)
+        # ----------------------------------------
+        
         # Theme management now handled by ttkbootstrap
         self.root.title(f"CodeBase v{self.version}")
         self.root.geometry(self.settings.get('app', 'window_geometry', DEFAULT_WINDOW_SIZE))
@@ -68,8 +77,17 @@ class RepoPromptGUI:
         self.search_handler = SearchHandler(self)
         self.copy_handler = CopyHandler(self)
         self.repo_handler = RepoHandler(self)
+        self.git_handler = GitHandler(self)
         self.setup_ui()
         self.bind_keys()
+        
+        # Register drag and drop
+        try:
+            self.root.drop_target_register(DND_FILES)
+            self.root.dnd_bind('<<Drop>>', self._on_drop)
+        except Exception as e:
+            self.logger.warning(f"Drag and drop registration failed: {e}")
+            
         self.apply_default_tab()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         
@@ -79,17 +97,45 @@ class RepoPromptGUI:
         self.list_selected_files = set()
         self.list_read_errors = []
         
-        # Resource cleanup tracking (must be before _poll_queue)
+        # Resource cleanup tracking
         self._shutdown_requested = False
         self._background_threads = []
         
-        # FIX: Added queue for thread-safe Tkinter callbacks from background threads
+        # Queue for thread-safe Tkinter callbacks from background threads
         self.task_queue = queue.Queue()
         
         # Update logging configuration based on settings
         self._update_logging_config()
         
         self._poll_queue()
+
+    def _on_drop(self, event):
+        """Handle file/folder drop events."""
+        try:
+            path = event.data
+            if not path: return
+            
+            # Clean up path (Tcl/Tk wraps paths with spaces in curly braces)
+            if path.startswith('{') and path.endswith('}'):
+                path = path[1:-1]
+            
+            # Verify path exists
+            if not os.path.exists(path):
+                self.show_status_message(f"Invalid path dropped: {path}", error=True)
+                return
+                
+            if os.path.isdir(path):
+                self.show_status_message(f"Loading dropped repository: {path}")
+                self.update_recent_folders(path)
+                self.repo_handler._clear_internal_state(clear_ui=True)
+                self.show_loading_state(f"Scanning {os.path.basename(path)}...", show_cancel=True)
+                self.repo_handler.load_repo(path, self.show_status_message, self.repo_handler._handle_load_completion)
+            else:
+                self.show_status_message("Please drop a folder, not a file.", error=True)
+                
+        except Exception as e:
+            self.logger.error(f"Error handling drop event: {e}")
+            self.show_status_message("Error processing dropped item.", error=True)
 
     def _update_logging_config(self):
         """Update logging configuration based on user settings."""
@@ -115,20 +161,28 @@ class RepoPromptGUI:
         except Exception as e:
             self.logger.error(f"Failed to update logging configuration: {e}")
 
-    # FIX: Polling method to process queued tasks in the main thread
+    # Polling method to process queued tasks in the main thread
     def _poll_queue(self):
         # Stop polling if shutdown requested
         if self._shutdown_requested:
+            return
+        
+        if not self.root.winfo_exists():
             return
             
         try:
             # Process all available tasks in the queue
             while True:
-                task = self.task_queue.get_nowait()
+                try:
+                    task = self.task_queue.get_nowait()
+                except tk.TclError:
+                    return
                 if isinstance(task, tuple) and len(task) == 2:
                     func, args = task
                     try:
                         func(*args)
+                    except tk.TclError:
+                        return
                     except Exception as e:
                         logging.error(f"Error executing queued task: {e}")
         except queue.Empty:
@@ -137,12 +191,11 @@ class RepoPromptGUI:
             logging.error(f"Error in queue polling: {e}")
         finally:
             # Schedule next poll only if not shutting down
-            if not self._shutdown_requested:
+            if not self._shutdown_requested and self.root.winfo_exists():
                 self.root.after(50, self._poll_queue)  # Poll every 50ms for better responsiveness
 
     def trigger_preview_update(self):
         """Triggers the generation of the content preview tab."""
-        # NEW_LOG
         logging.info("Triggering preview update")
         if self.is_loading:
             return
@@ -184,8 +237,7 @@ class RepoPromptGUI:
         if abs_path in self.recent_folders:
             self.recent_folders.remove(abs_path)
         self.recent_folders.insert(0, abs_path)
-        max_recent = 20
-        self.recent_folders = self.recent_folders[:max_recent]
+        self.recent_folders = self.recent_folders[:MAX_RECENT_FOLDERS]
         self.save_recent_folders()
 
     def delete_recent_folder(self, folder_to_delete):
@@ -215,6 +267,7 @@ class RepoPromptGUI:
         self.root.grid_rowconfigure(2, weight=1)
         self.root.grid_columnconfigure(2, weight=1)
         self.header_frame = HeaderFrame(self.root, title="CodeBase", version=self.version)
+        self.header_frame.repo_name_label.bind("<Button-1>", self.change_repo_color)
         self.left_frame = LeftPanel(self.root, self)
         self.left_separator = ttk.Frame(self.root, width=2)
         self.left_separator.grid(row=2, column=1, padx=8, pady=15, sticky="ns")
@@ -247,16 +300,11 @@ class RepoPromptGUI:
         self.status_context_menu.add_command(label="Clear", command=self._clear_status_bar)
 
     def show_loading_state(self, message: str, show_cancel: bool = False) -> None:
-        print(f"DEBUG: show_loading_state called with message: {message}")
-        
         # Show file counter in center of screen
-        print("DEBUG: Showing file counter")
         self.file_counter.grid(row=2, column=0, columnspan=3, padx=30, pady=30)
         
-        # Initialize file counter (don't show "0" initially)
-        print("DEBUG: Initializing file counter")
+        # Initialize file counter
         self.file_counter.config(text="")
-        print(f"DEBUG: File counter initialized - text: {self.file_counter.cget('text')}")
         
         self.show_status_message(message, duration=ERROR_MESSAGE_DURATION)
         self.is_loading = True
@@ -375,35 +423,24 @@ class RepoPromptGUI:
         """Update the file counter display."""
         try:
             percentage = max(0, min(100, percentage))  # Clamp between 0-100
-            print(f"DEBUG: update_progress called with percentage={percentage}, message={message}, file_count={file_count}")
             
             # Check if file counter exists
             if not hasattr(self, 'file_counter'):
-                print("DEBUG: File counter not found!")
                 return
                 
             # Show file count if available, otherwise percentage
             if file_count:
                 # Show the full "X/Y files" format
                 self.file_counter.config(text=file_count)
-                print(f"DEBUG: File counter set to: {file_count}")
             else:
                 self.file_counter.config(text=f"{percentage}%")
-                print(f"DEBUG: File counter set to percentage: {percentage}%")
                 
-            print(f"DEBUG: File counter text set to {self.file_counter.cget('text')}")
-            
             if message:
-                print(f"DEBUG: Showing status message: {message}")
                 self.show_status_message(message, duration=1000)
             
             # Force immediate UI update
-            print("DEBUG: Forcing UI update")
             self.root.update_idletasks()
-            self.root.update()
-            print("DEBUG: UI update completed")
         except Exception as e:
-            print(f"DEBUG: Error updating progress: {e}")
             logging.warning(f"Error updating progress: {e}")
 
     def set_progress_max(self, max_value: int):
@@ -602,6 +639,19 @@ class RepoPromptGUI:
                             "Developed by Mikael Sundh.\n"
                             "License: MIT (To be finalized)\n"
                             "© 2024-2025")
+
+    def change_repo_color(self, event=None):
+        if not self.current_repo_path:
+            return
+        current_color = self.header_frame.repo_name_label.cget("foreground")
+        _, color_code = colorchooser.askcolor(title="Choose Repo Color", initialcolor=current_color)
+        if color_code:
+            self.header_frame.repo_name_label.config(foreground=color_code)
+            repo_data = self.settings.get('repo', self.current_repo_path, {})
+            repo_data['color'] = color_code
+            self.settings.set('repo', self.current_repo_path, repo_data)
+            self.settings.save()
+            self.show_status_message(f"Repository color updated to {color_code}")
 
     def on_close(self):
         """Handle application shutdown with proper resource cleanup."""

@@ -1,15 +1,12 @@
 import os
-import pyperclip
-import fnmatch
-import mimetypes
 import tkinter as tk
 from tkinter import messagebox
 import threading
 import logging
-import time
+from collections import deque
 from typing import Set, List, Optional, Any, Dict
 
-from file_scanner import scan_repo, parse_gitignore, is_ignored_path, is_text_file
+from file_scanner import parse_gitignore, is_ignored_path, is_text_file
 from content_manager import get_file_content, generate_content
 from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED, TREE_MAX_ITEMS, TREE_UI_UPDATE_INTERVAL, TREE_SAFETY_LIMIT
 from lru_cache import ThreadSafeLRUCache
@@ -48,6 +45,81 @@ class FileHandler:
         if other_extensions:
             groups["Other"].extend(sorted(other_extensions))
         return groups
+
+    def apply_filter(self, query):
+        """
+        Filters the file tree based on the query.
+        If query is empty, restores the normal tree.
+        If query exists, builds a filtered tree showing only matches and their parents.
+        """
+        if not self.repo_path: return
+        
+        if not query:
+            # Restore normal view
+            self.populate_tree(self.repo_path)
+            return
+            
+        tree = self.gui.structure_tab.tree
+        tree.delete(*tree.get_children())
+        
+        query = query.lower()
+        matches = []
+        
+        # Find matching files in scanned list
+        search_pool = self.scanned_text_files.union(self.loaded_files)
+        
+        for file_path in search_pool:
+            if query in os.path.basename(file_path).lower():
+                matches.append(file_path)
+                
+        if not matches:
+            tree.insert("", "end", text="No matches found", tags=('empty',))
+            return
+            
+        # 2. Build the tree with matches
+        # We need to create folders as we go.
+        created_items = {} # path -> item_id
+        
+        root_basename = os.path.basename(self.repo_path)
+        root_id = tree.insert("", "end", text=f"📁 {root_basename} (Filtered)", 
+                             values=(self.repo_path, "☑"), open=True, tags=('folder',))
+        created_items[self.repo_path] = root_id
+        
+        for file_path in sorted(matches):
+            # Ensure parents exist
+            parent_path = os.path.dirname(file_path)
+            
+            # We need to build the chain from repo_path down to parent_path
+            # Get relative path parts
+            try:
+                rel_path = os.path.relpath(file_path, self.repo_path)
+            except ValueError:
+                continue # Should not happen if file is in repo
+                
+            parts = rel_path.split(os.sep)
+            current_path = self.repo_path
+            parent_id = root_id
+            
+            # Create directory structure in tree
+            for part in parts[:-1]:
+                current_path = os.path.join(current_path, part)
+                if current_path not in created_items:
+                    folder_id = tree.insert(parent_id, "end", text=f"📁 {part}",
+                                           values=(current_path, "☐"), open=True, tags=('folder',))
+                    created_items[current_path] = folder_id
+                    parent_id = folder_id
+                else:
+                    parent_id = created_items[current_path]
+            
+            # Insert file
+            filename = parts[-1]
+            item_path_norm = normalize_for_cache(file_path)
+            is_selected = item_path_norm in self.loaded_files
+            checkbox_state = "☑" if is_selected else "☐"
+            tags = ['file_selected'] if is_selected else ['file_default']
+            
+            tree.insert(parent_id, "end", text=f"📄 {filename}",
+                       values=(file_path, checkbox_state), tags=tuple(tags))
 
     def populate_tree(self, root_dir):
         tree = self.gui.structure_tab.tree
@@ -150,9 +222,8 @@ class FileHandler:
             logging.info(f"Received expand request for item_id: '{item_id}'")
             children = tree.get_children(item_id)
 
-            # *** THE FIX IS HERE ***
             # Only build the level if the children list is not empty AND the first child has the 'dummy' tag.
-            # This is the only state where we need to populate the folder.
+            # This ensures we only populate folders that have not been loaded yet.
             if children and 'dummy' in tree.item(children[0])['tags']:
                 logging.debug(f"Item '{item_id}' has a dummy child. Proceeding to build level.")
                 
@@ -268,11 +339,23 @@ class FileHandler:
 
         return content_changed_flag
 
-    def generate_and_update_preview(self, _, completion_callback):
+    def generate_and_update_preview(self, _, completion_callback=None):
+        """
+        Generates the combined content preview and updates the UI.
+        """
+        # If no completion callback is provided, default to updating the content tab
+        if completion_callback is None:
+            completion_callback = self.gui.content_tab._handle_preview_completion
+            
         with self.lock:
             files_to_include = set(self.loaded_files)
+        
         logging.info(f"Generating preview for {len(files_to_include)} files")
         self.gui.show_loading_state("Generating content preview...")
+        
+        # Get the currently selected template format from the settings/UI
+        current_format = self.gui.settings.get('app', 'copy_format', "Markdown (Grok)")
+        
         def update_progress(processed, total, elapsed):
             if processed > 5:
                 avg = elapsed / processed
@@ -291,7 +374,7 @@ class FileHandler:
         def wrapped_completion(content, token_count, errors):
             self.gui.task_queue.put((completion_callback, (content, token_count, errors)))
             self.gui.task_queue.put((self.gui.hide_loading_state, ()))
-        thread = threading.Thread(target=generate_content, args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui), daemon=True)
+        thread = threading.Thread(target=generate_content, args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui, current_format), daemon=True)
         thread.start()
 
     def expand_all(self, item: str = "", max_depth: int = None) -> None:
@@ -306,11 +389,11 @@ class FileHandler:
         
         # Use a queue for iterative processing instead of recursion
         # Each item in queue is (item_id, depth)
-        items_to_process = [(item, 0)]
+        items_to_process = deque([(item, 0)])
         processed_count = 0
         
         while items_to_process and processed_count < TREE_SAFETY_LIMIT:
-            current_item, depth = items_to_process.pop(0)
+            current_item, depth = items_to_process.popleft()
             processed_count += 1
             
             # Skip if we've reached max depth
@@ -392,11 +475,11 @@ class FileHandler:
         tree = self.gui.structure_tab.tree
         
         # Use a queue for iterative processing instead of recursion
-        items_to_process = [item]
+        items_to_process = deque([item])
         processed_count = 0
         
         while items_to_process and processed_count < TREE_SAFETY_LIMIT:
-            current_item = items_to_process.pop(0)
+            current_item = items_to_process.popleft()
             processed_count += 1
             
             # Get children of current item
@@ -455,11 +538,11 @@ class FileHandler:
         tree = self.gui.structure_tab.tree
         
         # Use a queue for iterative processing instead of recursion
-        items_to_check = [item]
+        items_to_check = deque([item])
         processed_count = 0
         
         while items_to_check and processed_count < TREE_SAFETY_LIMIT:
-            current_item = items_to_check.pop(0)
+            current_item = items_to_check.popleft()
             processed_count += 1
             
             # Get children of current item
@@ -484,11 +567,11 @@ class FileHandler:
         tree = self.gui.structure_tab.tree
         
         # Use a queue for iterative processing with level tracking
-        items_to_process = [(item, current_level)]
+        items_to_process = deque([(item, current_level)])
         processed_count = 0
         
         while items_to_process and processed_count < TREE_SAFETY_LIMIT:
-            current_item, level = items_to_process.pop(0)
+            current_item, level = items_to_process.popleft()
             processed_count += 1
             
             # Stop if we've reached the desired level

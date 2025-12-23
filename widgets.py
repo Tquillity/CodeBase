@@ -23,6 +23,8 @@ class Tooltip:
         self.widget.bind("<Enter>", self.schedule_show, add='+')
         self.widget.bind("<Leave>", self.hide_tip, add='+')
         self.widget.bind("<ButtonPress>", self.hide_tip, add='+') # Hide on click
+        self.widget.bind("<FocusIn>", self.schedule_show, add='+')
+        self.widget.bind("<FocusOut>", self.hide_tip, add='+')
 
     def schedule_show(self, event=None):
         """Schedules the tooltip display after a delay."""
@@ -45,10 +47,8 @@ class Tooltip:
         tw.wm_geometry(f"+{x}+{y}")
         # Make it appear above other windows (may vary by WM)
         tw.wm_attributes("-topmost", True)
-
-        # FIX: Use tk.Label instead of ttk.Label to strictly enforce colors
-        # Background: Dark Grey (from __init__)
-        # Foreground: White (explicitly set)
+        
+        # Use tk.Label for tooltips to strictly control background/foreground colors
         label = tk.Label(tw, text=self.text, justify='left',
                        background=self.tooltip_bg, 
                        foreground="#ffffff", # Force white text
@@ -123,6 +123,11 @@ class FolderDialog:
         self.list_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind('<MouseWheel>', self._on_mousewheel)
         self.list_frame.bind('<MouseWheel>', self._on_mousewheel)
+        # Linux/X11: mouse wheel events may arrive as Button-4/Button-5
+        self.canvas.bind('<Button-4>', lambda e: self.canvas.yview_scroll(-1, "units"))
+        self.canvas.bind('<Button-5>', lambda e: self.canvas.yview_scroll(1, "units"))
+        self.list_frame.bind('<Button-4>', lambda e: self.canvas.yview_scroll(-1, "units"))
+        self.list_frame.bind('<Button-5>', lambda e: self.canvas.yview_scroll(1, "units"))
 
         self.populate_recent_list()
 
@@ -214,7 +219,7 @@ class FolderDialog:
         if self.on_delete_callback:
             self.on_delete_callback(folder_path)
         
-        # Also remove from the local list for immediate UI update
+        # Remove from local list for immediate UI update
         if folder_path in self.recent_folders:
             self.recent_folders.remove(folder_path)
         

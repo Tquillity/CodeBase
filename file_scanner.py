@@ -7,7 +7,7 @@ import logging
 from path_utils import normalize_path, get_relative_path
 from exceptions import RepositoryError, FileOperationError, SecurityError
 from error_handler import handle_error, safe_execute
-from constants import ERROR_HANDLING_ENABLED
+from constants import ERROR_HANDLING_ENABLED, MAX_FILE_SIZE
 
 def yield_repo_files(repo_path, ignore_patterns, gui):
     """
@@ -76,7 +76,6 @@ def scan_repo(folder, gui, progress_callback, completion_callback, lock):
 def parse_gitignore(gitignore_path):
     ignore_patterns = []
     default_ignores = ['.git']
-    # NEW_LOG
     logging.debug(f"Parsing .gitignore at {gitignore_path}")
     if os.path.exists(gitignore_path):
         try:
@@ -87,7 +86,6 @@ def parse_gitignore(gitignore_path):
                         ignore_patterns.append(line)
         except Exception as e:
             logging.warning(f"Could not read .gitignore file {gitignore_path}: {e}")
-    # NEW_LOG
     logging.debug(f"Parsed ignore patterns: {ignore_patterns}")
     return default_ignores + ignore_patterns
 
@@ -97,50 +95,47 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
         rel_path = get_relative_path(path, repo_root)
         if rel_path is None:
             return False
-        # NEW_LOG
         logging.debug(f"Checking if ignored: {path} (rel: {rel_path})")
-        rel_path_parts = rel_path.replace('\\', '/').split('/')
+        rel_path_parts = rel_path.split('/')
         path_basename = os.path.basename(path)
 
         for pattern in ignore_list:
-            if fnmatch.fnmatch(path_basename, pattern) or fnmatch.fnmatch(rel_path.replace('\\', '/'), pattern):
-                # NEW_LOG
+            if fnmatch.fnmatch(path_basename, pattern) or fnmatch.fnmatch(rel_path, pattern):
                 logging.debug(f"Ignored '{path}' due to pattern: {pattern}")
                 return True
-            if pattern.endswith('/') and os.path.isdir(path) and fnmatch.fnmatch(rel_path.replace('\\', '/') + '/', pattern):
-                # NEW_LOG
+            if pattern.endswith('/') and os.path.isdir(path) and fnmatch.fnmatch(rel_path + '/', pattern):
                 logging.debug(f"Ignored directory '{path}' due to pattern: {pattern}")
                 return True
-            if pattern.endswith('/') and fnmatch.fnmatch(rel_path.replace('\\', '/'), pattern.rstrip('/')):
+            if pattern.endswith('/') and fnmatch.fnmatch(rel_path, pattern.rstrip('/')):
                  if os.path.isfile(path):
-                      # NEW_LOG
                       logging.debug(f"Ignored file-as-dir '{path}' due to pattern: {pattern}")
                       return True
 
         if gui.settings.get('app', 'exclude_node_modules', 1) == 1 and 'node_modules' in rel_path_parts:
-            # NEW_LOG
             logging.debug(f"Ignored '{path}' due to node_modules setting")
             return True
         if gui.settings.get('app', 'exclude_dist', 1) == 1 and 'dist' in rel_path_parts:
-            # NEW_LOG
             logging.debug(f"Ignored '{path}' due to dist setting")
             return True
         if gui.settings.get('app', 'exclude_coverage', 1) == 1 and any(part.lower() in ['coverage', 'htmlcov', 'cov_html'] for part in rel_path_parts):
-            # NEW_LOG
             logging.debug(f"Ignored '{path}' due to coverage setting")
+            return True
+        
+        # Virtual environment check
+        if any(part in rel_path_parts for part in ['venv', 'env', 'ENV']):
+            logging.debug(f"Ignored '{path}' (virtual environment)")
             return True
         
         # Check for test file exclusion
         exclude_test_files_setting = gui.settings.get('app', 'exclude_test_files', 0)
         if exclude_test_files_setting == 1 and is_test_file(path, rel_path):
-            # NEW_LOG
             logging.info(f"Ignored '{path}' due to test file exclusion setting (exclude_test_files={exclude_test_files_setting})")
             return True
         elif exclude_test_files_setting == 0 and is_test_file(path, rel_path):
             logging.info(f"Including test file '{path}' (exclude_test_files={exclude_test_files_setting})")
 
     except ValueError:
-         # This can happen if path is not within repo_root, e.g. a different drive on Windows
+         # This can happen if path is not within repo_root
          if '.git' in path.split(os.sep): return True
          if gui.settings.get('app', 'exclude_node_modules', 1) == 1 and 'node_modules' in path.split(os.sep): return True
          if gui.settings.get('app', 'exclude_dist', 1) == 1 and 'dist' in path.split(os.sep): return True
@@ -153,8 +148,20 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
 
 def is_text_file(file_path, gui):
     try:
+        # Check file size first
+        try:
+            if os.path.getsize(file_path) > MAX_FILE_SIZE:
+                logging.debug(f"Not text: '{file_path}' exceeds MAX_FILE_SIZE")
+                return False
+        except OSError:
+            return False
+
         ext = os.path.splitext(file_path)[1].lower()
-        # NEW_LOG
+        # Explicitly skip known binary extensions
+        if ext in ['.so', '.bin', '.dylib', '.pyc', '.pyo']:
+             logging.debug(f"Not text: '{file_path}' has binary extension")
+             return False
+
         logging.debug(f"Determining if text: {file_path} (ext: {ext})")
         from file_handler import FileHandler
         text_extensions_settings = gui.settings.get('app', 'text_extensions', {ext: 1 for ext in FileHandler.text_extensions_default})
@@ -168,49 +175,43 @@ def is_text_file(file_path, gui):
                 return False
 
         if ext in text_extensions_settings and text_extensions_settings[ext] == 1:
-             filename = os.path.basename(file_path)
-             exclude_files_settings = gui.settings.get('app', 'exclude_files', {})
-             if filename in exclude_files_settings and exclude_files_settings[filename] == 1:
-                 # NEW_LOG
-                 logging.debug(f"Not text: '{file_path}' is in exclude_files setting")
-                 return False
-             
-             # Null byte check
-             if has_null_bytes(file_path):
-                 logging.debug(f"Not text: '{file_path}' contains null bytes (binary)")
-                 return False
+            filename = os.path.basename(file_path)
+            exclude_files_settings = gui.settings.get('app', 'exclude_files', {})
+            if filename in exclude_files_settings and exclude_files_settings[filename] == 1:
+                logging.debug(f"Not text: '{file_path}' is in exclude_files setting")
+                return False
+            
+            # Null byte check
+            if has_null_bytes(file_path):
+                logging.debug(f"Not text: '{file_path}' contains null bytes (binary)")
+                return False
 
-             # NEW_LOG
-             logging.debug(f"Text by extension setting: {ext}")
-             return True
+            logging.debug(f"Text by extension setting: {ext}")
+            return True
 
         if ext in text_extensions_settings and text_extensions_settings[ext] == 0:
-             # NEW_LOG
-             logging.debug(f"Not text: extension '{ext}' is disabled in settings")
-             return False
+            logging.debug(f"Not text: extension '{ext}' is disabled in settings")
+            return False
 
         mime_type, encoding = mimetypes.guess_type(file_path)
         if mime_type and mime_type.startswith('text/'):
-             filename = os.path.basename(file_path)
-             exclude_files_settings = gui.settings.get('app', 'exclude_files', {})
-             if filename in exclude_files_settings and exclude_files_settings[filename] == 1:
-                 # NEW_LOG
-                 logging.debug(f"Not text: '{file_path}' (MIME: {mime_type}) is in exclude_files setting")
-                 return False
-             
-             # Null byte check
-             if has_null_bytes(file_path):
-                 logging.debug(f"Not text: '{file_path}' contains null bytes (binary)")
-                 return False
+            filename = os.path.basename(file_path)
+            exclude_files_settings = gui.settings.get('app', 'exclude_files', {})
+            if filename in exclude_files_settings and exclude_files_settings[filename] == 1:
+                logging.debug(f"Not text: '{file_path}' (MIME: {mime_type}) is in exclude_files setting")
+                return False
+            
+            # Null byte check
+            if has_null_bytes(file_path):
+                logging.debug(f"Not text: '{file_path}' contains null bytes (binary)")
+                return False
 
-             # NEW_LOG
-             logging.debug(f"Text by MIME: {mime_type}")
-             return True
+            logging.debug(f"Text by MIME: {mime_type}")
+            return True
 
     except Exception as e:
         logging.warning(f"Could not determine if {file_path} is text: {e}")
     
-    # NEW_LOG
     logging.debug(f"Not text: {file_path} (default case)")
     return False
 
