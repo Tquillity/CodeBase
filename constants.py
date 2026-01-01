@@ -21,7 +21,7 @@ TEXT_EXTENSIONS_DEFAULT = {
     '.elm', '.hs', '.lhs', '.agda', '.idr', '.nix', '.dhall', '.tex', 
     '.bib', '.sty', '.cls', '.cs', '.fs', '.fsx', '.mdx', '.rst', '.adoc', 
     '.org', '.texinfo', '.w', '.man', '.conf', '.cfg', '.env', '.ipynb', 
-    '.rmd', '.qmd', '.lock', '.srt', '.vtt', '.po', '.pot', '.mts'
+    '.rmd', '.qmd', '.lock', '.srt', '.vtt', '.po', '.pot', '.mts', '.astro'
 }
 
 # File separator used in content generation
