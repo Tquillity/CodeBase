@@ -125,6 +125,17 @@ class LeftPanel(ttk.Frame):
         self.gui.prepend_checkbox.pack(pady=(0, 8), padx=0, fill='x')
         Tooltip(self.gui.prepend_checkbox, "Include Base Prompt text when copying content or 'Copy All'")
 
+        # Neutralize URLs checkbox
+        self.gui.sanitize_urls_var = tk.IntVar(value=self.gui.settings.get('app', 'sanitize_urls', 0))
+        self.gui.sanitize_urls_checkbox = ttk.Checkbutton(
+            options_frame, 
+            text="Neutralize URLs", 
+            variable=self.gui.sanitize_urls_var,
+            command=self.on_sanitize_urls_toggle
+        )
+        self.gui.sanitize_urls_checkbox.pack(pady=(0, 8), padx=0, fill='x')
+        Tooltip(self.gui.sanitize_urls_checkbox, "Replace links with [URL_REDACTED] to fix Google AI Studio preview errors")
+
         # Test files toggle button
         self.gui.test_toggle_button = self.gui.create_button(options_frame, "With Tests", self.gui.toggle_test_files_and_refresh, "Toggle test files inclusion and refresh repository")
         self.gui.test_toggle_button.pack(pady=(0, 0), padx=0, fill='x')
@@ -146,6 +157,12 @@ class LeftPanel(ttk.Frame):
         """Handle format selection change."""
         new_format = self.gui.format_var.get()
         self.gui.settings.set('app', 'copy_format', new_format)
+        self.gui.settings.save()
+        self.gui.trigger_preview_update()
+
+    def on_sanitize_urls_toggle(self):
+        """Handle Neutralize URLs checkbox toggle."""
+        self.gui.settings.set('app', 'sanitize_urls', self.gui.sanitize_urls_var.get())
         self.gui.settings.save()
         self.gui.trigger_preview_update()
 

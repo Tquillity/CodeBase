@@ -341,3 +341,18 @@ def validate_file_size(file_path: Union[str, os.PathLike], max_size: int = None)
 def sanitize_content(content: str) -> str:
     """Convenience function to sanitize content."""
     return get_security_validator().sanitize_content(content)
+
+def neutralize_urls(content: str) -> str:
+    """
+    Replaces http/https URLs with a placeholder to prevent 
+    LLM safety filters or media previews from blocking the prompt.
+    
+    Args:
+        content: Content that may contain URLs
+        
+    Returns:
+        Content with URLs replaced by [URL_REDACTED]
+    """
+    # This regex finds standard http/https links
+    url_pattern = r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+[^\s]*'
+    return re.sub(url_pattern, '[URL_REDACTED]', content)

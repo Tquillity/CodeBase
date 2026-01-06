@@ -16,7 +16,7 @@ from lru_cache import ThreadSafeLRUCache
 from path_utils import normalize_for_cache, get_relative_path
 from exceptions import FileOperationError, RepositoryError
 from error_handler import handle_error, safe_execute
-from security import validate_file_size, validate_content_security
+from security import validate_file_size, validate_content_security, neutralize_urls
 
 def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: threading.Lock, read_errors: List[str]) -> Optional[str]:
     # Use normalized path for cache keys for cross-platform consistency
@@ -141,6 +141,10 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
         file_content = get_file_content(file_path, content_cache, lock, read_errors)
         
         if file_content is not None:
+            # Apply URL neutralization if setting is enabled
+            if gui and gui.settings.get('app', 'sanitize_urls', 0) == 1:
+                file_content = neutralize_urls(file_content)
+            
             rel_path = get_relative_path(file_path, repo_path) or file_path
             
             if template_format == TEMPLATE_XML:

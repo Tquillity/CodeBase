@@ -58,6 +58,8 @@ class SettingsManager:
                 # Path normalization settings
                 "path_normalization_enabled": 1,
                 "cross_platform_paths": 1,
+                # URL sanitization settings
+                "sanitize_urls": 0,
                 # Folder selection settings
                 "default_start_folder": os.path.expanduser("~")
             },
