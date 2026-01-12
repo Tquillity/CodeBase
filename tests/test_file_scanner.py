@@ -86,6 +86,23 @@ def test_is_ignored_path_gitignore_patterns(monkeypatch):
     assert is_ignored_path(os.path.join(repo_root, "node_modules"), repo_root, ignore_list, gui) == True
     assert is_ignored_path(os.path.join(repo_root, "src", "code.py"), repo_root, ignore_list, gui) == False
 
+def test_is_ignored_path_directory_patterns_match_nested_files(monkeypatch):
+    """Test that directory patterns like .next/ or node_modules/ match files inside those directories."""
+    repo_root = "/repo"
+    ignore_list = ['.next/', 'node_modules/', 'build/', 'dist/']
+    gui = MagicMock()
+    gui.settings.get.side_effect = lambda sec, key, default: 0 if key in ['exclude_node_modules', 'exclude_dist'] else default
+
+    # Files inside ignored directories should be ignored
+    assert is_ignored_path(os.path.join(repo_root, "apps", "web", ".next", "dev", "static", "chunks", "file.js"), repo_root, ignore_list, gui) == True
+    assert is_ignored_path(os.path.join(repo_root, "node_modules", "some-package", "index.js"), repo_root, ignore_list, gui) == True
+    assert is_ignored_path(os.path.join(repo_root, "build", "output", "app.js"), repo_root, ignore_list, gui) == True
+    assert is_ignored_path(os.path.join(repo_root, "dist", "bundle.js"), repo_root, ignore_list, gui) == True
+    
+    # Files outside ignored directories should not be ignored
+    assert is_ignored_path(os.path.join(repo_root, "src", "code.js"), repo_root, ignore_list, gui) == False
+    assert is_ignored_path(os.path.join(repo_root, "apps", "web", "src", "page.tsx"), repo_root, ignore_list, gui) == False
+
 def test_is_ignored_path_settings_excludes(monkeypatch):
     repo_root = "/repo"
     ignore_list = []

@@ -100,16 +100,26 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
         path_basename = os.path.basename(path)
 
         for pattern in ignore_list:
+            # Check if pattern matches basename or full relative path
             if fnmatch.fnmatch(path_basename, pattern) or fnmatch.fnmatch(rel_path, pattern):
                 logging.debug(f"Ignored '{path}' due to pattern: {pattern}")
                 return True
-            if pattern.endswith('/') and os.path.isdir(path) and fnmatch.fnmatch(rel_path + '/', pattern):
-                logging.debug(f"Ignored directory '{path}' due to pattern: {pattern}")
-                return True
-            if pattern.endswith('/') and fnmatch.fnmatch(rel_path, pattern.rstrip('/')):
-                 if os.path.isfile(path):
-                      logging.debug(f"Ignored file-as-dir '{path}' due to pattern: {pattern}")
-                      return True
+            
+            # For directory patterns (ending with /), check if any directory component matches
+            # This handles cases like ".next/" or "node_modules/" matching files inside those directories
+            if pattern.endswith('/'):
+                pattern_dir = pattern.rstrip('/')
+                # Check if any directory component in the path matches the pattern
+                for part in rel_path_parts[:-1]:  # Exclude the filename (last part)
+                    if fnmatch.fnmatch(part, pattern_dir):
+                        logging.debug(f"Ignored '{path}' due to directory pattern: {pattern} (matched component: {part})")
+                        return True
+                # Also check if the pattern matches a path prefix (for nested patterns)
+                for i in range(len(rel_path_parts)):
+                    path_prefix = '/'.join(rel_path_parts[:i+1])
+                    if fnmatch.fnmatch(path_prefix, pattern_dir) or fnmatch.fnmatch(path_prefix + '/', pattern):
+                        logging.debug(f"Ignored '{path}' due to directory pattern: {pattern} (matched prefix: {path_prefix})")
+                        return True
 
         if gui.settings.get('app', 'exclude_node_modules', 1) == 1 and 'node_modules' in rel_path_parts:
             logging.debug(f"Ignored '{path}' due to node_modules setting")
