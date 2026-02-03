@@ -22,6 +22,7 @@ class SettingsTab(ttk.Frame):
         self.exclude_node_modules_var = tk.IntVar(value=self.settings.get('app', 'exclude_node_modules', 1))
         self.exclude_dist_var = tk.IntVar(value=self.settings.get('app', 'exclude_dist', 1))
         self.exclude_coverage_var = tk.IntVar(value=self.settings.get('app', 'exclude_coverage', 1))
+        self.exclude_lock_files_var = tk.IntVar(value=self.settings.get('app', 'exclude_lock_files', 1))
         self.include_icons_var = tk.IntVar(value=self.settings.get('app', 'include_icons', 1))
         self.setup_ui()
 
@@ -127,13 +128,18 @@ class SettingsTab(ttk.Frame):
         exclude_coverage_checkbox.grid(row=7, column=0, columnspan=2, padx=25, pady=4, sticky="w")
         Tooltip(exclude_coverage_checkbox, "Hide coverage report folders.")
 
+        # Exclude All Lock Files (Global)
+        exclude_lock_files_checkbox = ttk.Checkbutton(inner_frame, text="Exclude All Lock Files (Global)", variable=self.exclude_lock_files_var)
+        exclude_lock_files_checkbox.grid(row=8, column=0, columnspan=2, padx=25, pady=4, sticky="w")
+        Tooltip(exclude_lock_files_checkbox, "Hide all lock files (pnpm-lock.yaml, yarn.lock, package-lock.json, etc.) globally.")
+
         # Exclude Specific Files
         exclude_files_label = ttk.Label(inner_frame, text="Exclude Specific Files:", font=("Arial", 10, "bold"))
-        exclude_files_label.grid(row=8, column=0, columnspan=2, padx=25, pady=(15, 8), sticky="w")
+        exclude_files_label.grid(row=9, column=0, columnspan=2, padx=25, pady=(15, 8), sticky="w")
         Tooltip(exclude_files_label, "Check to hide specific lock files.")
 
         exclude_files = self.settings.get('app', 'exclude_files', {})
-        row = 9
+        row = 10
         for file, value in exclude_files.items():
             var = tk.IntVar(value=value)
             checkbox = ttk.Checkbutton(inner_frame, text=file, variable=var)

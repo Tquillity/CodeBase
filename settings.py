@@ -25,6 +25,7 @@ class SettingsManager:
                 "exclude_dist": 1,
                 "exclude_coverage": 1,
                 "exclude_test_files": 0,
+                "exclude_lock_files": 1,
                 "exclude_files": {
                     'package-lock.json': 1, 'yarn.lock': 1, 'composer.lock': 1,
                     'Gemfile.lock': 1, 'poetry.lock': 1, 'get-pip.py': 1

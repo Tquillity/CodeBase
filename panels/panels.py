@@ -9,9 +9,9 @@ from tabs.file_list_tab import FileListTab
 from constants import VERSION, LEFT_PANEL_WIDTH, TEMPLATE_MARKDOWN, TEMPLATE_XML, LEGENDARY_GOLD
 
 class HeaderFrame(ttk.Frame):
-    def __init__(self, parent, title="CodeBase", version=VERSION):
+    def __init__(self, parent, title="CodeBase", version=VERSION, row_offset=0):
         super().__init__(parent)
-        self.grid(row=0, column=0, columnspan=3, padx=12, pady=(12, 0), sticky="ew")
+        self.grid(row=0 + row_offset, column=0, columnspan=3, padx=12, pady=(12, 0), sticky="ew")
 
         # Title and version section
         title_frame = ttk.Frame(self)
@@ -50,13 +50,13 @@ class HeaderFrame(ttk.Frame):
 
         # Separator line
         self.header_separator = ttk.Frame(parent, height=1)
-        self.header_separator.grid(row=1, column=0, columnspan=3, sticky="ew", padx=12, pady=(8, 8))
+        self.header_separator.grid(row=1 + row_offset, column=0, columnspan=3, sticky="ew", padx=12, pady=(8, 8))
 
 class LeftPanel(ttk.Frame):
-    def __init__(self, parent, gui):
+    def __init__(self, parent, gui, row_offset=0):
         super().__init__(parent, width=LEFT_PANEL_WIDTH)
         self.gui = gui
-        self.grid(row=2, column=0, padx=(10, 0), pady=10, sticky="nsw")
+        self.grid(row=2 + row_offset, column=0, padx=(10, 0), pady=10, sticky="nsw")
         self.grid_propagate(False)
         self.setup_ui()
 
@@ -140,6 +140,10 @@ class LeftPanel(ttk.Frame):
         self.gui.test_toggle_button = self.gui.create_button(options_frame, "With Tests", self.gui.toggle_test_files_and_refresh, "Toggle test files inclusion and refresh repository")
         self.gui.test_toggle_button.pack(pady=(0, 0), padx=0, fill='x')
 
+        # Lock files toggle button
+        self.gui.lock_toggle_button = self.gui.create_button(options_frame, "No Locks", self.gui.toggle_lock_files_and_refresh, "Toggle lock files inclusion and refresh repository")
+        self.gui.lock_toggle_button.pack(pady=(0, 0), padx=0, fill='x')
+
         # Clear buttons section at bottom
         self.gui.clear_button_frame = ttk.Frame(self)
         self.gui.clear_button_frame.pack(side='bottom', fill='x', pady=(15, 10), padx=button_padx)
@@ -167,10 +171,10 @@ class LeftPanel(ttk.Frame):
         self.gui.trigger_preview_update()
 
 class RightPanel(ttk.Frame):
-    def __init__(self, parent, gui):
+    def __init__(self, parent, gui, row_offset=0):
         super().__init__(parent)
         self.gui = gui
-        self.grid(row=2, column=2, padx=(0, 10), pady=10, sticky="nsew")
+        self.grid(row=2 + row_offset, column=2, padx=(0, 10), pady=10, sticky="nsew")
         self.setup_ui()
 
     def on_tab_changed(self, event):

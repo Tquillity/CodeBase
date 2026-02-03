@@ -94,6 +94,9 @@ class RepoPromptGUI:
         # Update test toggle button after UI is fully initialized
         if hasattr(self, 'test_toggle_button'):
             self.update_test_toggle_button()
+        # Update lock toggle button after UI is fully initialized
+        if hasattr(self, 'lock_toggle_button'):
+            self.update_lock_toggle_button()
         self.list_selected_files = set()
         self.list_read_errors = []
         
@@ -264,14 +267,23 @@ class RepoPromptGUI:
         help_menu = tk.Menu(self.menu, tearoff=0)
         self.menu.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About", command=self.show_about)
-        self.root.grid_rowconfigure(2, weight=1)
+        
+        # Add red bar at top if running from live_reload.py
+        row_offset = 0
+        if os.environ.get('CODEBASE_LIVE_RELOAD') == '1':
+            self.live_reload_bar = tk.Frame(self.root, bg='#DC3545', height=8)
+            self.live_reload_bar.grid(row=0, column=0, columnspan=3, sticky="ew")
+            self.root.grid_rowconfigure(0, weight=0)
+            row_offset = 1
+        
+        self.root.grid_rowconfigure(2 + row_offset, weight=1)
         self.root.grid_columnconfigure(2, weight=1)
-        self.header_frame = HeaderFrame(self.root, title="CodeBase", version=self.version)
+        self.header_frame = HeaderFrame(self.root, title="CodeBase", version=self.version, row_offset=row_offset)
         self.header_frame.repo_name_label.bind("<Button-1>", self.change_repo_color)
-        self.left_frame = LeftPanel(self.root, self)
+        self.left_frame = LeftPanel(self.root, self, row_offset=row_offset)
         self.left_separator = ttk.Frame(self.root, width=2)
-        self.left_separator.grid(row=2, column=1, padx=8, pady=15, sticky="ns")
-        self.right_frame = RightPanel(self.root, self)
+        self.left_separator.grid(row=2 + row_offset, column=1, padx=8, pady=15, sticky="ns")
+        self.right_frame = RightPanel(self.root, self, row_offset=row_offset)
         self.setup_status_bar()
         # Create large file counter display instead of progress bar
         self.file_counter = ttk.Label(self.root, text="", font=("Arial", 36, "bold"))
@@ -516,6 +528,62 @@ class RepoPromptGUI:
         except Exception as e:
             logging.error(f"Error updating test toggle button: {e}")
 
+    def toggle_lock_files_and_refresh(self):
+        """Toggle lock files exclusion and refresh the current repository."""
+        try:
+            if not self.current_repo_path:
+                self.show_status_message("No repository loaded", error=True)
+                return
+                
+            # Toggle the setting
+            current_setting = self.settings.get('app', 'exclude_lock_files', 1)
+            new_setting = 1 if current_setting == 0 else 0
+            self.settings.set('app', 'exclude_lock_files', new_setting)
+            self.settings.save()
+            
+            # Debug logging
+            logging.info(f"Lock files exclusion toggled: {current_setting} -> {new_setting}")
+            logging.info(f"Settings file saved. Reading back: {self.settings.get('app', 'exclude_lock_files', 1)}")
+            
+            # Force reload settings to ensure we have the latest value
+            self.settings.settings = self.settings.load_settings()
+            logging.info(f"After reload, setting is: {self.settings.get('app', 'exclude_lock_files', 1)}")
+            
+            # Update button appearance
+            self.update_lock_toggle_button()
+            
+            # Show status message
+            if new_setting:
+                self.show_status_message("Refreshing repository without lock files...")
+            else:
+                self.show_status_message("Refreshing repository with lock files...")
+            
+            # Force a complete reload of the repository with the new setting
+            repo_path = self.current_repo_path  # Preserve the path before clearing
+            self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)
+            self.repo_handler.load_repo(repo_path, self.show_status_message, self.repo_handler._handle_load_completion)
+                
+        except Exception as e:
+            logging.error(f"Error toggling lock files exclusion: {e}")
+            self.show_status_message("Error updating lock files setting", error=True)
+
+    def update_lock_toggle_button(self):
+        """Update the lock toggle button appearance based on current setting."""
+        try:
+            exclude_locks = self.settings.get('app', 'exclude_lock_files', 1)
+            
+            if exclude_locks:
+                # Red button - excluding locks
+                self.lock_toggle_button.config(text="No Locks")
+                self.lock_toggle_button.configure(bootstyle="danger")
+            else:
+                # Green button - including locks
+                self.lock_toggle_button.config(text="With Locks")
+                self.lock_toggle_button.configure(bootstyle="success")
+                
+        except Exception as e:
+            logging.error(f"Error updating lock toggle button: {e}")
+
     def clear_current(self):
         if self.is_loading: self.show_status_message("Loading...", error=True); return
         current_index = self.notebook.index('current')
@@ -566,6 +634,7 @@ class RepoPromptGUI:
             self.settings.set('app', 'exclude_node_modules', self.settings_tab.exclude_node_modules_var.get())
             self.settings.set('app', 'exclude_dist', self.settings_tab.exclude_dist_var.get())
             self.settings.set('app', 'exclude_coverage', self.settings_tab.exclude_coverage_var.get())
+            self.settings.set('app', 'exclude_lock_files', self.settings_tab.exclude_lock_files_var.get())
             self.settings.set('app', 'exclude_files', {file: var.get() for file, var in self.settings_tab.exclude_file_vars.items()})
             self.settings.set('app', 'search_case_sensitive', self.case_sensitive_var.get())
             self.settings.set('app', 'search_whole_word', self.whole_word_var.get())
