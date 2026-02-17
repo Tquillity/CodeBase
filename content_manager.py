@@ -99,7 +99,7 @@ def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: th
 
     return None
 
-def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock, completion_callback: Callable, content_cache: ThreadSafeLRUCache, read_errors: List[str], progress_callback: Optional[Callable] = None, gui: Optional[Any] = None, template_format: str = "Markdown (Grok)") -> None:
+def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock, completion_callback: Callable, content_cache: ThreadSafeLRUCache, read_errors: List[str], progress_callback: Optional[Callable] = None, gui: Optional[Any] = None, template_format: str = "Markdown (Grok)", cancelled_callback: Optional[Callable] = None) -> None:
     try:
         start_time = time.time()
         content_parts = []
@@ -133,7 +133,13 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
         if gui and hasattr(gui, '_shutdown_requested') and gui._shutdown_requested:
             logging.info("Shutdown requested during content generation, aborting")
             return
-        
+        # Check for user cancel (scan or preview)
+        if gui and getattr(gui, '_scan_cancel_requested', False):
+            logging.info("Preview generation cancelled by user")
+            if cancelled_callback:
+                cancelled_callback()
+            return
+
         logging.debug(f"Processing file: {file_path}")
         
         file_content = get_file_content(file_path, content_cache, lock, read_errors, deleted_files=deleted_files)
@@ -161,6 +167,13 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
         elapsed = time.time() - start_time
         if progress_callback:
             progress_callback(processed_count, total_files, elapsed)
+
+    # After loop: do not call completion if user cancelled
+    if gui and getattr(gui, '_scan_cancel_requested', False):
+        logging.info("Preview generation cancelled by user (after loop)")
+        if cancelled_callback:
+            cancelled_callback()
+        return
 
     final_content = FILE_SEPARATOR.join(content_parts)
     

@@ -41,12 +41,13 @@ python3 main.py
 ✅ **#7 Toast Notifications** — Modern, non-blocking toast notifications (success / info / warning / error); thread-safe via task_queue; replaced blocking messagebox for errors/warnings where appropriate.
 ✅ **Git Status panel UX** — Panel uses full vertical height; collapsible Staged/Changes sections; listbox height and scrollbars adapt to content.
 ✅ **Deleted/missing files** — Preview and copy never fail due to missing files; deleted files shown in Content tab as red strikethrough with [DELETED]; Git panel shows "D" for deleted; error summary groups "Deleted files (not copied)".
+✅ **Cancel during preview + loading messages** — Cancel button works during both scan and preview; phased messages: "Scanning repository...", "Refreshing repository...", "Building tree...", "Generating preview..."; cancel during preview shows toast "Preview generation cancelled." and hides overlay.
 
 ## Changelog
-- **6.6.0** — Toast notifications (non-blocking); Git Status panel full-height + collapsible sections; graceful deleted/missing file handling (preview + copy); QC-audited.
+- **6.6.0** — Toast notifications (non-blocking); Git Status panel full-height + collapsible sections; graceful deleted/missing file handling (preview + copy); Cancel during preview + contextual loading messages; QC-audited.
 
 ## Next (optional)
-- Make Cancel button work during preview generation; context-aware loading messages (e.g. "Loading repository…" / "Refreshing…" / "Generating preview…").
+- Full type hints; Sprint 1 (Dependency Graph Engine).
 
 ## Key Files
 - `main.py` - Application entry point

@@ -373,7 +373,18 @@ class FileHandler:
         def wrapped_completion(content, token_count, errors, deleted_files=None):
             self.gui.task_queue.put((completion_callback, (content, token_count, errors, deleted_files or [])))
             self.gui.task_queue.put((self.gui.hide_loading_state, ()))
-        thread = threading.Thread(target=generate_content, args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui, current_format), daemon=True)
+        def on_preview_cancelled():
+            def cleanup():
+                self.gui.is_generating_preview = False
+                self.gui.hide_loading_state()
+                self.gui.show_toast("Preview generation cancelled.", "info")
+            self.gui.task_queue.put((cleanup, ()))
+        thread = threading.Thread(
+            target=generate_content,
+            args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui, current_format),
+            kwargs={"cancelled_callback": on_preview_cancelled},
+            daemon=True,
+        )
         thread.start()
 
     def expand_all(self, item: str = "", max_depth: int = None) -> None:

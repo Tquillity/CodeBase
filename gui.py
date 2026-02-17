@@ -139,7 +139,7 @@ class RepoPromptGUI:
                 self.show_status_message(f"Loading dropped repository: {path}")
                 self.update_recent_folders(path)
                 self.repo_handler._clear_internal_state(clear_ui=True)
-                self.show_loading_state(f"Scanning {os.path.basename(path)}...", show_cancel=True)
+                self.show_loading_state("Scanning repository...", show_cancel=True)
                 self.repo_handler.load_repo(path, self._queue_loading_progress, self.repo_handler._handle_load_completion)
             else:
                 self.show_status_message("Please drop a folder, not a file.", error=True)
@@ -218,7 +218,7 @@ class RepoPromptGUI:
             return
 
         self.is_generating_preview = True
-        self.show_status_message("Generating content preview...")
+        self.show_status_message("Generating preview...")
 
         # Disable buttons while generating
         self.copy_button.config(state=tk.DISABLED)
@@ -641,7 +641,7 @@ class RepoPromptGUI:
             # Force a complete reload of the repository with the new setting
             repo_path = self.current_repo_path  # Preserve the path before clearing
             self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)
-            self.show_loading_state(f"Refreshing {os.path.basename(repo_path)}...", show_cancel=True)
+            self.show_loading_state("Refreshing repository...", show_cancel=True)
             self.repo_handler.load_repo(repo_path, self._queue_loading_progress, self.repo_handler._handle_load_completion)
                 
         except Exception as e:
@@ -698,7 +698,7 @@ class RepoPromptGUI:
             # Force a complete reload of the repository with the new setting
             repo_path = self.current_repo_path  # Preserve the path before clearing
             self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)
-            self.show_loading_state(f"Refreshing {os.path.basename(repo_path)}...", show_cancel=True)
+            self.show_loading_state("Refreshing repository...", show_cancel=True)
             self.repo_handler.load_repo(repo_path, self._queue_loading_progress, self.repo_handler._handle_load_completion)
                 
         except Exception as e:

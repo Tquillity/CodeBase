@@ -23,12 +23,13 @@ class CopyHandler:
         with self.gui.file_handler.lock:
             files_to_copy = set(self.gui.file_handler.loaded_files)
 
-        completion_lambda = lambda content, token_count, errors: self._handle_copy_completion_final(
+        completion_lambda = lambda content, token_count, errors, deleted_files=None: self._handle_copy_completion_final(
             prompt=prompt,
             content=content,
             structure=None,
             errors=errors,
-            status_message="Copied selected file contents" if not errors else "Copy failed with errors"
+            status_message="Copied selected file contents" if not errors else "Copy failed with errors",
+            deleted_files=deleted_files or []
         )
 
         # FIX: Pass current_format as the last argument
