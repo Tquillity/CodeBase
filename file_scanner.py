@@ -1,15 +1,24 @@
 # file_scanner.py
-import os
+from __future__ import annotations
+
 import fnmatch
-import mimetypes
-import time
 import logging
-from path_utils import normalize_path, get_relative_path
-from exceptions import RepositoryError, FileOperationError, SecurityError
-from error_handler import handle_error, safe_execute
+import mimetypes
+import os
+import time
+from typing import Any, Callable, Generator, Optional
+
+from path_utils import get_relative_path, normalize_path
+from exceptions import RepositoryError, SecurityError
+from error_handler import handle_error
 from constants import ERROR_HANDLING_ENABLED, MAX_FILE_SIZE
 
-def yield_repo_files(repo_path, ignore_patterns, gui):
+
+def yield_repo_files(
+    repo_path: str,
+    ignore_patterns: list[str],
+    gui: Any,
+) -> Generator[str, None, None]:
     """
     Generator that yields all non-ignored file paths in the repository.
     """
@@ -23,7 +32,13 @@ def yield_repo_files(repo_path, ignore_patterns, gui):
             if not is_ignored_path(file_path_abs, repo_path, ignore_patterns, gui):
                 yield file_path_abs
 
-def scan_repo(folder, gui, progress_callback, completion_callback, lock):
+def scan_repo(
+    folder: str,
+    gui: Any,
+    progress_callback: Callable[[str], None],
+    completion_callback: Callable[..., None],
+    lock: Any,
+) -> None:
     try:
         start_time = time.time()
         abs_path = os.path.abspath(folder)
@@ -34,9 +49,9 @@ def scan_repo(folder, gui, progress_callback, completion_callback, lock):
         repo_path = abs_path
         ignore_patterns = parse_gitignore(os.path.join(repo_path, '.gitignore'))
 
-        scanned_files_temp = set()
-        loaded_files_temp = set()
-        errors = []
+        scanned_files_temp: set[str] = set()
+        loaded_files_temp: set[str] = set()
+        errors: list[str] = []
         file_count = 0
 
         # Use unified generator for file discovery
@@ -73,9 +88,9 @@ def scan_repo(folder, gui, progress_callback, completion_callback, lock):
         gui.root.after(0, completion_callback, None, None, set(), set(), [f"Unexpected scan error: {e}"])
 
 
-def parse_gitignore(gitignore_path):
-    ignore_patterns = []
-    default_ignores = ['.git']
+def parse_gitignore(gitignore_path: str) -> list[str]:
+    ignore_patterns: list[str] = []
+    default_ignores: list[str] = [".git"]
     logging.debug(f"Parsing .gitignore at {gitignore_path}")
     if os.path.exists(gitignore_path):
         try:
@@ -89,9 +104,16 @@ def parse_gitignore(gitignore_path):
     logging.debug(f"Parsed ignore patterns: {ignore_patterns}")
     return default_ignores + ignore_patterns
 
-def is_ignored_path(path, repo_root, ignore_list, gui):
-    rel_path = None
+def is_ignored_path(
+    path: str,
+    repo_root: Optional[str],
+    ignore_list: list[str],
+    gui: Any,
+) -> bool:
+    rel_path: Optional[str] = None
     try:
+        if repo_root is None:
+            return False
         rel_path = get_relative_path(path, repo_root)
         if rel_path is None:
             return False
@@ -177,7 +199,7 @@ def is_ignored_path(path, repo_root, ignore_list, gui):
 
     return False
 
-def is_text_file(file_path, gui):
+def is_text_file(file_path: str, gui: Any) -> bool:
     try:
         # Check file size first
         try:
@@ -197,11 +219,10 @@ def is_text_file(file_path, gui):
         from file_handler import FileHandler
         text_extensions_settings = gui.settings.get('app', 'text_extensions', {ext: 1 for ext in FileHandler.text_extensions_default})
         
-        # Helper for null byte check
-        def has_null_bytes(path):
+        def has_null_bytes(path: str) -> bool:
             try:
-                with open(path, 'rb') as f:
-                    return b'\x00' in f.read(1024)
+                with open(path, "rb") as f:
+                    return b"\x00" in f.read(1024)
             except Exception:
                 return False
 
@@ -246,7 +267,7 @@ def is_text_file(file_path, gui):
     logging.debug(f"Not text: {file_path} (default case)")
     return False
 
-def is_test_file(file_path, rel_path):
+def is_test_file(file_path: str, rel_path: Optional[str]) -> bool:
     """Check if a file is a test file based on common test file patterns."""
     try:
         filename = os.path.basename(file_path).lower()

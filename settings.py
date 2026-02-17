@@ -1,17 +1,21 @@
-import os
+from __future__ import annotations
+
 import json
-import appdirs
 import logging
-from typing import Dict, Any, Optional
+import os
+from typing import Any, Optional, cast
+
+import appdirs  # type: ignore[import-untyped]
+
 
 class SettingsManager:
     def __init__(self) -> None:
         self.user_data_dir: str = appdirs.user_data_dir("CodeBase")
         self.settings_file: str = os.path.join(self.user_data_dir, "settings.json")
         os.makedirs(self.user_data_dir, exist_ok=True)
-        self.settings: Dict[str, Any] = self.load_settings()
+        self.settings: dict[str, Any] = self.load_settings()
 
-    def load_settings(self) -> Dict[str, Any]:
+    def load_settings(self) -> dict[str, Any]:
         """Loads settings from JSON file, applying defaults for missing keys."""
         default_settings = {
             "app": {
@@ -75,12 +79,13 @@ class SettingsManager:
                 # Deep merge for 'app' section
                 app_settings = default_settings['app'].copy()
                 app_settings.update(loaded_settings.get('app', {}))
-                # Ensure nested dicts like exclude_files are also merged/defaulted
-                default_exclude = default_settings['app']['exclude_files']
-                loaded_exclude = app_settings.get('exclude_files', {})
+                default_exclude: dict[str, int] = cast(
+                    dict[str, int], default_settings["app"]["exclude_files"]
+                )
+                loaded_exclude: Any = app_settings.get("exclude_files", {})
                 final_exclude = default_exclude.copy()
-                final_exclude.update(loaded_exclude) # Overwrite defaults with loaded values
-                app_settings['exclude_files'] = final_exclude
+                final_exclude.update(dict(loaded_exclude))
+                app_settings["exclude_files"] = final_exclude
 
                 settings = default_settings # Start with defaults
                 settings['app'] = app_settings # Update app section
@@ -97,16 +102,12 @@ class SettingsManager:
         # Ensure that any new default text extensions are merged into the loaded settings,
         # preserving the user's choices for existing extensions.
         from constants import TEXT_EXTENSIONS_DEFAULT
-        # Get the full default list with every extension enabled by default.
-        default_extensions = {ext: 1 for ext in TEXT_EXTENSIONS_DEFAULT}
-        # Get the user's currently loaded extensions (or an empty dict if none exist).
-        loaded_extensions = settings['app'].get('text_extensions', {})
-        # Update the defaults with the user's settings. This means if a user has
-        # turned an extension OFF, their choice is preserved. Any NEW extensions
-        # from the default list that are not in the loaded list will be added.
-        default_extensions.update(loaded_extensions)
-        # Assign the fully merged dictionary back to the settings.
-        settings['app']['text_extensions'] = default_extensions
+        default_extensions: dict[str, int] = {
+            ext: 1 for ext in TEXT_EXTENSIONS_DEFAULT
+        }
+        loaded_extensions: Any = settings["app"].get("text_extensions", {})
+        default_extensions.update(dict(loaded_extensions))
+        settings["app"]["text_extensions"] = default_extensions
 
         return settings
 

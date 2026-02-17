@@ -1,11 +1,11 @@
 # security.py
 # Comprehensive security utilities for CodeBase application
+from __future__ import annotations
 
 import os
 import re
-import hashlib
-import mimetypes
-from typing import Union, List, Optional, Tuple
+import logging
+from typing import List, Optional, Tuple, Union
 from path_utils import normalize_path, is_path_within_base
 from exceptions import SecurityError
 from error_handler import handle_error
@@ -49,14 +49,18 @@ class SecurityValidator:
     
     ALLOWED_TEMPLATE_EXTENSIONS = {'.txt', '.md', '.rst', '.py', '.js', '.html', '.css', '.json', '.yaml', '.yml'}
     
-    def __init__(self):
-        self.logger = None
-    
-    def set_logger(self, logger):
+    def __init__(self) -> None:
+        self.logger: Optional[logging.Logger] = None
+
+    def set_logger(self, logger: logging.Logger) -> None:
         """Set logger for security events."""
         self.logger = logger
     
-    def validate_file_path(self, file_path: Union[str, os.PathLike], base_path: Union[str, os.PathLike] = None) -> Tuple[bool, str]:
+    def validate_file_path(
+        self,
+        file_path: Union[str, os.PathLike[str]],
+        base_path: Optional[Union[str, os.PathLike[str]]] = None,
+    ) -> Tuple[bool, str]:
         """
         Validate file path for security issues.
         
@@ -99,7 +103,11 @@ class SecurityValidator:
         except Exception as e:
             return False, f"Path validation error: {str(e)}"
     
-    def validate_file_size(self, file_path: Union[str, os.PathLike], max_size: int = None) -> Tuple[bool, str]:
+    def validate_file_size(
+        self,
+        file_path: Union[str, os.PathLike[str]],
+        max_size: Optional[int] = None,
+    ) -> Tuple[bool, str]:
         """
         Validate file size.
         
@@ -177,7 +185,9 @@ class SecurityValidator:
         except Exception as e:
             return False, f"Content validation error: {str(e)}"
     
-    def validate_template_file(self, file_path: Union[str, os.PathLike]) -> Tuple[bool, str]:
+    def validate_template_file(
+        self, file_path: Union[str, os.PathLike[str]]
+    ) -> Tuple[bool, str]:
         """
         Validate template file for security.
         
@@ -253,7 +263,9 @@ class SecurityValidator:
                 self.logger.error(f"Content sanitization error: {e}")
             return content
     
-    def validate_repository_access(self, repo_path: Union[str, os.PathLike]) -> Tuple[bool, str]:
+    def validate_repository_access(
+        self, repo_path: Union[str, os.PathLike[str]]
+    ) -> Tuple[bool, str]:
         """
         Validate repository access for security.
         
@@ -289,7 +301,11 @@ class SecurityValidator:
         except Exception as e:
             return False, f"Repository validation error: {str(e)}"
     
-    def validate_file_list(self, file_paths: List[str], base_path: Union[str, os.PathLike] = None) -> Tuple[List[str], List[str]]:
+    def validate_file_list(
+        self,
+        file_paths: List[str],
+        base_path: Optional[Union[str, os.PathLike[str]]] = None,
+    ) -> Tuple[List[str], List[str]]:
         """
         Validate a list of file paths for security.
         
@@ -313,7 +329,8 @@ class SecurityValidator:
         return valid_paths, invalid_paths
 
 # Global security validator instance
-_security_validator = None
+_security_validator: Optional[SecurityValidator] = None
+
 
 def get_security_validator() -> SecurityValidator:
     """Get the global security validator instance."""
@@ -322,7 +339,10 @@ def get_security_validator() -> SecurityValidator:
         _security_validator = SecurityValidator()
     return _security_validator
 
-def validate_file_path(file_path: Union[str, os.PathLike], base_path: Union[str, os.PathLike] = None) -> Tuple[bool, str]:
+def validate_file_path(
+    file_path: Union[str, os.PathLike[str]],
+    base_path: Optional[Union[str, os.PathLike[str]]] = None,
+) -> Tuple[bool, str]:
     """Convenience function to validate file path."""
     return get_security_validator().validate_file_path(file_path, base_path)
 
@@ -330,11 +350,16 @@ def validate_content_security(content: str, content_type: str = "file") -> Tuple
     """Convenience function to validate content security."""
     return get_security_validator().validate_content_security(content, content_type)
 
-def validate_template_file(file_path: Union[str, os.PathLike]) -> Tuple[bool, str]:
+def validate_template_file(
+    file_path: Union[str, os.PathLike[str]]
+) -> Tuple[bool, str]:
     """Convenience function to validate template file."""
     return get_security_validator().validate_template_file(file_path)
 
-def validate_file_size(file_path: Union[str, os.PathLike], max_size: int = None) -> Tuple[bool, str]:
+def validate_file_size(
+    file_path: Union[str, os.PathLike[str]],
+    max_size: Optional[int] = None,
+) -> Tuple[bool, str]:
     """Convenience function to validate file size."""
     return get_security_validator().validate_file_size(file_path, max_size)
 

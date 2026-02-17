@@ -1,14 +1,19 @@
-import pyperclip
+from __future__ import annotations
+
 import logging
 import tkinter as tk
+from typing import Any, Optional
+
+import pyperclip  # type: ignore[import-untyped]
 from content_manager import generate_content
 from constants import ERROR_MESSAGE_DURATION
 
-class CopyHandler:
-    def __init__(self, gui):
-        self.gui = gui
 
-    def copy_contents(self):
+class CopyHandler:
+    def __init__(self, gui: Any) -> None:
+        self.gui: Any = gui
+
+    def copy_contents(self) -> None:
         if self.gui.is_loading: self.gui.show_status_message("Loading...", error=True); return
         with self.gui.file_handler.lock:
              if not self.gui.file_handler.loaded_files:
@@ -35,7 +40,7 @@ class CopyHandler:
         # FIX: Pass current_format as the last argument
         generate_content(files_to_copy, self.gui.current_repo_path, self.gui.file_handler.lock, completion_lambda, self.gui.file_handler.content_cache, self.gui.file_handler.read_errors, None, self.gui, current_format)
 
-    def copy_structure(self):
+    def copy_structure(self) -> None:
         if self.gui.is_loading: self.gui.show_status_message("Loading...", error=True); return
         if not self.gui.structure_tab.tree.get_children():
              self.gui.show_status_message("No structure to copy.", error=True); return
@@ -52,7 +57,7 @@ class CopyHandler:
             self.gui.show_status_message("Error copying structure!", error=True)
             self.gui.show_toast(f"Could not copy structure: {e}", toast_type="error")
 
-    def copy_all(self):
+    def copy_all(self) -> None:
         if self.gui.is_loading: self.gui.show_status_message("Loading...", error=True); return
         with self.gui.file_handler.lock:
              no_files = not self.gui.file_handler.loaded_files
@@ -88,41 +93,51 @@ class CopyHandler:
         else:
             self._handle_copy_completion_final(prompt=prompt, content="", structure=structure, errors=[], status_message="Copied All (Prompt, Structure)", deleted_files=[])
 
-    def _handle_copy_completion_final(self, prompt, content, structure, errors, status_message, deleted_files=None):
-         deleted_files = deleted_files or []
-         self.gui.hide_loading_state()
+    def _handle_copy_completion_final(
+        self,
+        prompt: str,
+        content: str,
+        structure: Any,
+        errors: list[str],
+        status_message: str,
+        deleted_files: Optional[list[str]] = None,
+    ) -> None:
+        deleted_files = deleted_files or []
+        self.gui.hide_loading_state()
 
-         if errors:
-             error_msg = "Errors occurred during content preparation for copy."
-             error_msg += f" Files: {'; '.join(errors[:3])}"
-             self.gui.show_status_message(error_msg, error=True, duration=ERROR_MESSAGE_DURATION)
-             self.gui.show_toast(error_msg, toast_type="warning")
-         elif deleted_files:
-             self.gui.show_toast(f"{len(deleted_files)} deleted file(s) not copied.", toast_type="info")
+        if errors:
+            error_msg = "Errors occurred during content preparation for copy."
+            error_msg += f" Files: {'; '.join(errors[:3])}"
+            self.gui.show_status_message(error_msg, error=True, duration=ERROR_MESSAGE_DURATION)
+            self.gui.show_toast(error_msg, toast_type="warning")
+        elif deleted_files:
+            self.gui.show_toast(f"{len(deleted_files)} deleted file(s) not copied.", toast_type="info")
 
-         final_parts = []
-         if prompt:
-             final_parts.append(prompt)
+        final_parts = []
+        if prompt:
+            final_parts.append(prompt)
 
-         if content:
-             if final_parts: final_parts.append("\n\n---\n\n")
-             final_parts.append(content.rstrip())
+        if content:
+            if final_parts:
+                final_parts.append("\n\n---\n\n")
+            final_parts.append(content.rstrip())
 
-         if structure:
-             if final_parts: final_parts.append("\n\n---\n\n")
-             final_parts.append("Folder Structure:\n")
-             final_parts.append(structure)
+        if structure:
+            if final_parts:
+                final_parts.append("\n\n---\n\n")
+            final_parts.append("Folder Structure:\n")
+            final_parts.append(structure)
 
-         final_string = "".join(final_parts)
+        final_string = "".join(final_parts)
 
-         if not final_string and not errors:
-              self.gui.show_status_message("Nothing generated to copy.", error=True)
-              return
+        if not final_string and not errors:
+            self.gui.show_status_message("Nothing generated to copy.", error=True)
+            return
 
-         try:
-             pyperclip.copy(final_string)
-             self.gui.show_status_message(status_message)
-         except Exception as e:
-             logging.error(f"Error copying to clipboard: {e}", exc_info=True)
-             self.gui.show_status_message("Error copying to clipboard!", error=True)
-             self.gui.show_toast(f"Could not copy combined content to clipboard: {e}", toast_type="error")
+        try:
+            pyperclip.copy(final_string)
+            self.gui.show_status_message(status_message)
+        except Exception as e:
+            logging.error(f"Error copying to clipboard: {e}", exc_info=True)
+            self.gui.show_status_message("Error copying to clipboard!", error=True)
+            self.gui.show_toast(f"Could not copy combined content to clipboard: {e}", toast_type="error")

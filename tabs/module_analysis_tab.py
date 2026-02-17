@@ -137,7 +137,7 @@ class ModuleAnalysisTab(ttk.Frame):
             return
 
         # Import here to avoid circular imports
-        from module_analyzer import ModuleAnalyzer
+        from module_analyzer import ModuleAnalyzer  # type: ignore[import-not-found]
         
         self.analyze_button.config(state=tk.DISABLED)
         self.progress_label.config(text="Analyzing modules...")

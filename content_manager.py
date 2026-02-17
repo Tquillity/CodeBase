@@ -1,39 +1,59 @@
-import os
-import time
-import threading
+# content_manager.py
+from __future__ import annotations
+
 import logging
+import os
+import threading
+import time
+from typing import Any, Callable, Optional
+
 import tiktoken
-from typing import Optional, List, Any, Callable
-from constants import FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_HANDLING_ENABLED, SECURITY_ENABLED, TEMPLATE_XML
-
-# Initialize tokenizer
-try:
-    tokenizer = tiktoken.get_encoding("cl100k_base")
-except Exception as e:
-    logging.warning(f"Failed to initialize tiktoken: {e}. Falling back to approximate token counting.")
-    tokenizer = None
+from constants import (
+    ERROR_HANDLING_ENABLED,
+    SECURITY_ENABLED,
+    TEMPLATE_XML,
+    FILE_SEPARATOR,
+)
 from lru_cache import ThreadSafeLRUCache
-from path_utils import normalize_for_cache, get_relative_path
+from path_utils import get_relative_path, normalize_for_cache
 from exceptions import FileOperationError, RepositoryError
-from error_handler import handle_error, safe_execute
-from security import validate_file_size, validate_content_security, neutralize_urls
+from error_handler import handle_error
+from security import (
+    neutralize_urls,
+    validate_content_security,
+    validate_file_size,
+)
 
-def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: threading.Lock, read_errors: List[str], deleted_files: Optional[List[str]] = None) -> Optional[str]:
+try:
+    tokenizer: Optional[Any] = tiktoken.get_encoding("cl100k_base")
+except Exception as e:
+    logging.warning(
+        f"Failed to initialize tiktoken: {e}. Falling back to approximate token counting."
+    )
+    tokenizer = None
+
+
+def get_file_content(
+    file_path: str,
+    content_cache: ThreadSafeLRUCache,
+    lock: threading.Lock,
+    read_errors: list[str],
+    deleted_files: Optional[list[str]] = None,
+) -> Optional[str]:
     # Use normalized path for cache keys for cross-platform consistency
     normalized_path = normalize_for_cache(file_path)
     
     # Check cache (LRU cache handles its own locking)
     cached_content = content_cache.get(normalized_path)
     if cached_content is not None:
-        return cached_content
+        return str(cached_content)
 
     # Enhanced security validation (only for suspicious files)
     if SECURITY_ENABLED:
-        # Only validate file size for normal repository files
-        is_valid, error = validate_file_size(file_path)
+        is_valid, err_msg = validate_file_size(file_path)
         if not is_valid:
             with lock:
-                read_errors.append(f"Size: {file_path} - {error}")
+                read_errors.append(f"Size: {file_path} - {err_msg}")
             return None
 
     try:
@@ -46,10 +66,10 @@ def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: th
                 # Only validate content for files that might be dangerous
                 file_ext = os.path.splitext(file_path)[1].lower()
                 if file_ext in ['.html', '.htm', '.xml', '.svg']:
-                    is_valid, error = validate_content_security(content, "file")
+                    is_valid, err_msg = validate_content_security(content, "file")
                     if not is_valid:
                         with lock:
-                            read_errors.append(f"Content: {file_path} - {error}")
+                            read_errors.append(f"Content: {file_path} - {err_msg}")
                         return None
             
             # Store in LRU cache (handles its own locking)
@@ -99,10 +119,28 @@ def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: th
 
     return None
 
-def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock, completion_callback: Callable, content_cache: ThreadSafeLRUCache, read_errors: List[str], progress_callback: Optional[Callable] = None, gui: Optional[Any] = None, template_format: str = "Markdown (Grok)", cancelled_callback: Optional[Callable] = None) -> None:
+CompletionCallback = Callable[
+    [str, int, list[str], list[str]], None
+]
+ProgressCallback = Callable[[int, int, float], None]
+CancelledCallback = Callable[[], None]
+
+
+def generate_content(
+    files_to_include: set[str],
+    repo_path: str,
+    lock: threading.Lock,
+    completion_callback: CompletionCallback,
+    content_cache: ThreadSafeLRUCache,
+    read_errors: list[str],
+    progress_callback: Optional[ProgressCallback] = None,
+    gui: Optional[Any] = None,
+    template_format: str = "Markdown (Grok)",
+    cancelled_callback: Optional[CancelledCallback] = None,
+) -> None:
     try:
         start_time = time.time()
-        content_parts = []
+        content_parts: list[str] = []
         
         # Check if shutdown was requested
         if gui and hasattr(gui, '_shutdown_requested') and gui._shutdown_requested:
@@ -126,7 +164,7 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
     sorted_files = sorted(list(files_to_include))
     total_files = len(sorted_files)
     processed_count = 0
-    deleted_files = []
+    deleted_files: list[str] = []
 
     for file_path in sorted_files:
         # Check for shutdown during processing

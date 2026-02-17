@@ -1,16 +1,21 @@
-import threading
-import subprocess
+from __future__ import annotations
+
 import logging
-import pyperclip
 import os
-from exceptions import RepositoryError
+import subprocess
+import threading
+from typing import Any, Optional
+
+import pyperclip  # type: ignore[import-untyped]
 from content_manager import generate_content
+from exceptions import RepositoryError
+
 
 class GitHandler:
-    def __init__(self, gui):
-        self.gui = gui
+    def __init__(self, gui: Any) -> None:
+        self.gui: Any = gui
 
-    def get_git_diff(self, repo_path):
+    def get_git_diff(self, repo_path: str) -> str:
         """
         Runs `git diff HEAD` in the specified repository path.
         Returns the diff output string or raises an error.
@@ -39,7 +44,7 @@ class GitHandler:
         except Exception as e:
             raise RepositoryError(f"Unexpected error running git diff: {str(e)}", repo_path=repo_path)
 
-    def copy_diff(self):
+    def copy_diff(self) -> None:
         """
         Runs get_git_diff in a background thread and copies result to clipboard.
         """
@@ -49,7 +54,7 @@ class GitHandler:
 
         self.gui.show_loading_state("Generating git diff...")
         
-        def _worker():
+        def _worker() -> None:
             try:
                 diff_content = self.get_git_diff(self.gui.current_repo_path)
                 
@@ -74,7 +79,7 @@ class GitHandler:
         self.gui.register_background_thread(thread)
         thread.start()
 
-    def _finish_copy(self, content):
+    def _finish_copy(self, content: str) -> None:
         """
         Called from main thread via task_queue to actually copy content and update UI.
         """
@@ -86,7 +91,7 @@ class GitHandler:
         finally:
             self.gui.hide_loading_state()
 
-    def get_git_status(self, repo_path: str = None) -> dict:
+    def get_git_status(self, repo_path: str | None = None) -> dict[str, Any]:
         """Return clean status dict for UI + copy operations."""
         if repo_path is None:
             repo_path = self.gui.current_repo_path
@@ -142,7 +147,7 @@ class GitHandler:
             logging.warning(f"Git status failed: {e}")
             return {'staged': [], 'changes': [], 'staged_deleted': set(), 'changes_deleted': set(), 'branch': 'error'}
 
-    def copy_staged_changes(self):
+    def copy_staged_changes(self) -> None:
         """Copy full content of all staged files (formatted)."""
         status = self.get_git_status()
         if not status['staged']:
@@ -150,7 +155,7 @@ class GitHandler:
             return
         self._copy_file_list(status['staged'], "Staged Changes")
 
-    def copy_unstaged_changes(self):
+    def copy_unstaged_changes(self) -> None:
         """Copy full content of all unstaged changes."""
         status = self.get_git_status()
         if not status['changes']:
@@ -158,7 +163,7 @@ class GitHandler:
             return
         self._copy_file_list(status['changes'], "Unstaged Changes")
 
-    def _copy_file_list(self, file_paths: list, title: str):
+    def _copy_file_list(self, file_paths: list[str], title: str) -> None:
         """Shared helper — uses existing content pipeline (threaded)."""
         if not file_paths:
             return
@@ -171,7 +176,7 @@ class GitHandler:
         count = len(file_paths)
         title_lower = title.lower()
 
-        def _finish(content, errors):
+        def _finish(content: str, errors: list[str]) -> None:
             self.gui.hide_loading_state()
             if errors:
                 self.gui.show_status_message("Failed to copy changes", error=True)
@@ -184,7 +189,12 @@ class GitHandler:
                     logging.error(f"Copy to clipboard failed: {e}")
                     self.gui.show_status_message("Failed to copy to clipboard", error=True)
 
-        def completion(content, token_count, errors, deleted_files=None):
+        def completion(
+            content: str,
+            token_count: int,
+            errors: list[str],
+            deleted_files: Optional[list[str]] = None,
+        ) -> None:
             self.gui.task_queue.put((_finish, (content, errors)))
 
         self.gui.show_loading_state(f"Preparing {title_lower}...")

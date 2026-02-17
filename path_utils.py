@@ -1,11 +1,12 @@
 # path_utils.py
 # Centralized path normalization utilities for Linux-exclusive environment
+from __future__ import annotations
 
 import os
 import logging
-from typing import Union, Optional
+from typing import Optional, Union
 
-def normalize_path(path: Union[str, os.PathLike]) -> str:
+def normalize_path(path: Union[str, os.PathLike[str]]) -> str:
     """
     Normalize a file path for Linux.
     
@@ -21,7 +22,7 @@ def normalize_path(path: Union[str, os.PathLike]) -> str:
     # Use normpath to resolve .. and . components
     return os.path.normpath(str(path))
 
-def normalize_for_cache(path: Union[str, os.PathLike]) -> str:
+def normalize_for_cache(path: Union[str, os.PathLike[str]]) -> str:
     """
     Normalize a path specifically for cache keys.
     
@@ -36,7 +37,10 @@ def normalize_for_cache(path: Union[str, os.PathLike]) -> str:
     
     return os.path.normpath(str(path))
 
-def safe_join(base_path: Union[str, os.PathLike], *paths: Union[str, os.PathLike]) -> str:
+def safe_join(
+    base_path: Union[str, os.PathLike[str]],
+    *paths: Union[str, os.PathLike[str]],
+) -> str:
     """
     Safely join paths with proper normalization.
     
@@ -60,7 +64,10 @@ def safe_join(base_path: Union[str, os.PathLike], *paths: Union[str, os.PathLike
     
     return normalize_path(result)
 
-def get_relative_path(file_path: Union[str, os.PathLike], base_path: Union[str, os.PathLike]) -> Optional[str]:
+def get_relative_path(
+    file_path: Union[str, os.PathLike[str]],
+    base_path: Union[str, os.PathLike[str]],
+) -> Optional[str]:
     """
     Get relative path from base to file.
     
@@ -79,7 +86,10 @@ def get_relative_path(file_path: Union[str, os.PathLike], base_path: Union[str, 
         logging.warning(f"Could not get relative path from {base_path} to {file_path}: {e}")
         return None
 
-def is_path_within_base(file_path: Union[str, os.PathLike], base_path: Union[str, os.PathLike]) -> bool:
+def is_path_within_base(
+    file_path: Union[str, os.PathLike[str]],
+    base_path: Union[str, os.PathLike[str]],
+) -> bool:
     """
     Check if a file path is within a base directory (security check).
     
@@ -100,7 +110,10 @@ def is_path_within_base(file_path: Union[str, os.PathLike], base_path: Union[str
     except (ValueError, OSError):
         return False
 
-def ensure_absolute_path(path: Union[str, os.PathLike], base_path: Optional[Union[str, os.PathLike]] = None) -> str:
+def ensure_absolute_path(
+    path: Union[str, os.PathLike[str]],
+    base_path: Optional[Union[str, os.PathLike[str]]] = None,
+) -> str:
     """
     Ensure a path is absolute, using base_path if provided for relative paths.
     
@@ -123,7 +136,7 @@ def ensure_absolute_path(path: Union[str, os.PathLike], base_path: Optional[Unio
     else:
         return normalize_path(os.path.abspath(path_str))
 
-def get_path_components(path: Union[str, os.PathLike]) -> list:
+def get_path_components(path: Union[str, os.PathLike[str]]) -> list[str]:
     """
     Get path components as a list.
     
@@ -139,7 +152,10 @@ def get_path_components(path: Union[str, os.PathLike]) -> list:
     normalized = normalize_path(path)
     return normalized.split('/')
 
-def is_same_path(path1: Union[str, os.PathLike], path2: Union[str, os.PathLike]) -> bool:
+def is_same_path(
+    path1: Union[str, os.PathLike[str]],
+    path2: Union[str, os.PathLike[str]],
+) -> bool:
     """
     Check if two paths refer to the same file/directory.
     

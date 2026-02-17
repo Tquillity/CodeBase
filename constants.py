@@ -1,11 +1,19 @@
 # constants.py
 # Centralized constants for CodeBase application
+from __future__ import annotations
 
-def get_configurable_constant(settings_manager, key: str, default_value):
+from typing import Any, TypeVar, cast
+
+T = TypeVar("T")
+
+
+def get_configurable_constant(
+    settings_manager: Any, key: str, default_value: T
+) -> T:
     """Get a configurable constant from settings, with fallback to default."""
     if settings_manager is None:
         return default_value
-    return settings_manager.get('app', key, default_value)
+    return cast(T, settings_manager.get("app", key, default_value))
 
 # Default text file extensions that CodeBase recognizes
 TEXT_EXTENSIONS_DEFAULT = {
@@ -28,7 +36,7 @@ TEXT_EXTENSIONS_DEFAULT = {
 FILE_SEPARATOR = "===FILE_SEPARATOR===\n"
 
 # Application version
-VERSION = "6.6.0"
+VERSION = "6.7.0"
 
 # Cache configuration
 CACHE_MAX_SIZE = 1000  # Maximum number of cached files

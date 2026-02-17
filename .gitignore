@@ -55,3 +55,15 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Python & tooling caches
+__pycache__/
+*.py[cod]
+*$py.class
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.coverage.*
+.cache
+.ruff_cache/

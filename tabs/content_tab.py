@@ -1,18 +1,24 @@
-import os
-import ttkbootstrap as ttk
-import tkinter as tk
-from ttkbootstrap.widgets.scrolled import ScrolledText
-from widgets import Tooltip
+from __future__ import annotations
+
 import logging
+import os
+import tkinter as tk
+from typing import Any
+
+import ttkbootstrap as ttk
+from ttkbootstrap.widgets.scrolled import ScrolledText
+import pygments  # type: ignore[import-untyped]
+from pygments.lexers import get_lexer_for_filename, TextLexer  # type: ignore[import-untyped]
+from pygments.styles import get_style_by_name  # type: ignore[import-untyped]
+from pygments.token import Token  # type: ignore[import-untyped]
+
 from constants import ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION
 from path_utils import get_relative_path
-import pygments
-from pygments.lexers import get_lexer_for_filename, TextLexer
-from pygments.styles import get_style_by_name
-from pygments.token import Token
+from widgets import Tooltip
+
 
 class ContentTab(ttk.Frame):
-    def __init__(self, parent, gui, file_handler):
+    def __init__(self, parent: ttk.Frame, gui: Any, file_handler: Any) -> None:
         super().__init__(parent)
         self.gui = gui
         self.file_handler = file_handler
