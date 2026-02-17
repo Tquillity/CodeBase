@@ -139,7 +139,12 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
         logging.debug(f"Processing file: {file_path}")
         
         file_content = get_file_content(file_path, content_cache, lock, read_errors)
-        
+
+        if file_content is not None:
+            logging.info(f"[PREVIEW] Successfully read {os.path.basename(file_path)} ({len(file_content):,} chars)")
+        else:
+            logging.warning(f"[PREVIEW] Failed to read {os.path.basename(file_path)}")
+
         if file_content is not None:
             # Apply URL neutralization if setting is enabled
             if gui and gui.settings.get('app', 'sanitize_urls', 0) == 1:
@@ -172,5 +177,5 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
         
     end_time = time.time()
     logging.info(f"Content generation complete for {len(files_to_include)} files in {end_time - start_time:.2f} seconds. Tokens: {token_count}")
-
+    logging.info(f"[PREVIEW] All files processed. Calling completion callback with {len(final_content):,} chars")
     completion_callback(final_content, token_count, read_errors)

@@ -4,6 +4,7 @@ import logging
 import pyperclip
 import os
 from exceptions import RepositoryError
+from content_manager import generate_content
 
 class GitHandler:
     def __init__(self, gui):
@@ -84,4 +85,112 @@ class GitHandler:
             self.gui.show_status_message(f"Failed to copy to clipboard: {e}", error=True)
         finally:
             self.gui.hide_loading_state()
+
+    def get_git_status(self, repo_path: str = None) -> dict:
+        """Return clean status dict for UI + copy operations."""
+        if repo_path is None:
+            repo_path = self.gui.current_repo_path
+        if not repo_path or not os.path.exists(os.path.join(repo_path, '.git')):
+            return {'staged': [], 'changes': [], 'branch': '—'}
+
+        try:
+            # --porcelain=v1 gives a 2-character status code
+            result = subprocess.run(
+                ['git', 'status', '--porcelain=v1', '--branch', '--untracked-files=all'],
+                cwd=repo_path, capture_output=True, text=True, timeout=5, check=True
+            )
+            lines = result.stdout.strip().splitlines()
+            branch = "main"
+            staged = []
+            changes = []
+
+            for line in lines:
+                if line.startswith('## '):
+                    branch = line.split('...')[0][3:].strip() or "main"
+                    continue
+                if len(line) < 3:
+                    continue
+
+                # XY PATH
+                # X = Index (Staged), Y = Work tree (Unstaged)
+                x_status = line[0]
+                y_status = line[1]
+                path = line[3:].strip()
+
+                # Handle renames (R  old -> new)
+                if " -> " in path:
+                    path = path.split(" -> ")[-1]
+
+                full_path = os.path.join(repo_path, path)
+
+                # 1. Check if staged (X is not space and not ?)
+                if x_status not in (' ', '?'):
+                    staged.append(full_path)
+
+                # 2. Check if unstaged (Y is not space) OR untracked (??)
+                if y_status != ' ' or (x_status == '?' and y_status == '?'):
+                    changes.append(full_path)
+
+            return {
+                'staged': sorted(list(set(staged))),
+                'changes': sorted(list(set(changes))),
+                'branch': branch
+            }
+        except Exception as e:
+            logging.warning(f"Git status failed: {e}")
+            return {'staged': [], 'changes': [], 'branch': 'error'}
+
+    def copy_staged_changes(self):
+        """Copy full content of all staged files (formatted)."""
+        status = self.get_git_status()
+        if not status['staged']:
+            self.gui.show_status_message("No staged changes to copy", error=True)
+            return
+        self._copy_file_list(status['staged'], "Staged Changes")
+
+    def copy_unstaged_changes(self):
+        """Copy full content of all unstaged changes."""
+        status = self.get_git_status()
+        if not status['changes']:
+            self.gui.show_status_message("No unstaged changes to copy", error=True)
+            return
+        self._copy_file_list(status['changes'], "Unstaged Changes")
+
+    def _copy_file_list(self, file_paths: list, title: str):
+        """Shared helper — uses existing content pipeline (threaded)."""
+        if not file_paths:
+            return
+        if not self.gui.current_repo_path:
+            self.gui.show_status_message("No repository loaded.", error=True)
+            return
+        repo_path = self.gui.current_repo_path
+        current_format = self.gui.settings.get('app', 'copy_format', "Markdown (Grok)")
+        fh = self.gui.file_handler
+        count = len(file_paths)
+        title_lower = title.lower()
+
+        def _finish(content, errors):
+            self.gui.hide_loading_state()
+            if errors:
+                self.gui.show_status_message("Failed to copy changes", error=True)
+            else:
+                try:
+                    pyperclip.copy(content)
+                    self.gui.show_status_message(f"Copied {count} {title_lower} to clipboard", duration=3000)
+                    logging.info(f"Copied {count} files ({title})")
+                except Exception as e:
+                    logging.error(f"Copy to clipboard failed: {e}")
+                    self.gui.show_status_message("Failed to copy to clipboard", error=True)
+
+        def completion(content, token_count, errors):
+            self.gui.task_queue.put((_finish, (content, errors)))
+
+        self.gui.show_loading_state(f"Preparing {title_lower}...")
+        thread = threading.Thread(
+            target=generate_content,
+            args=(set(file_paths), repo_path, fh.lock, completion, fh.content_cache, fh.read_errors, None, self.gui, current_format),
+            daemon=True
+        )
+        self.gui.register_background_thread(thread)
+        thread.start()
 

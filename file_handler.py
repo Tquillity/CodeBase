@@ -349,10 +349,10 @@ class FileHandler:
             
         with self.lock:
             files_to_include = set(self.loaded_files)
-        
-        logging.info(f"Generating preview for {len(files_to_include)} files")
-        self.gui.show_loading_state("Generating content preview...")
-        
+
+        logging.info(f"[PREVIEW] Starting generation for {len(files_to_include)} files")
+        # Loading phase already set by repo_handler (e.g. "Generating preview..."); do not call show_loading_state here (avoids reset loop)
+
         # Get the currently selected template format from the settings/UI
         current_format = self.gui.settings.get('app', 'copy_format', "Markdown (Grok)")
         

@@ -38,7 +38,7 @@ class RepoHandler:
             self.gui.update_recent_folders(folder)
             self._clear_internal_state(clear_ui=True)
             self.gui.show_loading_state(f"Scanning {os.path.basename(folder)}...", show_cancel=True)
-            self.load_repo(folder, self.gui.show_status_message, self._handle_load_completion)
+            self.load_repo(folder, self.gui._queue_loading_progress, self._handle_load_completion)
 
     def refresh_repo(self):
         """
@@ -72,7 +72,7 @@ class RepoHandler:
             self._handle_refresh_completion(repo_path, ignore_patterns, scanned, errors, previous_selections, expansion_state)
         
         logging.info(f"Calling load_repo with path: {self.repo_path}")
-        self.load_repo(self.repo_path, self.gui.show_status_message, completion_callback)
+        self.load_repo(self.repo_path, self.gui._queue_loading_progress, completion_callback)
 
     def get_tree_expansion_state(self):
         """Traverses the tree and returns a set of paths for all open folders."""
@@ -135,6 +135,9 @@ class RepoHandler:
             self.gui.save_recent_folders()
         if clear_ui:
             self._update_ui_for_no_repo()
+        if hasattr(self.gui, '_git_monitor_id') and self.gui._git_monitor_id:
+            self.gui.root.after_cancel(self.gui._git_monitor_id)
+            self.gui._git_monitor_id = None
 
     def _update_ui_for_no_repo(self):
         """Resets the UI to its initial state when no repo is loaded."""
@@ -169,14 +172,15 @@ class RepoHandler:
         return groups
 
     def _scan_repo_worker(self, folder, progress_callback, completion_callback):
-        """Worker function to run in a separate thread with detailed progress."""
+        """Worker function to run in a separate thread with detailed progress and cancel support."""
         try:
             logging.info(f"Starting repository scan for {folder}")
-            # Check if shutdown was requested
-            if self.gui._shutdown_requested:
+            if getattr(self.gui, '_shutdown_requested', False):
                 logging.info("Shutdown requested, aborting repository scan")
                 return
-                
+            # Notify UI: scanning started
+            progress_callback("Scanning files...", None, None)
+
             start_time = time.time()
             abs_path = os.path.abspath(folder)
             if not os.path.commonpath([abs_path, os.path.expanduser("~")]).startswith(os.path.expanduser("~")):
@@ -192,35 +196,45 @@ class RepoHandler:
             repo_path = abs_path
             ignore_patterns = parse_gitignore(os.path.join(repo_path, '.gitignore'))
             errors = []
-        
-            # --- Collect all non-ignored file paths ---
+
+            # --- Collect all non-ignored file paths (with cancel check) ---
             file_paths = []
             for file_path_abs in yield_repo_files(repo_path, ignore_patterns, self.gui):
+                if getattr(self.gui, '_scan_cancel_requested', False):
+                    logging.info("Scan cancelled by user during file collection")
+                    self.gui.task_queue.put((completion_callback, (None, None, set(), set(), ["Scan cancelled by user."])))
+                    return
                 file_paths.append(file_path_abs)
-        
+
             total_files = len(file_paths)
-        
-            # --- Process files ---
+            if total_files == 0:
+                progress_callback("Building file list...", 100, "0/0 files")
+            else:
+                progress_callback("Building file list...", 0, f"0/{total_files} files")
+
+            # --- Process files with progress and cancel checks ---
             processed_count = 0
             scanned_files_temp = set()
             loaded_files_temp = set()
-            scan_start_time = time.time()
+            progress_interval = max(1, min(100, total_files // 20)) if total_files else 1
             for file_path_abs in file_paths:
+                if getattr(self.gui, '_scan_cancel_requested', False):
+                    logging.info("Scan cancelled by user during processing")
+                    self.gui.task_queue.put((completion_callback, (None, None, set(), set(), ["Scan cancelled by user."])))
+                    return
+
                 processed_count += 1
-            
                 if is_text_file(file_path_abs, self.gui):
-                    # Always normalize paths for consistent internal storage
                     normalized_path = normalize_for_cache(file_path_abs)
                     scanned_files_temp.add(normalized_path)
                     loaded_files_temp.add(normalized_path)
-            
-                # Just log occasionally for debugging
-                if processed_count % 50 == 0 or processed_count == total_files:
-                    elapsed = time.time() - scan_start_time
-        
+
+                if processed_count % progress_interval == 0 or processed_count == total_files:
+                    pct = int((processed_count / total_files) * 100) if total_files else 100
+                    progress_callback("Scanning...", pct, f"{processed_count}/{total_files} files")
+
             end_time = time.time()
             logging.info(f"Scan complete for {repo_path}. Found {len(scanned_files_temp)} text files out of {total_files} total files in {end_time - start_time:.2f} seconds.")
-            logging.info(f"Putting completion callback in queue with {len(scanned_files_temp)} scanned files")
             self.gui.task_queue.put((completion_callback, (repo_path, ignore_patterns, scanned_files_temp, loaded_files_temp, errors)))
         except Exception as e:
             logging.error(f"Error during repo scan worker: {e}", exc_info=True)
@@ -236,10 +250,10 @@ class RepoHandler:
 
 
     def _handle_load_completion(self, repo_path, ignore_patterns, scanned_files, loaded_files, errors):
-        """Callback for the *initial* repo load."""
+        """Callback for the *initial* repo load. Keeps progress visible through tree build and preview."""
         logging.info(f"Handling initial load completion for {repo_path}")
-        self.gui.hide_loading_state()
         if errors or repo_path is None:
+            self.gui.hide_loading_state()
             logging.error(f"Load errors: {errors}")
             error_message = "Error loading repository."
             if errors: error_message += f" Details: {'; '.join(errors[:3])}"
@@ -247,72 +261,67 @@ class RepoHandler:
             messagebox.showerror("Load Error", f"Failed to load repository.\n{error_message}")
             self._clear_internal_state(clear_ui=True)
             return
-        # --- Success ---
+        # --- Success: keep progress bar visible for tree + preview phases ---
+        self.gui.show_loading_phase("Building tree...")
         self.repo_path = repo_path
         self.gui.current_repo_path = repo_path
-       
+
         file_handler = self.gui.file_handler
         file_handler.repo_path = repo_path
         file_handler.ignore_patterns = ignore_patterns or []
         file_handler.scanned_text_files = scanned_files or set()
-       
+
         with file_handler.lock:
             file_handler.loaded_files = loaded_files or set()
             file_handler.content_cache.clear()
             file_handler.read_errors.clear()
-        
-        # Update GUI elements
+
         repo_name = os.path.basename(repo_path)
         repo_settings = self.gui.settings.get('repo', repo_path, {})
         saved_color = repo_settings.get('color', self.gui.header_frame.LEGENDARY_GOLD)
         self.gui.header_frame.repo_name_label.config(text=repo_name, foreground=saved_color)
         self.gui.refresh_button.config(state=tk.NORMAL)
-       
+
         self.gui.structure_tab.populate_tree(repo_path)
         self.gui.structure_tab.apply_initial_expansion()
         if self.gui.structure_tab.tree.get_children():
             self.gui.copy_structure_button.config(state=tk.NORMAL)
         else:
             self.gui.copy_structure_button.config(state=tk.DISABLED)
+        self.gui.show_loading_phase("Generating preview...")
         self.gui.trigger_preview_update()
         self.gui.show_status_message(f"Loaded {repo_name} successfully.", duration=STATUS_MESSAGE_DURATION)
+        self.gui.start_git_status_monitor()
 
     def _handle_refresh_completion(self, repo_path, ignore_patterns, scanned_files, errors, previous_selections, expansion_state):
-        """Callback specifically for handling a repository refresh."""
+        """Callback for repository refresh. Keeps progress visible through tree build and preview."""
         logging.info(f"Handling refresh completion for {repo_path}")
-        self.gui.hide_loading_state()
         if errors or repo_path is None:
+            self.gui.hide_loading_state()
             logging.error(f"Refresh errors: {errors}")
             error_message = "Error refreshing repository."
             if errors: error_message += f" Details: {'; '.join(errors[:3])}"
             self.gui.show_status_message(error_message, error=True, duration=ERROR_MESSAGE_DURATION)
             messagebox.showerror("Refresh Error", f"Failed to refresh repository.\n{error_message}")
-            # Don't clear state on failed refresh, just report error
             return
+        self.gui.show_loading_phase("Building tree...")
         file_handler = self.gui.file_handler
         file_handler.ignore_patterns = ignore_patterns or []
         file_handler.scanned_text_files = scanned_files or set()
 
-        # Path Normalization & Selection Alignment
         with file_handler.lock:
-            # Normalize all scanned files for reliable comparison
             normalized_scanned = {normalize_for_cache(p) for p in scanned_files}
-            
-            # Select ALL scanned files, just like _handle_load_completion does
-            # This ensures new files are auto-selected on refresh
             file_handler.loaded_files = normalized_scanned
             logging.debug(f"Aligned {len(normalized_scanned)} files after refresh.")
 
-        # 2. Repopulate the tree, which is necessary to show new/deleted files
         self.gui.structure_tab.populate_tree(repo_path)
-       
-        # 3. Restore the expansion state of the tree
         self.apply_tree_expansion_state(expansion_state)
-       
-        # Re-apply the personalized color
+
         repo_settings = self.gui.settings.get('repo', repo_path, {})
         saved_color = repo_settings.get('color', self.gui.header_frame.LEGENDARY_GOLD)
         self.gui.header_frame.repo_name_label.config(foreground=saved_color)
 
+        self.gui.show_loading_phase("Generating preview...")
         self.gui.trigger_preview_update()
         self.gui.show_status_message(f"Refreshed {os.path.basename(repo_path)} successfully.", duration=STATUS_MESSAGE_DURATION)
+        self.gui.start_git_status_monitor()

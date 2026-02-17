@@ -11,7 +11,7 @@ from constants import VERSION, LEFT_PANEL_WIDTH, TEMPLATE_MARKDOWN, TEMPLATE_XML
 class HeaderFrame(ttk.Frame):
     def __init__(self, parent, title="CodeBase", version=VERSION, row_offset=0):
         super().__init__(parent)
-        self.grid(row=0 + row_offset, column=0, columnspan=3, padx=12, pady=(12, 0), sticky="ew")
+        self.grid(row=0 + row_offset, column=0, columnspan=5, padx=12, pady=(12, 0), sticky="ew")
 
         # Title and version section
         title_frame = ttk.Frame(self)
@@ -50,7 +50,7 @@ class HeaderFrame(ttk.Frame):
 
         # Separator line
         self.header_separator = ttk.Frame(parent, height=1)
-        self.header_separator.grid(row=1 + row_offset, column=0, columnspan=3, sticky="ew", padx=12, pady=(8, 8))
+        self.header_separator.grid(row=1 + row_offset, column=0, columnspan=5, sticky="ew", padx=12, pady=(8, 8))
 
 class LeftPanel(ttk.Frame):
     def __init__(self, parent, gui, row_offset=0):
@@ -100,6 +100,9 @@ class LeftPanel(ttk.Frame):
         # Git Actions
         self.gui.copy_diff_button = self.gui.create_button(copy_section_frame, "Copy Git Diff", self.gui.git_handler.copy_diff, "Copy changes (git diff HEAD)")
         self.gui.copy_diff_button.pack(pady=(0, 0), padx=0, fill='x')
+
+        # === GIT STATUS PANEL MOVED TO RIGHT SIDE ===
+        # (Git Status is now in GitStatusPanel on the right)
 
         # Options section
         options_frame = ttk.Frame(self)
@@ -257,3 +260,70 @@ class RightPanel(ttk.Frame):
         self.gui.file_list_tab.copy_list_button.config(command=self.gui.file_list_tab.copy_from_list)
         # Add the fully configured tab to the notebook
         self.gui.notebook.add(self.gui.file_list_tab, text="File List Selection")
+
+
+class GitStatusPanel(ttk.Frame):
+    """Dedicated right sidebar for Git Status (VSCode-style)"""
+    def __init__(self, parent, gui):
+        super().__init__(parent)
+        self.gui = gui
+        self.pack_propagate(False)
+        self.config(width=240)
+        self.setup_ui()
+
+    def setup_ui(self):
+        ttk.Label(self, text="Git Status", font=("Arial", 11, "bold")).pack(anchor="w", padx=12, pady=(12, 8))
+
+        # Branch
+        self.git_branch_label = ttk.Label(self, text="Branch: —", font=("Arial", 9, "italic"))
+        self.git_branch_label.pack(anchor="w", padx=12, pady=2)
+
+        ttk.Separator(self).pack(fill='x', padx=12, pady=8)
+
+        # --- Staged Changes ---
+        self.staged_label = ttk.Label(self, text="Staged Changes (0)", font=("Arial", 10, "bold"), bootstyle="success")
+        self.staged_label.pack(anchor="w", padx=12, pady=(4, 2))
+
+        # Container for List + Scrollbar
+        staged_container = ttk.Frame(self)
+        staged_container.pack(fill='x', padx=12, pady=4)
+
+        staged_sb = ttk.Scrollbar(staged_container, orient=tk.VERTICAL)
+        self.staged_list = tk.Listbox(
+            staged_container, height=6, font=("Arial", 9), selectmode=tk.SINGLE,
+            bg="#1e1e1e", fg="#9cdcfe", borderwidth=0, highlightthickness=0,
+            yscrollcommand=staged_sb.set
+        )
+        staged_sb.config(command=self.staged_list.yview)
+
+        self.staged_list.pack(side=tk.LEFT, fill='x', expand=True)
+        staged_sb.pack(side=tk.RIGHT, fill='y')
+
+        ttk.Button(self, text="Copy All Staged", bootstyle="success-outline",
+                   command=self.gui.copy_staged_changes).pack(pady=(2, 10), padx=12, fill='x')
+
+        # --- Unstaged Changes ---
+        self.changes_label = ttk.Label(self, text="Changes (0)", font=("Arial", 10, "bold"), bootstyle="warning")
+        self.changes_label.pack(anchor="w", padx=12, pady=(8, 2))
+
+        # Container for List + Scrollbar
+        changes_container = ttk.Frame(self)
+        changes_container.pack(fill='x', padx=12, pady=4)
+
+        changes_sb = ttk.Scrollbar(changes_container, orient=tk.VERTICAL)
+        self.changes_list = tk.Listbox(
+            changes_container, height=6, font=("Arial", 9), selectmode=tk.SINGLE,
+            bg="#1e1e1e", fg="#9cdcfe", borderwidth=0, highlightthickness=0,
+            yscrollcommand=changes_sb.set
+        )
+        changes_sb.config(command=self.changes_list.yview)
+
+        self.changes_list.pack(side=tk.LEFT, fill='x', expand=True)
+        changes_sb.pack(side=tk.RIGHT, fill='y')
+
+        ttk.Button(self, text="Copy All Changes", bootstyle="warning-outline",
+                   command=self.gui.copy_unstaged_changes).pack(pady=(2, 10), padx=12, fill='x')
+
+        # Refresh
+        ttk.Button(self, text="↻ Refresh Git Status", bootstyle="outline",
+                   command=self.gui.update_git_status).pack(pady=6, padx=12, fill='x')

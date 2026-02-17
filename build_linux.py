@@ -90,6 +90,7 @@ def create_linux_structure():
 
     # 3. Create .desktop file
     desktop_content = f"""[Desktop Entry]
+Version={VERSION}
 Name={APP_NAME}
 Comment={DESCRIPTION}
 Exec=/usr/bin/{APP_NAME}

@@ -3,7 +3,7 @@ import tkinter as tk
 from ttkbootstrap.widgets.scrolled import ScrolledText
 from widgets import Tooltip
 import logging
-from constants import ERROR_MESSAGE_DURATION
+from constants import ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION
 import pygments
 from pygments.lexers import get_lexer_for_filename, TextLexer
 from pygments.styles import get_style_by_name
@@ -140,10 +140,20 @@ class ContentTab(ttk.Frame):
                 self.update_idletasks()
 
     def _handle_preview_completion(self, generated_content, token_count, errors):
+        # Reset flag so future previews can run
+        self.gui.is_generating_preview = False
+
+        logging.info(f"[PREVIEW COMPLETE] Callback received. Content length: {len(generated_content or ''):,} chars, Errors: {len(errors or [])}")
+
+        # Always hide loading overlay first (fixes stuck spinner)
+        self.gui.hide_loading_state()
+
         if errors:
-             error_msg = "Errors generating preview content."
-             if errors: error_msg += f" Files: {'; '.join(errors[:3])}"
-             self.gui.show_status_message(error_msg, error=True, duration=ERROR_MESSAGE_DURATION)
+            error_msg = "Errors generating preview content."
+            error_msg += f" Files: {'; '.join(errors[:3])}"
+            self.gui.show_status_message(error_msg, error=True, duration=ERROR_MESSAGE_DURATION)
+        else:
+            self.gui.show_status_message("Preview ready.", duration=STATUS_MESSAGE_DURATION)
 
         # ttkbootstrap ScrolledText is always editable
         self.content_text.delete(1.0, tk.END)
@@ -260,9 +270,6 @@ class ContentTab(ttk.Frame):
         self.gui.update_cache_info()
 
         self.update_content_expand_collapse_button()
-
-        if not errors:
-             self.gui.show_status_message("Content preview updated.", duration=3000)
 
     def toggle_content_all(self):
         if not self.file_states: return

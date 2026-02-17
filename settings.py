@@ -15,7 +15,7 @@ class SettingsManager:
         """Loads settings from JSON file, applying defaults for missing keys."""
         default_settings = {
             "app": {
-                "window_geometry": "1200x800",
+                "window_geometry": "1200x820",
                 "default_tab": "Content Preview",
                 "prepend_prompt": 1,
                 "show_unloaded": 0,

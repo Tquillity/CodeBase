@@ -25,6 +25,9 @@ def mock_gui():
     gui.show_status_message = MagicMock()
     gui.show_loading_state = MagicMock()
     gui.hide_loading_state = MagicMock()
+    gui._queue_loading_progress = MagicMock()
+    gui._update_loading_progress = MagicMock()
+    gui.show_loading_phase = MagicMock()
     gui.trigger_preview_update = MagicMock()
     gui.refresh_button = MagicMock()
     gui.copy_structure_button = MagicMock()
@@ -70,7 +73,7 @@ def test_select_repo_success(repo_handler, mock_gui):
             mock_gui.update_recent_folders.assert_called_with("/selected")
             mock_clear.assert_called_with(clear_ui=True)
             mock_gui.show_loading_state.assert_called_with("Scanning selected...", show_cancel=True)
-            mock_load.assert_called_with("/selected", mock_gui.show_status_message, repo_handler._handle_load_completion)
+            mock_load.assert_called_with("/selected", mock_gui._queue_loading_progress, repo_handler._handle_load_completion)
 
 def test_refresh_repo_no_path(repo_handler, mock_gui):
     mock_gui.current_repo_path = None
@@ -85,14 +88,14 @@ def test_refresh_repo_success(repo_handler, mock_gui):
          patch.object(repo_handler, 'load_repo') as mock_load:
         repo_handler.refresh_repo()
         mock_gui.show_loading_state.assert_called_with("Refreshing repo...", show_cancel=True)
-        mock_load.assert_called_with("/repo", mock_gui.show_status_message, ANY)  # The lambda for refresh_completion
+        mock_load.assert_called_with("/repo", mock_gui._queue_loading_progress, ANY)  # refresh_completion lambda
 
 def test_handle_load_completion_success(repo_handler, mock_gui):
     scanned = set(["file1", "file2"])
     loaded = set(["file1"])
     ignore_patterns = [".git"]
     repo_handler._handle_load_completion("/repo", ignore_patterns, scanned, loaded, [])
-    mock_gui.hide_loading_state.assert_called_once()
+    # hide_loading_state is not called on success; it is called when preview completes
     assert repo_handler.repo_path == "/repo"
     assert mock_gui.current_repo_path == "/repo"
     assert mock_gui.file_handler.repo_path == "/repo"
@@ -116,8 +119,8 @@ def test_handle_refresh_completion_success(repo_handler, mock_gui):
     expansion = set(["/repo/dir"])
     
     repo_handler._handle_refresh_completion("/repo", [".git"], scanned, [], previous, expansion)
-    
-    mock_gui.hide_loading_state.assert_called_once()
+
+    # hide_loading_state is not called on success; it is called when preview completes
     # Should now select ALL scanned files, normalized
     expected_loaded = {normalize_for_cache(f) for f in scanned}
     assert mock_gui.file_handler.loaded_files == expected_loaded

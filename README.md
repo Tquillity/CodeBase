@@ -1,5 +1,7 @@
 # CodeBase
 
+**Version 6.5.0**
+
 CodeBase is a Linux desktop application that scans a local source repository, lets you select files, previews the combined content, and copies the result to the clipboard for use in LLM prompts or code reviews.
 
 ## Features
