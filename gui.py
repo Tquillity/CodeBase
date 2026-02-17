@@ -50,7 +50,11 @@ class RepoPromptGUI:
         
         # Theme management now handled by ttkbootstrap
         self.root.title(f"CodeBase v{self.version}")
-        self.root.geometry(self.settings.get('app', 'window_geometry', DEFAULT_WINDOW_SIZE))
+        geom = self.settings.get('app', 'window_geometry', DEFAULT_WINDOW_SIZE)
+        try:
+            self.root.geometry(geom)
+        except (tk.TclError, Exception):
+            self.root.geometry(f"{DEFAULT_WINDOW_SIZE}{DEFAULT_WINDOW_POSITION}")
         # Background color now managed by ttkbootstrap theme
         
         # Quick window visibility check and fix
