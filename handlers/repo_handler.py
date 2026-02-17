@@ -1,6 +1,5 @@
 import os
 import tkinter as tk
-from tkinter import messagebox
 import threading
 import logging
 import time
@@ -32,7 +31,7 @@ class RepoHandler:
             self.gui.show_status_message("Loading...", error=True)
             return
         default_start_folder = self.gui.settings.get('app', 'default_start_folder', os.path.expanduser("~"))
-        dialog = FolderDialog(self.gui.root, self.gui.recent_folders, on_delete_callback=self.gui.delete_recent_folder, default_start_folder=default_start_folder)
+        dialog = FolderDialog(self.gui.root, self.gui.recent_folders, on_delete_callback=self.gui.delete_recent_folder, default_start_folder=default_start_folder, gui=self.gui)
         folder = dialog.show()
         if folder:
             self.gui.update_recent_folders(folder)
@@ -258,7 +257,7 @@ class RepoHandler:
             error_message = "Error loading repository."
             if errors: error_message += f" Details: {'; '.join(errors[:3])}"
             self.gui.show_status_message(error_message, error=True, duration=ERROR_MESSAGE_DURATION)
-            messagebox.showerror("Load Error", f"Failed to load repository.\n{error_message}")
+            self.gui.show_toast(f"Failed to load repository. {error_message}", toast_type="error")
             self._clear_internal_state(clear_ui=True)
             return
         # --- Success: keep progress bar visible for tree + preview phases ---
@@ -302,7 +301,7 @@ class RepoHandler:
             error_message = "Error refreshing repository."
             if errors: error_message += f" Details: {'; '.join(errors[:3])}"
             self.gui.show_status_message(error_message, error=True, duration=ERROR_MESSAGE_DURATION)
-            messagebox.showerror("Refresh Error", f"Failed to refresh repository.\n{error_message}")
+            self.gui.show_toast(f"Failed to refresh repository. {error_message}", toast_type="error")
             return
         self.gui.show_loading_phase("Building tree...")
         file_handler = self.gui.file_handler

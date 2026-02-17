@@ -263,67 +263,136 @@ class RightPanel(ttk.Frame):
 
 
 class GitStatusPanel(ttk.Frame):
-    """Dedicated right sidebar for Git Status (VSCode-style)"""
+    """Dedicated right sidebar for Git Status (VSCode-style). Full height, collapsible sections."""
     def __init__(self, parent, gui):
         super().__init__(parent)
         self.gui = gui
         self.pack_propagate(False)
         self.config(width=240)
+        self._staged_expanded = True
+        self._changes_expanded = True
         self.setup_ui()
 
+    def _toggle_staged(self):
+        self._staged_expanded = not self._staged_expanded
+        if self._staged_expanded:
+            self.staged_body.grid()
+            self._staged_btn.config(text="▼")
+        else:
+            self.staged_body.grid_remove()
+            self._staged_btn.config(text="▶")
+        self._update_listbox_heights()
+
+    def _toggle_changes(self):
+        self._changes_expanded = not self._changes_expanded
+        if self._changes_expanded:
+            self.changes_body.grid()
+            self._changes_btn.config(text="▼")
+        else:
+            self.changes_body.grid_remove()
+            self._changes_btn.config(text="▶")
+        self._update_listbox_heights()
+
+    def _on_staged_configure(self, event):
+        if self._staged_expanded and event.height > 10:
+            lines = max(3, event.height // 20)
+            self.staged_list.config(height=lines)
+
+    def _on_changes_configure(self, event):
+        if self._changes_expanded and event.height > 10:
+            lines = max(3, event.height // 20)
+            self.changes_list.config(height=lines)
+
+    def _update_listbox_heights(self):
+        for cont, lb in [(self.staged_list_frame, self.staged_list), (self.changes_list_frame, self.changes_list)]:
+            try:
+                h = cont.winfo_height()
+                if h > 10:
+                    lb.config(height=max(3, h // 20))
+            except tk.TclError:
+                pass
+
     def setup_ui(self):
-        ttk.Label(self, text="Git Status", font=("Arial", 11, "bold")).pack(anchor="w", padx=12, pady=(12, 8))
+        self.grid_columnconfigure(0, weight=1)
+        row = 0
 
-        # Branch
+        ttk.Label(self, text="Git Status", font=("Arial", 11, "bold")).grid(row=row, column=0, sticky="w", padx=12, pady=(12, 4))
+        row += 1
+
         self.git_branch_label = ttk.Label(self, text="Branch: —", font=("Arial", 9, "italic"))
-        self.git_branch_label.pack(anchor="w", padx=12, pady=2)
+        self.git_branch_label.grid(row=row, column=0, sticky="w", padx=12, pady=2)
+        row += 1
 
-        ttk.Separator(self).pack(fill='x', padx=12, pady=8)
+        ttk.Separator(self).grid(row=row, column=0, sticky="ew", padx=12, pady=8)
+        row += 1
 
-        # --- Staged Changes ---
-        self.staged_label = ttk.Label(self, text="Staged Changes (0)", font=("Arial", 10, "bold"), bootstyle="success")
-        self.staged_label.pack(anchor="w", padx=12, pady=(4, 2))
+        # --- Staged (collapsible) ---
+        staged_header = ttk.Frame(self)
+        staged_header.grid(row=row, column=0, sticky="ew", padx=8, pady=(4, 0))
+        staged_header.grid_columnconfigure(1, weight=1)
+        self._staged_btn = ttk.Button(staged_header, text="▼", width=2, command=self._toggle_staged, bootstyle="success-outline")
+        self._staged_btn.pack(side=tk.LEFT, padx=(4, 2))
+        self.staged_label = ttk.Label(staged_header, text="Staged Changes (0)", font=("Arial", 10, "bold"), bootstyle="success")
+        self.staged_label.pack(side=tk.LEFT, fill='x', expand=True)
+        row += 1
 
-        # Container for List + Scrollbar
-        staged_container = ttk.Frame(self)
-        staged_container.pack(fill='x', padx=12, pady=4)
-
-        staged_sb = ttk.Scrollbar(staged_container, orient=tk.VERTICAL)
+        self.staged_body = ttk.Frame(self)
+        self.staged_body.grid(row=row, column=0, sticky="nsew", padx=8, pady=2)
+        self.staged_body.grid_columnconfigure(0, weight=1)
+        self.staged_body.grid_rowconfigure(0, weight=1)
+        self.staged_list_frame = ttk.Frame(self.staged_body)
+        self.staged_list_frame.grid(row=0, column=0, sticky="nsew")
+        self.staged_list_frame.grid_columnconfigure(0, weight=1)
+        self.staged_list_frame.grid_rowconfigure(0, weight=1)
+        staged_sb = ttk.Scrollbar(self.staged_list_frame, orient=tk.VERTICAL)
         self.staged_list = tk.Listbox(
-            staged_container, height=6, font=("Arial", 9), selectmode=tk.SINGLE,
+            self.staged_list_frame, height=8, font=("Arial", 9), selectmode=tk.SINGLE,
             bg="#1e1e1e", fg="#9cdcfe", borderwidth=0, highlightthickness=0,
             yscrollcommand=staged_sb.set
         )
         staged_sb.config(command=self.staged_list.yview)
+        self.staged_list.grid(row=0, column=0, sticky="nsew")
+        staged_sb.grid(row=0, column=1, sticky="ns")
+        self.staged_list_frame.bind("<Configure>", self._on_staged_configure)
+        ttk.Button(self.staged_body, text="Copy All Staged", bootstyle="success-outline",
+                   command=self.gui.copy_staged_changes).grid(row=1, column=0, sticky="ew", pady=(2, 6), padx=4)
+        self.staged_body.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(row, weight=1)
+        row += 1
 
-        self.staged_list.pack(side=tk.LEFT, fill='x', expand=True)
-        staged_sb.pack(side=tk.RIGHT, fill='y')
+        # --- Changes (collapsible) ---
+        changes_header = ttk.Frame(self)
+        changes_header.grid(row=row, column=0, sticky="ew", padx=8, pady=(8, 0))
+        changes_header.grid_columnconfigure(1, weight=1)
+        self._changes_btn = ttk.Button(changes_header, text="▼", width=2, command=self._toggle_changes, bootstyle="warning-outline")
+        self._changes_btn.pack(side=tk.LEFT, padx=(4, 2))
+        self.changes_label = ttk.Label(changes_header, text="Changes (0)", font=("Arial", 10, "bold"), bootstyle="warning")
+        self.changes_label.pack(side=tk.LEFT, fill='x', expand=True)
+        row += 1
 
-        ttk.Button(self, text="Copy All Staged", bootstyle="success-outline",
-                   command=self.gui.copy_staged_changes).pack(pady=(2, 10), padx=12, fill='x')
-
-        # --- Unstaged Changes ---
-        self.changes_label = ttk.Label(self, text="Changes (0)", font=("Arial", 10, "bold"), bootstyle="warning")
-        self.changes_label.pack(anchor="w", padx=12, pady=(8, 2))
-
-        # Container for List + Scrollbar
-        changes_container = ttk.Frame(self)
-        changes_container.pack(fill='x', padx=12, pady=4)
-
-        changes_sb = ttk.Scrollbar(changes_container, orient=tk.VERTICAL)
+        self.changes_body = ttk.Frame(self)
+        self.changes_body.grid(row=row, column=0, sticky="nsew", padx=8, pady=2)
+        self.changes_body.grid_columnconfigure(0, weight=1)
+        self.changes_body.grid_rowconfigure(0, weight=1)
+        self.changes_list_frame = ttk.Frame(self.changes_body)
+        self.changes_list_frame.grid(row=0, column=0, sticky="nsew")
+        self.changes_list_frame.grid_columnconfigure(0, weight=1)
+        self.changes_list_frame.grid_rowconfigure(0, weight=1)
+        changes_sb = ttk.Scrollbar(self.changes_list_frame, orient=tk.VERTICAL)
         self.changes_list = tk.Listbox(
-            changes_container, height=6, font=("Arial", 9), selectmode=tk.SINGLE,
+            self.changes_list_frame, height=8, font=("Arial", 9), selectmode=tk.SINGLE,
             bg="#1e1e1e", fg="#9cdcfe", borderwidth=0, highlightthickness=0,
             yscrollcommand=changes_sb.set
         )
         changes_sb.config(command=self.changes_list.yview)
+        self.changes_list.grid(row=0, column=0, sticky="nsew")
+        changes_sb.grid(row=0, column=1, sticky="ns")
+        self.changes_list_frame.bind("<Configure>", self._on_changes_configure)
+        ttk.Button(self.changes_body, text="Copy All Changes", bootstyle="warning-outline",
+                   command=self.gui.copy_unstaged_changes).grid(row=1, column=0, sticky="ew", pady=(2, 6), padx=4)
+        self.changes_body.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(row, weight=1)
+        row += 1
 
-        self.changes_list.pack(side=tk.LEFT, fill='x', expand=True)
-        changes_sb.pack(side=tk.RIGHT, fill='y')
-
-        ttk.Button(self, text="Copy All Changes", bootstyle="warning-outline",
-                   command=self.gui.copy_unstaged_changes).pack(pady=(2, 10), padx=12, fill='x')
-
-        # Refresh
         ttk.Button(self, text="↻ Refresh Git Status", bootstyle="outline",
-                   command=self.gui.update_git_status).pack(pady=6, padx=12, fill='x')
+                   command=self.gui.update_git_status).grid(row=row + 1, column=0, sticky="ew", padx=12, pady=8)

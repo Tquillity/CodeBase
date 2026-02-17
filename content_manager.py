@@ -18,7 +18,7 @@ from exceptions import FileOperationError, RepositoryError
 from error_handler import handle_error, safe_execute
 from security import validate_file_size, validate_content_security, neutralize_urls
 
-def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: threading.Lock, read_errors: List[str]) -> Optional[str]:
+def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: threading.Lock, read_errors: List[str], deleted_files: Optional[List[str]] = None) -> Optional[str]:
     # Use normalized path for cache keys for cross-platform consistency
     normalized_path = normalize_for_cache(file_path)
     
@@ -55,17 +55,14 @@ def get_file_content(file_path: str, content_cache: ThreadSafeLRUCache, lock: th
             # Store in LRU cache (handles its own locking)
             content_cache.put(normalized_path, content)
             return content
-    except FileNotFoundError as e:
-        error = FileOperationError(
-            f"File not found: {file_path}",
-            file_path=file_path,
-            operation="read",
-            details={"error_type": "FileNotFoundError"}
-        )
-        if ERROR_HANDLING_ENABLED:
-            handle_error(error, "get_file_content", show_ui=False)
-        with lock:
-            read_errors.append(f"Not Found: {file_path}")
+    except FileNotFoundError:
+        if deleted_files is not None:
+            with lock:
+                deleted_files.append(file_path)
+            logging.debug(f"File missing (deleted): {file_path}")
+        else:
+            with lock:
+                read_errors.append(f"Not Found: {file_path}")
     except PermissionError as e:
         error = FileOperationError(
             f"Permission denied: {file_path}",
@@ -129,7 +126,8 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
     sorted_files = sorted(list(files_to_include))
     total_files = len(sorted_files)
     processed_count = 0
-    
+    deleted_files = []
+
     for file_path in sorted_files:
         # Check for shutdown during processing
         if gui and hasattr(gui, '_shutdown_requested') and gui._shutdown_requested:
@@ -138,7 +136,7 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
         
         logging.debug(f"Processing file: {file_path}")
         
-        file_content = get_file_content(file_path, content_cache, lock, read_errors)
+        file_content = get_file_content(file_path, content_cache, lock, read_errors, deleted_files=deleted_files)
 
         if file_content is not None:
             logging.info(f"[PREVIEW] Successfully read {os.path.basename(file_path)} ({len(file_content):,} chars)")
@@ -178,4 +176,4 @@ def generate_content(files_to_include: set, repo_path: str, lock: threading.Lock
     end_time = time.time()
     logging.info(f"Content generation complete for {len(files_to_include)} files in {end_time - start_time:.2f} seconds. Tokens: {token_count}")
     logging.info(f"[PREVIEW] All files processed. Calling completion callback with {len(final_content):,} chars")
-    completion_callback(final_content, token_count, read_errors)
+    completion_callback(final_content, token_count, read_errors, deleted_files)

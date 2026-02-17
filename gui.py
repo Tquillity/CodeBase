@@ -10,7 +10,7 @@ from tabs.structure_tab import StructureTab
 from tabs.base_prompt_tab import BasePromptTab
 from tabs.settings_tab import SettingsTab
 from tabs.file_list_tab import FileListTab
-from widgets import Tooltip, FolderDialog
+from widgets import Tooltip, FolderDialog, ToastManager
 from file_handler import FileHandler
 from settings import SettingsManager
 import appdirs
@@ -113,6 +113,7 @@ class RepoPromptGUI:
         # Queue for thread-safe Tkinter callbacks from background threads
         self.task_queue = queue.Queue()
         self._git_monitor_id = None
+        self.toast_manager = ToastManager(self.root)
 
         # Update logging configuration based on settings
         self._update_logging_config()
@@ -422,6 +423,14 @@ class RepoPromptGUI:
             self.status_bar.config(text=f" {message}")
         self.status_timer_id = self.root.after(duration, self.reset_status_bar)
 
+    def show_toast(self, message: str, toast_type: str = "info", duration: int | None = None) -> None:
+        """Display a modern non-blocking toast notification. Thread-safe via task_queue."""
+        self.task_queue.put((self._show_toast_main, (message, toast_type, duration)))
+
+    def _show_toast_main(self, message: str, toast_type: str, duration: int | None) -> None:
+        """Runs on main thread; called via task_queue from show_toast."""
+        self.toast_manager.show(message, toast_type=toast_type, duration=duration)
+
     def reset_status_bar(self):
         self.status_bar.config(text=" Ready")
         self.status_timer_id = None
@@ -584,18 +593,20 @@ class RepoPromptGUI:
     def _apply_git_status_ui(self, status: dict):
         """Main-thread UI update."""
         self.git_panel.git_branch_label.config(text=f"Branch: {status['branch']}")
+        staged_deleted = status.get('staged_deleted') or set()
+        changes_deleted = status.get('changes_deleted') or set()
 
-        # Staged
         self.git_panel.staged_label.config(text=f"Staged Changes ({len(status['staged'])})")
         self.git_panel.staged_list.delete(0, tk.END)
         for path in status['staged']:
-            self.git_panel.staged_list.insert(tk.END, f"• {os.path.basename(path)}")
+            prefix = "D " if path in staged_deleted else "• "
+            self.git_panel.staged_list.insert(tk.END, f"{prefix}{os.path.basename(path)}")
 
-        # Unstaged
         self.git_panel.changes_label.config(text=f"Changes ({len(status['changes'])})")
         self.git_panel.changes_list.delete(0, tk.END)
         for path in status['changes']:
-            self.git_panel.changes_list.insert(tk.END, f"• {os.path.basename(path)}")
+            prefix = "D " if path in changes_deleted else "• "
+            self.git_panel.changes_list.insert(tk.END, f"{prefix}{os.path.basename(path)}")
 
     def toggle_test_files_and_refresh(self):
         """Toggle test files exclusion and refresh the current repository."""
@@ -815,7 +826,7 @@ class RepoPromptGUI:
                  self.root.after(WINDOW_TOP_DURATION, self.repo_handler.refresh_repo)
         except Exception as e:
             logging.error(f"Error saving settings: {e}", exc_info=True)
-            messagebox.showerror("Settings Error", f"Could not save settings:\n{e}")
+            self.show_toast(f"Could not save settings: {e}", toast_type="error")
 
     def apply_default_tab(self):
         default_tab_name = self.settings.get('app', 'default_tab', 'Content Preview')
@@ -828,13 +839,10 @@ class RepoPromptGUI:
              logging.warning("Could not select default tab, notebook might not be ready.")
 
     def show_about(self):
-        messagebox.showinfo("About CodeBase",
-                            f"CodeBase v{self.version}\n\n"
-                            "A tool to scan local code repositories, preview text files, "
-                            "and copy contents or structure to the clipboard.\n\n"
-                            "Developed by Mikael Sundh.\n"
-                            "License: MIT (To be finalized)\n"
-                            "© 2024-2025")
+        msg = (f"CodeBase v{self.version} — A tool to scan local code repositories, "
+               "preview text files, and copy contents or structure to the clipboard. "
+               "Developed by Mikael Sundh. License: MIT. © 2024-2025")
+        self.show_toast(msg, toast_type="info", duration=6000)
 
     def change_repo_color(self, event=None):
         if not self.current_repo_path:

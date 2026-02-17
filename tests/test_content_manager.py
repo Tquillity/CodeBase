@@ -120,10 +120,10 @@ def test_generate_content_success(temp_repo):
     token_counts = []
     local_errors = []
 
-    def completion_callback(content, token_count, errors):
+    def completion_callback(content, token_count, errors, deleted_files=None):
         generated_content.append(content)
         token_counts.append(token_count)
-        local_errors.extend(errors)
+        local_errors.extend(errors or [])
 
     generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
 
@@ -149,15 +149,17 @@ def test_generate_content_with_errors(temp_repo):
 
     generated_content = []
     local_errors = []
+    local_deleted = []
 
-    def completion_callback(content, token_count, errors):
+    def completion_callback(content, token_count, errors, deleted_files=None):
         generated_content.append(content)
-        local_errors.extend(errors)
+        local_errors.extend(errors or [])
+        local_deleted.extend(deleted_files or [])
 
     generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
 
     assert generated_content[0] == ""
-    assert "Not Found: " in local_errors[0]
+    assert missing_path in local_deleted
 
 def test_generate_content_sorted_order(temp_repo):
     temp_dir, file1_path, file2_path, _, _ = temp_repo
@@ -196,7 +198,7 @@ def test_generate_content_token_count(temp_repo):
 
     token_counts = []
 
-    def completion_callback(_, token_count, __):
+    def completion_callback(_, token_count, __, ___=None):
         token_counts.append(token_count)
 
     generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)

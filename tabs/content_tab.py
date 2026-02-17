@@ -1,9 +1,11 @@
+import os
 import ttkbootstrap as ttk
 import tkinter as tk
 from ttkbootstrap.widgets.scrolled import ScrolledText
 from widgets import Tooltip
 import logging
 from constants import ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION
+from path_utils import get_relative_path
 import pygments
 from pygments.lexers import get_lexer_for_filename, TextLexer
 from pygments.styles import get_style_by_name
@@ -36,6 +38,7 @@ class ContentTab(ttk.Frame):
         
         self.content_text.tag_configure("filename", foreground=colors.danger, font=('Arial', 10, 'bold'))
         self.content_text.tag_configure("toggle", foreground=colors.success, underline=True)
+        self.content_text.tag_configure("deleted", foreground=colors.danger, overstrike=True, font=('Arial', 10, 'bold'))
         self.content_text.tag_configure("highlight", background=colors.warning, foreground=colors.bg)
         self.content_text.tag_configure("focused_highlight", background=colors.primary, foreground=colors.bg)
 
@@ -139,19 +142,20 @@ class ContentTab(ttk.Frame):
             if i > 0 and i % 5 == 0:
                 self.update_idletasks()
 
-    def _handle_preview_completion(self, generated_content, token_count, errors):
-        # Reset flag so future previews can run
+    def _handle_preview_completion(self, generated_content, token_count, errors, deleted_files=None):
+        deleted_files = deleted_files or []
         self.gui.is_generating_preview = False
 
-        logging.info(f"[PREVIEW COMPLETE] Callback received. Content length: {len(generated_content or ''):,} chars, Errors: {len(errors or [])}")
+        logging.info(f"[PREVIEW COMPLETE] Callback received. Content length: {len(generated_content or ''):,} chars, Errors: {len(errors or [])}, Deleted: {len(deleted_files)}")
 
-        # Always hide loading overlay first (fixes stuck spinner)
         self.gui.hide_loading_state()
 
         if errors:
             error_msg = "Errors generating preview content."
             error_msg += f" Files: {'; '.join(errors[:3])}"
             self.gui.show_status_message(error_msg, error=True, duration=ERROR_MESSAGE_DURATION)
+        elif deleted_files and not errors:
+            self.gui.show_status_message("Preview ready. Deleted files listed below.", duration=STATUS_MESSAGE_DURATION)
         else:
             self.gui.show_status_message("Preview ready.", duration=STATUS_MESSAGE_DURATION)
 
@@ -260,6 +264,20 @@ class ContentTab(ttk.Frame):
                     if len(section) > 5:
                          self.content_text.insert(tk.END, f"{section}\n\n")
 
+        if deleted_files:
+            repo_path = getattr(self.gui, 'current_repo_path', None) or ''
+            self.content_text.insert(tk.END, "\n", "deleted")
+            for path in sorted(deleted_files):
+                rel = get_relative_path(path, repo_path) or path
+                self.content_text.insert(tk.END, f"[DELETED] {rel}\n", "deleted")
+            self.content_text.insert(tk.END, "\n", "deleted")
+            summary = "Deleted files (not copied): " + ", ".join(
+                (get_relative_path(p, repo_path) or os.path.basename(p) for p in sorted(deleted_files)[:10])
+            )
+            if len(deleted_files) > 10:
+                summary += f" … +{len(deleted_files) - 10} more"
+            self.content_text.insert(tk.END, summary + "\n", "deleted")
+
         self.gui.current_token_count = token_count
         self.gui.info_label.config(text=f"Tokens (Selected): {self.gui.current_token_count:,}".replace(",", " "))
         if self.gui.current_repo_path:
@@ -345,5 +363,6 @@ class ContentTab(ttk.Frame):
 
         self.content_text.tag_configure("filename", foreground=colors.danger, font=('Arial', 10, 'bold'))
         self.content_text.tag_configure("toggle", foreground=colors.success, underline=True)
+        self.content_text.tag_configure("deleted", foreground=colors.danger, overstrike=True, font=('Arial', 10, 'bold'))
         self.content_text.tag_configure("highlight", background=colors.warning, foreground=colors.bg)
         self.content_text.tag_configure("focused_highlight", background=colors.primary, foreground=colors.bg)

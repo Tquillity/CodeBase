@@ -75,8 +75,8 @@ def test_handle_copy_completion_final_success(copy_handler, mock_gui):
         mock_gui.show_status_message.assert_called_with("Copied")
 
 def test_handle_copy_completion_final_errors(copy_handler, mock_gui):
-    # FIX: Patch the qualified name as imported in copy_handler.py
-    with patch('tkinter.messagebox.showwarning') as mock_warn:  # FIX: Patch tkinter.messagebox directly
-        copy_handler._handle_copy_completion_final("Prompt", "Content", "", ["error1", "error2"], "Failed")
-        mock_gui.show_status_message.assert_any_call(ANY, error=True, duration=10000)
-        mock_warn.assert_called()
+    copy_handler._handle_copy_completion_final("Prompt", "Content", "", ["error1", "error2"], "Failed")
+    mock_gui.show_status_message.assert_any_call(ANY, error=True, duration=10000)
+    mock_gui.show_toast.assert_called_once()
+    args = mock_gui.show_toast.call_args
+    assert args[1].get("toast_type") == "warning"

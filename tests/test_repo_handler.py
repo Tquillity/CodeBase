@@ -3,7 +3,6 @@ import os
 import pytest
 from unittest.mock import MagicMock, patch, ANY
 import tkinter as tk
-from tkinter import messagebox
 from handlers.repo_handler import RepoHandler
 from widgets import FolderDialog
 from constants import LEGENDARY_GOLD
@@ -129,12 +128,14 @@ def test_handle_refresh_completion_success(repo_handler, mock_gui):
     mock_gui.header_frame.repo_name_label.config.assert_called_with(foreground=LEGENDARY_GOLD)
 
 def test_handle_load_completion_errors(repo_handler, mock_gui):
-    with patch('tkinter.messagebox.showerror') as mock_error:
-        repo_handler._handle_load_completion(None, None, set(), set(), ["error1"])
-        mock_gui.hide_loading_state.assert_called_once()
-        mock_gui.show_status_message.assert_called_with(ANY, error=True, duration=10000)
-        mock_error.assert_called_with("Load Error", ANY)
-        assert repo_handler.repo_path is None  # Cleared
+    repo_handler._handle_load_completion(None, None, set(), set(), ["error1"])
+    mock_gui.hide_loading_state.assert_called_once()
+    mock_gui.show_status_message.assert_called_with(ANY, error=True, duration=10000)
+    mock_gui.show_toast.assert_called_once()
+    args = mock_gui.show_toast.call_args
+    assert "Failed to load repository" in args[0][0]
+    assert args[1].get("toast_type") == "error"
+    assert repo_handler.repo_path is None  # Cleared
 
 def test_clear_internal_state(repo_handler, mock_gui):
     with patch.object(repo_handler, '_update_ui_for_no_repo') as mock_update_ui:

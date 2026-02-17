@@ -91,7 +91,7 @@ class GitHandler:
         if repo_path is None:
             repo_path = self.gui.current_repo_path
         if not repo_path or not os.path.exists(os.path.join(repo_path, '.git')):
-            return {'staged': [], 'changes': [], 'branch': '—'}
+            return {'staged': [], 'changes': [], 'staged_deleted': set(), 'changes_deleted': set(), 'branch': '—'}
 
         try:
             # --porcelain=v1 gives a 2-character status code
@@ -103,6 +103,8 @@ class GitHandler:
             branch = "main"
             staged = []
             changes = []
+            staged_deleted = set()
+            changes_deleted = set()
 
             for line in lines:
                 if line.startswith('## '):
@@ -111,34 +113,34 @@ class GitHandler:
                 if len(line) < 3:
                     continue
 
-                # XY PATH
-                # X = Index (Staged), Y = Work tree (Unstaged)
+                # XY PATH; D = deleted
                 x_status = line[0]
                 y_status = line[1]
                 path = line[3:].strip()
-
-                # Handle renames (R  old -> new)
                 if " -> " in path:
                     path = path.split(" -> ")[-1]
-
                 full_path = os.path.join(repo_path, path)
+                is_deleted = (x_status == 'D' or y_status == 'D')
 
-                # 1. Check if staged (X is not space and not ?)
                 if x_status not in (' ', '?'):
                     staged.append(full_path)
-
-                # 2. Check if unstaged (Y is not space) OR untracked (??)
+                    if is_deleted:
+                        staged_deleted.add(full_path)
                 if y_status != ' ' or (x_status == '?' and y_status == '?'):
                     changes.append(full_path)
+                    if is_deleted:
+                        changes_deleted.add(full_path)
 
             return {
                 'staged': sorted(list(set(staged))),
                 'changes': sorted(list(set(changes))),
+                'staged_deleted': staged_deleted,
+                'changes_deleted': changes_deleted,
                 'branch': branch
             }
         except Exception as e:
             logging.warning(f"Git status failed: {e}")
-            return {'staged': [], 'changes': [], 'branch': 'error'}
+            return {'staged': [], 'changes': [], 'staged_deleted': set(), 'changes_deleted': set(), 'branch': 'error'}
 
     def copy_staged_changes(self):
         """Copy full content of all staged files (formatted)."""
@@ -182,7 +184,7 @@ class GitHandler:
                     logging.error(f"Copy to clipboard failed: {e}")
                     self.gui.show_status_message("Failed to copy to clipboard", error=True)
 
-        def completion(content, token_count, errors):
+        def completion(content, token_count, errors, deleted_files=None):
             self.gui.task_queue.put((_finish, (content, errors)))
 
         self.gui.show_loading_state(f"Preparing {title_lower}...")

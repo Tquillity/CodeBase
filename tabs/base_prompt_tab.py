@@ -108,7 +108,7 @@ class BasePromptTab(ttk.Frame):
                 self.gui.show_status_message(f"Template '{os.path.basename(template_name)}' saved.")
             except Exception as e:
                 logging.error(f"Error saving template {template_name}: {e}")
-                messagebox.showerror("Save Error", f"Could not save template:\n{e}")
+                self.gui.show_toast(f"Could not save template: {e}", toast_type="error")
 
     def load_template(self):
         template_file = filedialog.askopenfilename(
@@ -122,7 +122,7 @@ class BasePromptTab(ttk.Frame):
                 if SECURITY_ENABLED:
                     is_valid, error = validate_template_file(template_file)
                     if not is_valid:
-                        messagebox.showerror("Security Warning", f"Template validation failed:\n{error}")
+                        self.gui.show_toast(f"Template validation failed: {error}", toast_type="warning")
                         return
                 
                 with open(template_file, 'r', encoding='utf-8') as file:
@@ -132,7 +132,7 @@ class BasePromptTab(ttk.Frame):
                 if SECURITY_ENABLED:
                     is_valid, error = validate_content_security(content, "template")
                     if not is_valid:
-                        messagebox.showerror("Security Warning", f"Template content validation failed:\n{error}")
+                        self.gui.show_toast(f"Template content validation failed: {error}", toast_type="warning")
                         return
                     
                     # Sanitize content if needed
@@ -149,7 +149,7 @@ class BasePromptTab(ttk.Frame):
                 self.gui.show_status_message(f"Template '{os.path.basename(template_file)}' loaded.")
             except Exception as e:
                 logging.error(f"Error loading template {template_file}: {e}")
-                messagebox.showerror("Load Error", f"Could not load template:\n{e}")
+                self.gui.show_toast(f"Could not load template: {e}", toast_type="error")
 
     def delete_template(self):
         template_file = filedialog.askopenfilename(
@@ -164,7 +164,7 @@ class BasePromptTab(ttk.Frame):
                     self.gui.show_status_message(f"Template '{os.path.basename(template_file)}' deleted.")
                 except Exception as e:
                     logging.error(f"Error deleting template {template_file}: {e}")
-                    messagebox.showerror("Delete Error", f"Could not delete template:\n{e}")
+                    self.gui.show_toast(f"Could not delete template: {e}", toast_type="error")
 
     def clear(self):
         self.base_prompt_text.delete(1.0, tk.END)

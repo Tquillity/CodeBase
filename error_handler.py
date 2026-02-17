@@ -4,7 +4,6 @@
 import logging
 import traceback
 import tkinter as tk
-from tkinter import messagebox
 from typing import Optional, Callable, Any, Dict
 from exceptions import (
     CodeBaseError, FileOperationError, RepositoryError, CacheError, 
@@ -97,12 +96,10 @@ class ErrorHandler:
         if show_ui and self.gui:
             message = f"File operation failed: {error.message}"
             if error.file_path:
-                message += f"\nFile: {error.file_path}"
+                message += f" File: {error.file_path}"
             if error.operation:
-                message += f"\nOperation: {error.operation}"
-            
-            self.gui.show_status_message(message, error=True)
-            messagebox.showerror("File Error", message)
+                message += f" Operation: {error.operation}"
+            self.gui.show_toast(message, toast_type="error")
         
         return True
     
@@ -111,12 +108,10 @@ class ErrorHandler:
         if show_ui and self.gui:
             message = f"Repository operation failed: {error.message}"
             if error.repo_path:
-                message += f"\nRepository: {error.repo_path}"
+                message += f" Repo: {error.repo_path}"
             if error.operation:
-                message += f"\nOperation: {error.operation}"
-            
-            self.gui.show_status_message(message, error=True)
-            messagebox.showerror("Repository Error", message)
+                message += f" Operation: {error.operation}"
+            self.gui.show_toast(message, toast_type="error")
         
         return True
     
@@ -125,9 +120,8 @@ class ErrorHandler:
         if show_ui and self.gui:
             message = f"Cache operation failed: {error.message}"
             if error.cache_key:
-                message += f"\nCache key: {error.cache_key}"
-            
-            self.gui.show_status_message(message, error=True)
+                message += f" Key: {error.cache_key}"
+            self.gui.show_toast(message, toast_type="warning")
         
         return True
     
@@ -136,10 +130,8 @@ class ErrorHandler:
         if show_ui and self.gui:
             message = f"UI operation failed: {error.message}"
             if error.component:
-                message += f"\nComponent: {error.component}"
-            
-            self.gui.show_status_message(message, error=True)
-            messagebox.showerror("UI Error", message)
+                message += f" Component: {error.component}"
+            self.gui.show_toast(message, toast_type="error")
         
         return True
     
@@ -148,10 +140,8 @@ class ErrorHandler:
         if show_ui and self.gui:
             message = f"Security violation: {error.message}"
             if error.attempted_path:
-                message += f"\nAttempted path: {error.attempted_path}"
-            
-            self.gui.show_status_message(message, error=True)
-            messagebox.showerror("Security Error", message)
+                message += f" Path: {error.attempted_path}"
+            self.gui.show_toast(message, toast_type="error")
         
         return True
     
@@ -160,10 +150,8 @@ class ErrorHandler:
         if show_ui and self.gui:
             message = f"Configuration error: {error.message}"
             if error.config_key:
-                message += f"\nConfiguration key: {error.config_key}"
-            
-            self.gui.show_status_message(message, error=True)
-            messagebox.showerror("Configuration Error", message)
+                message += f" Key: {error.config_key}"
+            self.gui.show_toast(message, toast_type="error")
         
         return True
     
@@ -172,10 +160,8 @@ class ErrorHandler:
         if show_ui and self.gui:
             message = f"Threading error: {error.message}"
             if error.thread_name:
-                message += f"\nThread: {error.thread_name}"
-            
-            self.gui.show_status_message(message, error=True)
-            messagebox.showerror("Threading Error", message)
+                message += f" Thread: {error.thread_name}"
+            self.gui.show_toast(message, toast_type="error")
         
         return True
     
@@ -183,8 +169,7 @@ class ErrorHandler:
         """Handle generic CodeBase errors."""
         if show_ui and self.gui:
             message = f"Application error: {error.message}"
-            self.gui.show_status_message(message, error=True)
-            messagebox.showerror("Application Error", message)
+            self.gui.show_toast(message, toast_type="error")
         
         return True
     
@@ -192,8 +177,7 @@ class ErrorHandler:
         """Handle unexpected errors."""
         if show_ui and self.gui:
             message = f"Unexpected error: {str(error)}"
-            self.gui.show_status_message(message, error=True)
-            messagebox.showerror("Unexpected Error", message)
+            self.gui.show_toast(message, toast_type="error")
         
         return True
     

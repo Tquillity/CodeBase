@@ -1,6 +1,5 @@
 import os
 import tkinter as tk
-from tkinter import messagebox
 import threading
 import logging
 from collections import deque
@@ -371,8 +370,8 @@ class FileHandler:
             self.gui.update_progress(percentage, message, file_count_text)
         def queued_progress(processed, total, elapsed):
             self.gui.task_queue.put((update_progress, (processed, total, elapsed)))
-        def wrapped_completion(content, token_count, errors):
-            self.gui.task_queue.put((completion_callback, (content, token_count, errors)))
+        def wrapped_completion(content, token_count, errors, deleted_files=None):
+            self.gui.task_queue.put((completion_callback, (content, token_count, errors, deleted_files or [])))
             self.gui.task_queue.put((self.gui.hide_loading_state, ()))
         thread = threading.Thread(target=generate_content, args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui, current_format), daemon=True)
         thread.start()
