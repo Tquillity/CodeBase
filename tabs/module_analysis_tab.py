@@ -1,11 +1,11 @@
 # tabs/module_analysis_tab.py
-# Module Analysis tab: dependency graph, impact scores, one-click module selection.
+# Module Analysis tab: dependency graph, impact scores, clusters, one-click module/cluster selection.
 from __future__ import annotations
 
 import logging
 import os
 import tkinter as tk
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
 import ttkbootstrap as ttk
 from widgets import Tooltip
@@ -15,6 +15,9 @@ from module_analyzer import (
     MAX_GRAPH_NODES,
     modules_with_impact,
 )
+
+if TYPE_CHECKING:
+    from gui import RepoPromptGUI
 
 logger = logging.getLogger(__name__)
 
@@ -33,20 +36,53 @@ try:
 except ImportError:
     nx = None
 
+try:
+    from scipy.cluster import hierarchy as scipy_hierarchy  # type: ignore[import-untyped]
+    _HAS_SCIPY_DENDRO = True
+except ImportError:
+    scipy_hierarchy = None
+    _HAS_SCIPY_DENDRO = False
+
+
+# Tree parent IDs for left-panel sections
+_MODULES_PARENT_TEXT = "Modules"
+_CLUSTERS_PARENT_TEXT = "Clusters"
+
 
 class ModuleAnalysisTab(ttk.Frame):
+    _last_modules: List[Tuple[str, int, float]]
+    _last_module_to_paths: Dict[str, List[str]]
+    _last_G: Any
+    _last_py_files_by_rel: Dict[str, str]
+    _last_clusters: List[Tuple[str, List[str], int, float]]
+    _last_cluster_to_paths: Dict[str, List[str]]
+    _last_linkage_Z: Any
+    _canvas: Optional[Any]
+    _fallback_text: Optional[tk.Text]
+    _fallback_var: Optional[tk.StringVar]
+    _right_placeholder: Optional[Any]
+    _right_container: Optional[ttk.Frame]
+    _left_empty_label: Optional[ttk.Label]
+    _selected_cluster_name: Optional[str]
+    select_cluster_btn: ttk.Button
+
     def __init__(self, parent: tk.Misc, gui: Any) -> None:
         super().__init__(parent)
         self.gui = gui
-        self._last_modules: List[Tuple[str, int, float]] = []
-        self._last_module_to_paths: Dict[str, List[str]] = {}
-        self._last_G: Any = None
-        self._last_py_files_by_rel: Dict[str, str] = {}
-        self._canvas: Optional[Any] = None
-        self._fallback_text: Optional[tk.Text] = None
-        self._fallback_var: Optional[tk.StringVar] = None
-        self._right_placeholder: Optional[Any] = None
-        self._right_container: Optional[ttk.Frame] = None
+        self._last_modules = []
+        self._last_module_to_paths = {}
+        self._last_G = None
+        self._last_py_files_by_rel = {}
+        self._last_clusters = []
+        self._last_cluster_to_paths = {}
+        self._last_linkage_Z = None
+        self._canvas = None
+        self._fallback_text = None
+        self._fallback_var = None
+        self._right_placeholder = None
+        self._right_container = None
+        self._left_empty_label = None
+        self._selected_cluster_name = None
         self.setup_ui()
 
     def setup_ui(self) -> None:
@@ -67,8 +103,17 @@ class ModuleAnalysisTab(ttk.Frame):
             state=tk.DISABLED,
         )
         self.select_module_btn.pack(side=tk.LEFT, padx=(0, 8))
+        self.select_cluster_btn = self.gui.create_button(
+            toolbar,
+            "Select This Cluster",
+            self._on_select_cluster,
+            "Select all files in this cluster in the main file tree",
+            state=tk.DISABLED,
+        )
+        self.select_cluster_btn.pack(side=tk.LEFT, padx=(0, 8))
         Tooltip(self.analyze_btn, "Build dependency graph from current repository")
         Tooltip(self.select_module_btn, "Add this module's files to selection and update preview")
+        Tooltip(self.select_cluster_btn, "Add this cluster's files to selection and update preview")
 
         paned = ttk.Panedwindow(self, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True, padx=8, pady=(4, 8))
@@ -110,12 +155,30 @@ class ModuleAnalysisTab(ttk.Frame):
         self._right_container = right_frame
         self._left_empty_label: Optional[ttk.Label] = None
 
-    def _on_tree_select(self, event: tk.Event) -> None:
+    def _on_tree_select(self, event: tk.Event[Any]) -> None:
+        self._on_tree_select_impl()
+
+    def _on_tree_select_impl(self) -> None:
         sel = self.tree.selection()
-        if sel:
-            self.select_module_btn.config(state=tk.NORMAL)
-        else:
+        if not sel:
             self.select_module_btn.config(state=tk.DISABLED)
+            self.select_cluster_btn.config(state=tk.DISABLED)
+            self._selected_cluster_name = None
+            return
+        item_id = sel[0]
+        tags = self.tree.item(item_id, "tags")
+        if "cluster" in tags:
+            self._selected_cluster_name = self.tree.item(item_id, "text")
+            self.select_module_btn.config(state=tk.DISABLED)
+            self.select_cluster_btn.config(state=tk.NORMAL)
+        elif "module" in tags:
+            self._selected_cluster_name = None
+            self.select_module_btn.config(state=tk.NORMAL)
+            self.select_cluster_btn.config(state=tk.DISABLED)
+        else:
+            self._selected_cluster_name = None
+            self.select_module_btn.config(state=tk.DISABLED)
+            self.select_cluster_btn.config(state=tk.DISABLED)
 
     def _on_analyze(self) -> None:
         if self.gui.is_loading:
@@ -139,11 +202,14 @@ class ModuleAnalysisTab(ttk.Frame):
 
         def worker() -> None:
             try:
-                modules, G, py_files_by_rel, module_to_abs = modules_with_impact(
-                    repo, enabled_extensions=enabled_extensions
+                modules, G, py_files_by_rel, module_to_abs, clusters, linkage_Z = (
+                    modules_with_impact(repo, enabled_extensions=enabled_extensions)
                 )
                 self.gui.task_queue.put(
-                    (self._apply_analysis_result, (modules, G, py_files_by_rel, module_to_abs))
+                    (
+                        self._apply_analysis_result,
+                        (modules, G, py_files_by_rel, module_to_abs, clusters, linkage_Z),
+                    )
                 )
             except Exception as e:
                 logger.exception("Module analysis failed")
@@ -164,11 +230,22 @@ class ModuleAnalysisTab(ttk.Frame):
         G: Any,
         py_files_by_rel: Dict[str, str],
         module_to_abs_paths: Dict[str, List[str]],
+        clusters: List[Tuple[str, List[str], int, float]],
+        linkage_Z: Any,
     ) -> None:
         self._last_modules = modules
         self._last_module_to_paths = module_to_abs_paths
         self._last_G = G
         self._last_py_files_by_rel = py_files_by_rel
+        self._last_clusters = clusters
+        self._last_linkage_Z = linkage_Z
+        cluster_to_paths: Dict[str, List[str]] = {}
+        for cname, mod_keys, _fc, _imp in clusters:
+            paths: List[str] = []
+            for mod_key in mod_keys:
+                paths.extend(module_to_abs_paths.get(mod_key, []))
+            cluster_to_paths[cname] = paths
+        self._last_cluster_to_paths = cluster_to_paths
         self.analyze_btn.config(state=tk.NORMAL)
         if not modules:
             self.gui.show_status_message("No supported source files found.")
@@ -215,6 +292,7 @@ class ModuleAnalysisTab(ttk.Frame):
             ph.pack(expand=True, fill=tk.BOTH, pady=20, padx=20)
             self._right_placeholder = ph
         self.select_module_btn.config(state=tk.DISABLED)
+        self.select_cluster_btn.config(state=tk.DISABLED)
 
     def _refresh_tree(self) -> None:
         if self._left_empty_label:
@@ -224,16 +302,28 @@ class ModuleAnalysisTab(ttk.Frame):
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0), pady=(0, 5))
         self._tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.tree.delete(*self.tree.get_children())
+        modules_parent = self.tree.insert("", tk.END, text=_MODULES_PARENT_TEXT, values=("", ""), open=True)
         for name, count, impact in self._last_modules:
             display_name = name.replace(os.sep, ".")
             self.tree.insert(
-                "",
+                modules_parent,
                 tk.END,
                 text=display_name,
                 values=(count, f"{impact:.3f}"),
+                tags=("module",),
+            )
+        clusters_parent = self.tree.insert("", tk.END, text=_CLUSTERS_PARENT_TEXT, values=("", ""), open=True)
+        for cname, _mods, file_count, agg_impact in self._last_clusters:
+            self.tree.insert(
+                clusters_parent,
+                tk.END,
+                text=cname,
+                values=(file_count, f"{agg_impact:.3f}"),
+                tags=("cluster",),
             )
         if self._last_modules:
             self.select_module_btn.config(state=tk.NORMAL)
+        self._on_tree_select_impl()
 
     def _clear_right(self) -> None:
         if self._canvas:
@@ -326,18 +416,52 @@ class ModuleAnalysisTab(ttk.Frame):
         if self._right_placeholder:
             self._right_placeholder.destroy()
             self._right_placeholder = None
-        fig = Figure(figsize=(6, 5), dpi=100)
-        ax = fig.add_subplot(111)
         G = self._last_G
+        has_dendro = (
+            _HAS_SCIPY_DENDRO
+            and scipy_hierarchy is not None
+            and self._last_linkage_Z is not None
+        )
+        if has_dendro:
+            fig = Figure(figsize=(6, 7), dpi=100)
+            ax_graph = fig.add_subplot(211)
+            ax_dendro = fig.add_subplot(212)
+        else:
+            fig = Figure(figsize=(6, 5), dpi=100)
+            ax_graph = fig.add_subplot(111)
+            ax_dendro = None
         try:
             pos = nx.spring_layout(G, k=0.5, iterations=50, seed=42)
         except Exception:
             pos = nx.shell_layout(G)
-        nx.draw_networkx_edges(G, pos, ax=ax, edge_color="gray", alpha=0.6, arrows=True)
-        nx.draw_networkx_nodes(G, pos, ax=ax, node_color="steelblue", node_size=80)
+        node_to_cluster_idx: Dict[str, int] = {}
+        for idx, (_cname, mods, _fc, _imp) in enumerate(self._last_clusters):
+            for mod in mods:
+                node_to_cluster_idx[mod] = idx
+        _cluster_colors = [
+            "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+            "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+        ]
+        node_colors = [
+            _cluster_colors[node_to_cluster_idx.get(n, 0) % len(_cluster_colors)]
+            for n in G.nodes()
+        ]
+        nx.draw_networkx_edges(G, pos, ax=ax_graph, edge_color="gray", alpha=0.6, arrows=True)
+        nx.draw_networkx_nodes(
+            G, pos, ax=ax_graph, node_color=node_colors, node_size=80
+        )
         labels = {n: os.path.basename(n) if os.path.basename(n) else n for n in G.nodes()}
-        nx.draw_networkx_labels(G, pos, labels, ax=ax, font_size=6)
-        ax.axis("off")
+        nx.draw_networkx_labels(G, pos, labels, ax=ax_graph, font_size=6)
+        ax_graph.axis("off")
+        if ax_dendro is not None and scipy_hierarchy is not None and self._last_linkage_Z is not None:
+            nodes_ordered = list(G.nodes())
+            scipy_hierarchy.dendrogram(
+                self._last_linkage_Z,
+                ax=ax_dendro,
+                leaf_rotation=90,
+                leaf_label_func=lambda i: nodes_ordered[i] if i < len(nodes_ordered) else str(i),
+            )
+            ax_dendro.set_title("Dendrogram")
         fig.tight_layout()
         self._canvas = FigureCanvasTkAgg(fig, master=self._right_container)  # type: ignore[no-untyped-call]
         self._canvas.draw()  # type: ignore[no-untyped-call]
@@ -345,23 +469,45 @@ class ModuleAnalysisTab(ttk.Frame):
             self._canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)  # type: ignore[no-untyped-call]
 
     def _on_select_module(self) -> None:
+        gui = cast("RepoPromptGUI", self.gui)
         sel = self.tree.selection()
         if not sel or not self._last_module_to_paths:
-            self.gui.show_status_message("Select a module first.", error=True)
+            gui.show_status_message("Select a module first.", error=True)
             return
         item = self.tree.item(sel[0])
+        if "module" not in item.get("tags", ()):
+            gui.show_status_message("Select a module from the Modules section.", error=True)
+            return
         display_name = item["text"]
-        # Tree shows display_name with . separator; keys in _last_module_to_paths use os.sep; "(root)" -> "."
         key = "(root)" if display_name == "(root)" else display_name.replace(".", os.sep)
         if key not in self._last_module_to_paths:
             key = display_name
         paths = self._last_module_to_paths.get(key, [])
         if not paths:
-            self.gui.show_status_message("No files for this module.", error=True)
+            gui.show_status_message("No files for this module.", error=True)
             return
-        self.gui.file_handler.select_files_by_paths(paths)
-        self.gui.show_status_message(f"Selected {len(paths)} file(s) from {display_name}.")
-        self.gui.notebook.select(1)
+        gui.file_handler.select_files_by_paths(paths)
+        gui.show_status_message(f"Selected {len(paths)} file(s) from {display_name}.")
+        gui.notebook.select(1)  # type: ignore[no-untyped-call]
+
+    def _on_select_cluster(self) -> None:
+        gui = cast("RepoPromptGUI", self.gui)
+        sel = self.tree.selection()
+        if not sel or not self._last_cluster_to_paths:
+            gui.show_status_message("Select a cluster first.", error=True)
+            return
+        item = self.tree.item(sel[0])
+        if "cluster" not in item.get("tags", ()):
+            gui.show_status_message("Select a cluster from the Clusters section.", error=True)
+            return
+        cname = item["text"]
+        paths = self._last_cluster_to_paths.get(cname, [])
+        if not paths:
+            gui.show_status_message("No files in this cluster.", error=True)
+            return
+        gui.file_handler.select_cluster_by_paths(paths)
+        gui.show_status_message(f"Selected {len(paths)} file(s) from {cname}.")
+        gui.notebook.select(1)  # type: ignore[no-untyped-call]
 
     def perform_search(self, query: str, case_sensitive: bool, whole_word: bool) -> List[Any]:
         return []
@@ -384,6 +530,9 @@ class ModuleAnalysisTab(ttk.Frame):
         self._last_module_to_paths = {}
         self._last_G = None
         self._last_py_files_by_rel = {}
+        self._last_clusters = []
+        self._last_cluster_to_paths = {}
+        self._last_linkage_Z = None
         self._clear_right()
         if self._right_container:
             ph = ttk.Label(
@@ -394,3 +543,4 @@ class ModuleAnalysisTab(ttk.Frame):
             ph.pack(expand=True)
             self._right_placeholder = ph
         self.select_module_btn.config(state=tk.DISABLED)
+        self.select_cluster_btn.config(state=tk.DISABLED)

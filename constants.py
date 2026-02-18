@@ -36,7 +36,7 @@ TEXT_EXTENSIONS_DEFAULT = {
 FILE_SEPARATOR = "===FILE_SEPARATOR===\n"
 
 # Application version
-VERSION = "6.9.0"
+VERSION = "7.0.0"
 
 # Cache configuration
 CACHE_MAX_SIZE = 1000  # Maximum number of cached files
@@ -74,6 +74,11 @@ SECURITY_STRICT_MODE = True  # Enable strict security validation
 TREE_MAX_ITEMS = 10000  # Maximum items to process in tree operations
 TREE_UI_UPDATE_INTERVAL = 100  # Update UI every N items to prevent blocking
 TREE_SAFETY_LIMIT = 10000  # Safety limit to prevent infinite loops
+
+# Module Analysis — Hierarchical clustering (Sprint 2)
+MAX_CLUSTER_SIZE = 50  # Max modules per cluster for display; larger clusters are still computed
+CLUSTER_IMPACT_THRESHOLD = 0.0  # Min aggregate impact to show cluster (sum of in-degree centrality)
+CLUSTER_DISCONNECTED_DISTANCE = 1000.0  # Distance assigned between disconnected components for linkage
 
 # UI Configuration
 LEGENDARY_GOLD = "#FFD700"

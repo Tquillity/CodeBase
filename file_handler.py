@@ -358,6 +358,13 @@ class FileHandler:
         gui.structure_tab.update_tree_strikethrough()
         gui.trigger_preview_update()
 
+    def select_cluster_by_paths(self, cluster_paths: list[str]) -> None:
+        """
+        Select all files in a cluster in the main tree and trigger preview update.
+        Reuses the same logic as select_files_by_paths (cluster = list of file paths).
+        """
+        self.select_files_by_paths(cluster_paths)
+
     def _update_folder_selection_recursive(self, item_id: str, selected: bool) -> bool:
         gui = cast("RepoPromptGUI", self.gui)
         tree = gui.structure_tab.tree

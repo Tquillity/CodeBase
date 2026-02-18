@@ -1,5 +1,6 @@
 # module_analyzer.py
 # Multi-language dependency graph: regex-based imports, folder-as-module heuristic.
+# Sprint 2: hierarchical clustering via shortest-path distance matrix.
 from __future__ import annotations
 
 import logging
@@ -12,6 +13,13 @@ try:
 except ImportError:
     nx = None
 
+try:
+    from scipy.cluster import hierarchy as scipy_hierarchy  # type: ignore[import-untyped]
+    _HAS_SCIPY = True
+except ImportError:
+    scipy_hierarchy = None
+    _HAS_SCIPY = False
+
 logger = logging.getLogger(__name__)
 
 # Read only first 50 KB per file for speed
@@ -19,6 +27,9 @@ MAX_READ_BYTES = 50 * 1024
 
 # Maximum nodes beyond which we skip graph layout (use text fallback in UI)
 MAX_GRAPH_NODES = 100
+
+# Default max distance for disconnected components (overridden by constants.CLUSTER_DISCONNECTED_DISTANCE when used)
+_DEFAULT_DISCONNECTED_DISTANCE = 1000.0
 
 # Skip these directories when walking (non-source)
 SKIP_DIRS = frozenset({
@@ -240,23 +251,129 @@ def build_dependency_graph(
     return G, centrality
 
 
+def _condensed_distance_from_graph(
+    G: Any,
+    nodes: List[str],
+    disconnected_distance: float,
+) -> List[float]:
+    """
+    Build condensed distance matrix (n*(n-1)/2) for linkage.
+    Distance = shortest path length on undirected graph; disconnected = disconnected_distance.
+    """
+    n = len(nodes)
+    if n <= 1:
+        return []
+    try:
+        Gu = G.to_undirected()
+    except Exception:
+        Gu = G
+    node_to_idx = {nd: i for i, nd in enumerate(nodes)}
+    condensed: List[float] = [0.0] * (n * (n - 1) // 2)
+    for i in range(n):
+        for j in range(i + 1, n):
+            u, v = nodes[i], nodes[j]
+            try:
+                length = nx.shortest_path_length(Gu, u, v)
+            except (nx.NetworkXNoPath, nx.NodeNotFound, Exception):
+                length = disconnected_distance
+            k = (i * (2 * n - i - 1)) // 2 + (j - i - 1)
+            condensed[k] = float(length)
+    return condensed
+
+
+def _hierarchical_clusters(
+    G: Any,
+    centrality: Dict[str, float],
+    module_to_files: Dict[str, List[Tuple[str, str]]],
+    disconnected_distance: float,
+    max_cluster_size: int,
+    impact_threshold: float,
+) -> Tuple[List[Tuple[str, List[str], int, float]], Any]:
+    """
+    Compute hierarchical clusters from dependency graph.
+    Returns (list of (cluster_display_name, module_keys, file_count, aggregate_impact), linkage_matrix Z).
+    Z is None if clustering failed or scipy unavailable.
+    """
+    if not _HAS_SCIPY or scipy_hierarchy is None or nx is None or G is None:
+        return [], None
+    n = G.number_of_nodes()
+    if n <= 1:
+        return [], None
+    nodes = list(G.nodes())
+    condensed = _condensed_distance_from_graph(G, nodes, disconnected_distance)
+    if len(condensed) == 0:
+        return [], None
+    try:
+        Z = scipy_hierarchy.linkage(condensed, method="average")
+    except Exception as e:
+        logger.debug("linkage failed: %s", e)
+        return [], None
+    # Request a reasonable number of clusters so no cluster exceeds max_cluster_size
+    n_clusters = max(2, min(25, (n + max_cluster_size - 1) // max(1, max_cluster_size)))
+    try:
+        labels = scipy_hierarchy.fcluster(Z, n_clusters, criterion="maxclust")
+    except Exception as e:
+        logger.debug("fcluster failed: %s", e)
+        return [], None
+    # Group module names by cluster id
+    cluster_id_to_modules: Dict[int, List[str]] = {}
+    for idx, label in enumerate(labels):
+        if idx >= len(nodes):
+            continue
+        mod = nodes[idx]
+        cid = int(label)
+        cluster_id_to_modules.setdefault(cid, []).append(mod)
+    result: List[Tuple[str, List[str], int, float]] = []
+    for cid in sorted(cluster_id_to_modules.keys()):
+        mods = cluster_id_to_modules[cid]
+        file_count = sum(len(module_to_files.get(m, [])) for m in mods)
+        aggregate_impact = sum(centrality.get(m, 0.0) for m in mods)
+        if aggregate_impact < impact_threshold:
+            continue
+        name = f"Cluster {cid}"
+        result.append((name, mods, file_count, aggregate_impact))
+    result.sort(key=lambda x: (-x[3], -x[2], x[0]))
+    return result, Z
+
+
 def modules_with_impact(
     repo_root: str,
     enabled_extensions: Optional[Set[str]] = None,
-) -> Tuple[List[Tuple[str, int, float]], Any, Dict[str, str], Dict[str, List[str]]]:
+) -> Tuple[
+    List[Tuple[str, int, float]],
+    Any,
+    Dict[str, str],
+    Dict[str, List[str]],
+    List[Tuple[str, List[str], int, float]],
+    Any,
+]:
     """
     Multi-language: discover modules (folders) from enabled extensions, build graph, impact = in_degree_centrality.
+    Sprint 2: also computes hierarchical clusters from shortest-path distance (undirected).
     Returns:
       - list of (module_display_name, file_count, impact_score) sorted by impact desc
       - networkx DiGraph (or None)
       - rel_path -> abs_path for all scanned files
       - module_display_name -> list of absolute paths (for selection bridge)
+      - list of (cluster_name, module_keys, file_count, aggregate_impact) for clusters
+      - linkage matrix Z (for dendrogram) or None
     """
+    try:
+        from constants import (
+            CLUSTER_DISCONNECTED_DISTANCE,
+            CLUSTER_IMPACT_THRESHOLD,
+            MAX_CLUSTER_SIZE,
+        )
+    except ImportError:
+        CLUSTER_DISCONNECTED_DISTANCE = _DEFAULT_DISCONNECTED_DISTANCE
+        CLUSTER_IMPACT_THRESHOLD = 0.0
+        MAX_CLUSTER_SIZE = 50
+
     if enabled_extensions is None:
         enabled_extensions = set(IMPORT_PATTERNS.keys())
     module_to_files, all_files = discover_modules(repo_root, enabled_extensions)
     if not module_to_files:
-        return [], None, {}, {}
+        return [], None, {}, {}, [], None
     G, centrality = build_dependency_graph(repo_root, module_to_files, all_files)
     result: List[Tuple[str, int, float]] = []
     module_to_abs_paths: Dict[str, List[str]] = {}
@@ -267,4 +384,16 @@ def modules_with_impact(
         result.append((display, count, impact))
         module_to_abs_paths[mod_name] = [abs_path for _, abs_path in files]
     result.sort(key=lambda x: (-x[2], -x[1], x[0]))
-    return result, G, all_files, module_to_abs_paths
+
+    clusters: List[Tuple[str, List[str], int, float]] = []
+    linkage_Z: Any = None
+    if G is not None and centrality:
+        clusters, linkage_Z = _hierarchical_clusters(
+            G,
+            centrality,
+            module_to_files,
+            disconnected_distance=CLUSTER_DISCONNECTED_DISTANCE,
+            max_cluster_size=MAX_CLUSTER_SIZE,
+            impact_threshold=CLUSTER_IMPACT_THRESHOLD,
+        )
+    return result, G, all_files, module_to_abs_paths, clusters, linkage_Z
