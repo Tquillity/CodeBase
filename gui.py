@@ -1,41 +1,141 @@
 # gui.py
-import os
-import threading
-import ttkbootstrap as ttk
-import tkinter as tk
-from tkinter import messagebox, filedialog, Toplevel, BooleanVar, IntVar, StringVar, colorchooser
-from typing import Dict, List, Set, Optional, Any, Callable
-from tabs.content_tab import ContentTab
-from tabs.structure_tab import StructureTab
-from tabs.base_prompt_tab import BasePromptTab
-from tabs.settings_tab import SettingsTab
-from tabs.file_list_tab import FileListTab
-from widgets import Tooltip, FolderDialog, ToastManager
-from file_handler import FileHandler
-from settings import SettingsManager
-import appdirs
+from __future__ import annotations
+
 import logging
-import pyperclip
-from content_manager import generate_content
-from file_scanner import is_text_file
-from file_list_handler import generate_list_content
-from handlers.search_handler import SearchHandler
-from handlers.copy_handler import CopyHandler
-from handlers.repo_handler import RepoHandler
-from handlers.git_handler import GitHandler
-# Support for thread-safe Tkinter callbacks from background threads
-from panels.panels import HeaderFrame, LeftPanel, RightPanel, GitStatusPanel
+import os
 import queue
-from tkinterdnd2 import DND_FILES
-from constants import VERSION, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_POSITION, STATUS_MESSAGE_DURATION, ERROR_MESSAGE_DURATION, WINDOW_TOP_DURATION, ERROR_HANDLING_ENABLED, DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT, MAX_RECENT_FOLDERS, LEFT_PANEL_WIDTH
-from exceptions import UIError, ConfigurationError, ThreadingError
-from error_handler import handle_error, safe_execute, get_error_handler
-from logging_config import setup_logging, get_logger
+import threading
+import tkinter as tk
+from tkinter import BooleanVar, IntVar, StringVar, colorchooser, filedialog, messagebox, Toplevel
+from typing import TYPE_CHECKING, Any, Callable, Optional, cast
+
+import appdirs  # type: ignore[import-untyped]
+import pyperclip  # type: ignore[import-untyped]
+import ttkbootstrap as ttk
+from constants import (
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_WINDOW_POSITION,
+    DEFAULT_WINDOW_SIZE,
+    ERROR_MESSAGE_DURATION,
+    LEFT_PANEL_WIDTH,
+    LOG_FILE_PATH,
+    LOG_FORMAT,
+    MAX_RECENT_FOLDERS,
+    STATUS_MESSAGE_DURATION,
+    VERSION,
+    WINDOW_TOP_DURATION,
+)
+from content_manager import generate_content
+from error_handler import get_error_handler, handle_error, safe_execute
+from exceptions import ConfigurationError, ThreadingError, UIError
+from file_handler import FileHandler
+from file_list_handler import generate_list_content
+from file_scanner import is_text_file
+from handlers.copy_handler import CopyHandler
+from handlers.git_handler import GitHandler
+from handlers.repo_handler import RepoHandler
+from handlers.search_handler import SearchHandler
+from logging_config import get_logger, setup_logging
+from panels.panels import GitStatusPanel, HeaderFrame, LeftPanel, RightPanel
+from settings import SettingsManager
+from tkinterdnd2 import DND_FILES  # type: ignore[import-untyped]
+from widgets import FolderDialog, ToastManager, Tooltip
+
+if TYPE_CHECKING:
+    from tabs.base_prompt_tab import BasePromptTab
+    from tabs.content_tab import ContentTab
+    from tabs.file_list_tab import FileListTab
+    from tabs.module_analysis_tab import ModuleAnalysisTab
+    from tabs.settings_tab import SettingsTab
+    from tabs.structure_tab import StructureTab
 
 # Setup centralized logging configuration (moved to main.py)
 # setup_logging(...) removed to prevent double initialization
 
+
 class RepoPromptGUI:
+    root: ttk.Window
+    version: str
+    settings: SettingsManager
+    logger: Any
+    high_contrast_mode: tk.BooleanVar
+    prepend_var: tk.IntVar
+    show_unloaded_var: tk.IntVar
+    user_data_dir: str
+    template_dir: str
+    recent_folders_file: str
+    match_positions: dict[str, Any]
+    current_match_index: dict[str, Any]
+    recent_folders: list[str]
+    current_repo_path: Optional[str]
+    is_loading: bool
+    is_generating_preview: bool
+    current_token_count: int
+    file_handler: FileHandler
+    search_handler: SearchHandler
+    copy_handler: CopyHandler
+    repo_handler: RepoHandler
+    git_handler: GitHandler
+    task_queue: queue.Queue[tuple[Callable[..., Any], tuple[Any, ...]]]
+    _background_threads: list[threading.Thread]
+    _shutdown_requested: bool
+    _git_monitor_id: Optional[str]
+    toast_manager: ToastManager
+    list_selected_files: set[str]
+    list_read_errors: list[str]
+    menu: tk.Menu
+    header_frame: HeaderFrame
+    left_frame: LeftPanel
+    left_separator: ttk.Frame
+    right_frame: RightPanel
+    git_panel: GitStatusPanel
+    progress_frame: ttk.Frame
+    loading_status_label: ttk.Label
+    progress: ttk.Progressbar
+    cancel_button: Optional[ttk.Button]
+    file_counter: ttk.Label
+    _scan_cancel_requested: bool
+    status_bar: ttk.Label
+    status_timer_id: Optional[str]
+    status_context_menu: tk.Menu
+    select_button: ttk.Button
+    refresh_button: ttk.Button
+    info_label: ttk.Label
+    cache_info_label: ttk.Label
+    copy_button: ttk.Button
+    copy_structure_button: ttk.Button
+    copy_all_button: ttk.Button
+    copy_diff_button: ttk.Button
+    format_var: tk.StringVar
+    format_combo: ttk.Combobox
+    prepend_checkbox: ttk.Checkbutton
+    sanitize_urls_var: tk.IntVar
+    sanitize_urls_checkbox: ttk.Checkbutton
+    test_toggle_button: ttk.Button
+    lock_toggle_button: ttk.Button
+    clear_button_frame: ttk.Frame
+    clear_button: ttk.Button
+    clear_all_button: ttk.Button
+    search_var: tk.StringVar
+    search_entry: ttk.Entry
+    search_button: ttk.Button
+    next_button: ttk.Button
+    prev_button: ttk.Button
+    find_all_button: ttk.Button
+    search_count_label: ttk.Label
+    case_sensitive_var: tk.IntVar
+    case_sensitive_checkbox: ttk.Checkbutton
+    whole_word_var: tk.IntVar
+    whole_word_checkbox: ttk.Checkbutton
+    notebook: ttk.Notebook
+    content_tab: ContentTab
+    structure_tab: StructureTab
+    module_analysis_tab: ModuleAnalysisTab
+    base_prompt_tab: BasePromptTab
+    settings_tab: SettingsTab
+    file_list_tab: FileListTab
+    live_reload_bar: Optional[tk.Frame]
+
     def __init__(self, root: ttk.Window) -> None:
         self.root = root
         self.version = VERSION
@@ -80,17 +180,17 @@ class RepoPromptGUI:
         self.is_generating_preview = False
         self.current_token_count = 0
         self.file_handler = FileHandler(self)
-        self.search_handler = SearchHandler(self)
+        self.search_handler = SearchHandler(self)  # type: ignore[no-untyped-call]
         self.copy_handler = CopyHandler(self)
-        self.repo_handler = RepoHandler(self)
+        self.repo_handler = RepoHandler(self)  # type: ignore[no-untyped-call]
         self.git_handler = GitHandler(self)
         self.setup_ui()
         self.bind_keys()
         
-        # Register drag and drop
+        # Register drag and drop (tkinterdnd2 extends root with DnD methods)
         try:
-            self.root.drop_target_register(DND_FILES)
-            self.root.dnd_bind('<<Drop>>', self._on_drop)
+            cast(Any, self.root).drop_target_register(DND_FILES)
+            cast(Any, self.root).dnd_bind('<<Drop>>', self._on_drop)
         except Exception as e:
             self.logger.warning(f"Drag and drop registration failed: {e}")
             
@@ -111,7 +211,9 @@ class RepoPromptGUI:
         self._background_threads = []
         
         # Queue for thread-safe Tkinter callbacks from background threads
-        self.task_queue = queue.Queue()
+        self.task_queue = cast(
+            queue.Queue[tuple[Callable[..., Any], tuple[Any, ...]]], queue.Queue()
+        )
         self._git_monitor_id = None
         self.toast_manager = ToastManager(self.root)
 
@@ -120,7 +222,7 @@ class RepoPromptGUI:
         
         self._poll_queue()
 
-    def _on_drop(self, event):
+    def _on_drop(self, event: Any) -> None:
         """Handle file/folder drop events."""
         try:
             path = event.data
@@ -138,9 +240,9 @@ class RepoPromptGUI:
             if os.path.isdir(path):
                 self.show_status_message(f"Loading dropped repository: {path}")
                 self.update_recent_folders(path)
-                self.repo_handler._clear_internal_state(clear_ui=True)
+                self.repo_handler._clear_internal_state(clear_ui=True)  # type: ignore[no-untyped-call]
                 self.show_loading_state("Scanning repository...", show_cancel=True)
-                self.repo_handler.load_repo(path, self._queue_loading_progress, self.repo_handler._handle_load_completion)
+                self.repo_handler.load_repo(path, self._queue_loading_progress, self.repo_handler._handle_load_completion)  # type: ignore[no-untyped-call]
             else:
                 self.show_status_message("Please drop a folder, not a file.", error=True)
                 
@@ -148,7 +250,7 @@ class RepoPromptGUI:
             self.logger.error(f"Error handling drop event: {e}")
             self.show_status_message("Error processing dropped item.", error=True)
 
-    def _update_logging_config(self):
+    def _update_logging_config(self) -> None:
         """Update logging configuration based on user settings."""
         try:
             from logging_config import LoggingConfig
@@ -161,10 +263,10 @@ class RepoPromptGUI:
             # Update logging configuration
             LoggingConfig.setup_logging(
                 level=log_level,
-                log_file=LOG_FILE_PATH if log_to_file else None,
+                log_file=LOG_FILE_PATH if log_to_file else None,  # type: ignore[arg-type]
                 console_output=log_to_console,
                 format_string=LOG_FORMAT,
-                force=True
+                force=True,
             )
             
             self.logger.info(f"Logging configured: level={log_level}, file={log_to_file}, console={log_to_console}")
@@ -173,7 +275,7 @@ class RepoPromptGUI:
             self.logger.error(f"Failed to update logging configuration: {e}")
 
     # Polling method to process queued tasks in the main thread
-    def _poll_queue(self):
+    def _poll_queue(self) -> None:
         # Stop polling if shutdown requested
         if self._shutdown_requested:
             return
@@ -205,7 +307,7 @@ class RepoPromptGUI:
             if not self._shutdown_requested and self.root.winfo_exists():
                 self.root.after(50, self._poll_queue)  # Poll every 50ms for better responsiveness
 
-    def trigger_preview_update(self):
+    def trigger_preview_update(self) -> None:
         """Triggers the generation of the content preview tab."""
         logging.info(f"[PREVIEW] Trigger called. is_loading={self.is_loading}, current_repo={bool(self.current_repo_path)}")
 
@@ -224,9 +326,9 @@ class RepoPromptGUI:
         self.copy_button.config(state=tk.DISABLED)
         self.copy_all_button.config(state=tk.DISABLED)
 
-        self.file_handler.generate_and_update_preview(None, self.content_tab._handle_preview_completion)
+        self.file_handler.generate_and_update_preview(None, self.content_tab._handle_preview_completion)  # type: ignore[no-untyped-call]
 
-    def load_recent_folders(self):
+    def load_recent_folders(self) -> list[str]:
         if os.path.exists(self.recent_folders_file):
             try:
                 with open(self.recent_folders_file, 'r', encoding='utf-8') as file:
@@ -236,7 +338,7 @@ class RepoPromptGUI:
                 logging.error(f"Error loading recent folders from {self.recent_folders_file}: {e}")
         return []
 
-    def save_recent_folders(self):
+    def save_recent_folders(self) -> None:
         try:
             with open(self.recent_folders_file, 'w', encoding='utf-8') as file:
                 for folder in self.recent_folders:
@@ -244,7 +346,7 @@ class RepoPromptGUI:
         except Exception as e:
             logging.error(f"Error saving recent folders to {self.recent_folders_file}: {e}")
 
-    def update_recent_folders(self, new_folder):
+    def update_recent_folders(self, new_folder: str) -> None:
         if not new_folder: return
         abs_path = os.path.abspath(new_folder)
         
@@ -260,14 +362,14 @@ class RepoPromptGUI:
         self.recent_folders = self.recent_folders[:MAX_RECENT_FOLDERS]
         self.save_recent_folders()
 
-    def delete_recent_folder(self, folder_to_delete):
+    def delete_recent_folder(self, folder_to_delete: str) -> None:
         """Removes a specific folder from the recent list and saves the change."""
         if folder_to_delete in self.recent_folders:
             self.recent_folders.remove(folder_to_delete)
             self.save_recent_folders()
             logging.info(f"Removed recent folder: {folder_to_delete}")
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         self.menu = tk.Menu(self.root, tearoff=0)
         self.root.config(menu=self.menu)
         file_menu = tk.Menu(self.menu, tearoff=0)
@@ -284,7 +386,8 @@ class RepoPromptGUI:
         help_menu = tk.Menu(self.menu, tearoff=0)
         self.menu.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About", command=self.show_about)
-        
+
+        self.live_reload_bar = None
         # Add red bar at top if running from live_reload.py
         row_offset = 0
         if os.environ.get('CODEBASE_LIVE_RELOAD') == '1':
@@ -301,13 +404,13 @@ class RepoPromptGUI:
         self.root.grid_columnconfigure(3, weight=0, minsize=8)
         self.root.grid_columnconfigure(4, weight=0, minsize=240)
 
-        self.header_frame = HeaderFrame(self.root, title="CodeBase", version=self.version, row_offset=row_offset)
+        self.header_frame = HeaderFrame(self.root, title="CodeBase", version=self.version, row_offset=row_offset)  # type: ignore[no-untyped-call]
         self.header_frame.repo_name_label.bind("<Button-1>", self.change_repo_color)
-        self.left_frame = LeftPanel(self.root, self, row_offset=row_offset)
+        self.left_frame = LeftPanel(self.root, self, row_offset=row_offset)  # type: ignore[no-untyped-call]
         self.left_separator = ttk.Frame(self.root, width=2)
         self.left_separator.grid(row=2 + row_offset, column=1, padx=4, pady=15, sticky="ns")
-        self.right_frame = RightPanel(self.root, self, row_offset=row_offset)
-        self.git_panel = GitStatusPanel(self.root, self)
+        self.right_frame = RightPanel(self.root, self, row_offset=row_offset)  # type: ignore[no-untyped-call]
+        self.git_panel = GitStatusPanel(self.root, self)  # type: ignore[no-untyped-call]
         self.git_panel.grid(row=2 + row_offset, column=4, padx=(4, 10), pady=10, sticky="nsew")
         self.setup_status_bar()
         # === LOADING OVERLAY (centered on main area only) ===
@@ -322,13 +425,21 @@ class RepoPromptGUI:
         self._style_file_counter()
         self._scan_cancel_requested = False
 
-    def create_button(self, parent, text, command, tooltip_text=None, state=tk.NORMAL, bootstyle="primary"):
+    def create_button(
+        self,
+        parent: ttk.Frame,
+        text: str,
+        command: Callable[[], None],
+        tooltip_text: Optional[str] = None,
+        state: str = tk.NORMAL,
+        bootstyle: str = "primary",
+    ) -> ttk.Button:
         btn = ttk.Button(parent, text=text, command=command, state=state, bootstyle=bootstyle)
         if tooltip_text:
-            Tooltip(btn, tooltip_text)
+            Tooltip(btn, tooltip_text)  # type: ignore[no-untyped-call]
         return btn
 
-    def setup_status_bar(self):
+    def setup_status_bar(self) -> None:
         self.status_bar = ttk.Label(self.root, text="Ready", anchor="w")
         self.status_bar.grid(row=4, column=0, columnspan=5, sticky="ew", padx=12, pady=(5, 12))
         self.status_timer_id = None
@@ -349,21 +460,21 @@ class RepoPromptGUI:
         for btn_name in ('select_button', 'refresh_button', 'copy_button',
                         'copy_structure_button', 'copy_all_button'):
             btn = getattr(self, btn_name, None)
-            if btn and hasattr(btn, 'config'):
-                btn.config(state=tk.DISABLED)
+            if btn is not None and hasattr(btn, 'config'):
+                cast(ttk.Button, btn).config(state=tk.DISABLED)
 
     def _enable_buttons(self) -> None:
         """Re-enable repo/copy buttons after load (safe if buttons not yet created)."""
         btn = getattr(self, 'select_button', None)
-        if btn and hasattr(btn, 'config'):
-            btn.config(state=tk.NORMAL)
+        if btn is not None and hasattr(btn, 'config'):
+            cast(ttk.Button, btn).config(state=tk.NORMAL)
         btn = getattr(self, 'refresh_button', None)
-        if btn and hasattr(btn, 'config'):
-            btn.config(state=tk.NORMAL if self.current_repo_path else tk.DISABLED)
+        if btn is not None and hasattr(btn, 'config'):
+            cast(ttk.Button, btn).config(state=tk.NORMAL if self.current_repo_path else tk.DISABLED)
         for btn_name in ('copy_button', 'copy_structure_button', 'copy_all_button'):
             btn = getattr(self, btn_name, None)
-            if btn and hasattr(btn, 'config'):
-                btn.config(state=tk.NORMAL)
+            if btn is not None and hasattr(btn, 'config'):
+                cast(ttk.Button, btn).config(state=tk.NORMAL)
 
     def show_loading_state(self, message: str, show_cancel: bool = False) -> None:
         self._scan_cancel_requested = False
@@ -431,11 +542,11 @@ class RepoPromptGUI:
         """Runs on main thread; called via task_queue from show_toast."""
         self.toast_manager.show(message, toast_type=toast_type, duration=duration)
 
-    def reset_status_bar(self):
+    def reset_status_bar(self) -> None:
         self.status_bar.config(text=" Ready")
         self.status_timer_id = None
 
-    def _show_status_context_menu(self, event):
+    def _show_status_context_menu(self, event: Any) -> None:
         """Show right-click context menu for status bar."""
         try:
             # Show context menu at cursor position
@@ -445,7 +556,7 @@ class RepoPromptGUI:
         finally:
              self.status_context_menu.grab_release()
 
-    def _paste_to_status_bar(self):
+    def _paste_to_status_bar(self) -> None:
         """Paste clipboard content to status bar."""
         try:
             import pyperclip
@@ -465,7 +576,7 @@ class RepoPromptGUI:
             logging.error(f"Error pasting to status bar: {e}")
             self.show_status_message("Error pasting from clipboard", error=True)
 
-    def _copy_status_bar(self):
+    def _copy_status_bar(self) -> None:
         """Copy status bar content to clipboard."""
         try:
             import pyperclip
@@ -481,17 +592,17 @@ class RepoPromptGUI:
             logging.error(f"Error copying status bar: {e}")
             self.show_status_message("Error copying to clipboard", error=True)
 
-    def _clear_status_bar(self):
+    def _clear_status_bar(self) -> None:
         """Clear the status bar."""
         self.reset_status_bar()
 
-    def _style_file_counter(self):
+    def _style_file_counter(self) -> None:
         """Style the file counter display to match the application theme."""
         self.file_counter.config(
             font=("Arial", 36, "bold")
         )
 
-    def reconfigure_file_counter(self):
+    def reconfigure_file_counter(self) -> None:
         """Reconfigure file counter styling when theme changes."""
         self._style_file_counter()
 
@@ -499,11 +610,21 @@ class RepoPromptGUI:
         """Update loading overlay to a phase message (e.g. 'Building tree...'). No percentage/file count."""
         self._update_loading_progress(message, None, None)
 
-    def _queue_loading_progress(self, message: str, percentage: Optional[int] = None, file_count: Optional[str] = None):
+    def _queue_loading_progress(
+        self,
+        message: str,
+        percentage: Optional[int] = None,
+        file_count: Optional[str] = None,
+    ) -> None:
         """Queue a loading progress update for the main thread (call from worker thread)."""
         self.task_queue.put((self._update_loading_progress, (message, percentage, file_count)))
 
-    def _update_loading_progress(self, message: str, percentage: Optional[int] = None, file_count: Optional[str] = None):
+    def _update_loading_progress(
+        self,
+        message: str,
+        percentage: Optional[int] = None,
+        file_count: Optional[str] = None,
+    ) -> None:
         """Update loading overlay (status label + progress bar). Call only from main thread or via task_queue."""
         try:
             if not self.root.winfo_exists():
@@ -519,7 +640,12 @@ class RepoPromptGUI:
         except (tk.TclError, Exception) as e:
             self.logger.debug(f"Update loading progress: {e}")
 
-    def update_progress(self, percentage: int, message: str = None, file_count: str = None):
+    def update_progress(
+        self,
+        percentage: int,
+        message: Optional[str] = None,
+        file_count: Optional[str] = None,
+    ) -> None:
         """Update progress display (status label + progress bar when loading; else legacy file_counter)."""
         try:
             percentage = max(0, min(100, percentage))
@@ -541,7 +667,7 @@ class RepoPromptGUI:
         except Exception as e:
             self.logger.debug(f"Error updating progress: {e}")
 
-    def set_progress_max(self, max_value: int):
+    def set_progress_max(self, max_value: int) -> None:
         """Set the maximum value for the progress bar (determinate mode)."""
         try:
             if hasattr(self, 'progress'):
@@ -549,7 +675,7 @@ class RepoPromptGUI:
         except (tk.TclError, Exception) as e:
             self.logger.debug(f"Error setting progress max: {e}")
 
-    def update_cache_info(self):
+    def update_cache_info(self) -> None:
         """Update the cache information display."""
         try:
             stats = self.file_handler.content_cache.stats()
@@ -559,26 +685,26 @@ class RepoPromptGUI:
             logging.warning(f"Error updating cache info: {e}")
             self.cache_info_label.config(text="Cache: Error")
 
-    def copy_staged_changes(self):
+    def copy_staged_changes(self) -> None:
         """Copy full content of all staged files (delegate to git handler)."""
         self.git_handler.copy_staged_changes()
 
-    def copy_unstaged_changes(self):
+    def copy_unstaged_changes(self) -> None:
         """Copy full content of all unstaged changes (delegate to git handler)."""
         self.git_handler.copy_unstaged_changes()
 
-    def start_git_status_monitor(self):
+    def start_git_status_monitor(self) -> None:
         """Start auto-refresh after repo load."""
         if hasattr(self, '_git_monitor_id') and self._git_monitor_id:
             self.root.after_cancel(self._git_monitor_id)
         self.update_git_status()  # immediate
 
-    def update_git_status(self):
+    def update_git_status(self) -> None:
         """Safe background refresh."""
         if not self.current_repo_path:
             return
 
-        def _worker():
+        def _worker() -> None:
             status = self.git_handler.get_git_status()
             self.task_queue.put((self._apply_git_status_ui, (status,)))
 
@@ -590,7 +716,7 @@ class RepoPromptGUI:
         if not self._shutdown_requested:
             self._git_monitor_id = self.root.after(15000, self.update_git_status)
 
-    def _apply_git_status_ui(self, status: dict):
+    def _apply_git_status_ui(self, status: dict[str, Any]) -> None:
         """Main-thread UI update."""
         self.git_panel.git_branch_label.config(text=f"Branch: {status['branch']}")
         staged_deleted = status.get('staged_deleted') or set()
@@ -608,7 +734,7 @@ class RepoPromptGUI:
             prefix = "D " if path in changes_deleted else "• "
             self.git_panel.changes_list.insert(tk.END, f"{prefix}{os.path.basename(path)}")
 
-    def toggle_test_files_and_refresh(self):
+    def toggle_test_files_and_refresh(self) -> None:
         """Toggle test files exclusion and refresh the current repository."""
         try:
             if not self.current_repo_path:
@@ -640,15 +766,15 @@ class RepoPromptGUI:
             
             # Force a complete reload of the repository with the new setting
             repo_path = self.current_repo_path  # Preserve the path before clearing
-            self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)
+            self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)  # type: ignore[no-untyped-call]
             self.show_loading_state("Refreshing repository...", show_cancel=True)
-            self.repo_handler.load_repo(repo_path, self._queue_loading_progress, self.repo_handler._handle_load_completion)
+            self.repo_handler.load_repo(repo_path, self._queue_loading_progress, self.repo_handler._handle_load_completion)  # type: ignore[no-untyped-call]
                 
         except Exception as e:
             logging.error(f"Error toggling test files exclusion: {e}")
             self.show_status_message("Error updating test files setting", error=True)
 
-    def update_test_toggle_button(self):
+    def update_test_toggle_button(self) -> None:
         """Update the test toggle button appearance based on current setting."""
         try:
             exclude_tests = self.settings.get('app', 'exclude_test_files', 0)
@@ -665,7 +791,7 @@ class RepoPromptGUI:
         except Exception as e:
             logging.error(f"Error updating test toggle button: {e}")
 
-    def toggle_lock_files_and_refresh(self):
+    def toggle_lock_files_and_refresh(self) -> None:
         """Toggle lock files exclusion and refresh the current repository."""
         try:
             if not self.current_repo_path:
@@ -697,15 +823,15 @@ class RepoPromptGUI:
             
             # Force a complete reload of the repository with the new setting
             repo_path = self.current_repo_path  # Preserve the path before clearing
-            self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)
+            self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)  # type: ignore[no-untyped-call]
             self.show_loading_state("Refreshing repository...", show_cancel=True)
-            self.repo_handler.load_repo(repo_path, self._queue_loading_progress, self.repo_handler._handle_load_completion)
+            self.repo_handler.load_repo(repo_path, self._queue_loading_progress, self.repo_handler._handle_load_completion)  # type: ignore[no-untyped-call]
                 
         except Exception as e:
             logging.error(f"Error toggling lock files exclusion: {e}")
             self.show_status_message("Error updating lock files setting", error=True)
 
-    def update_lock_toggle_button(self):
+    def update_lock_toggle_button(self) -> None:
         """Update the lock toggle button appearance based on current setting."""
         try:
             exclude_locks = self.settings.get('app', 'exclude_lock_files', 1)
@@ -722,12 +848,12 @@ class RepoPromptGUI:
         except Exception as e:
             logging.error(f"Error updating lock toggle button: {e}")
 
-    def clear_current(self):
+    def clear_current(self) -> None:
         if self.is_loading: self.show_status_message("Loading...", error=True); return
-        current_index = self.notebook.index('current')
+        current_index = self.notebook.index('current')  # type: ignore[no-untyped-call]
         cleared = False
         if current_index == 0:
-            self.content_tab.clear()
+            self.content_tab.clear()  # type: ignore[no-untyped-call]
             cleared = True
         elif current_index == 1:
              if messagebox.askyesno("Confirm Clear", "Clearing the structure requires reloading the repository. Proceed?"):
@@ -739,30 +865,30 @@ class RepoPromptGUI:
             self.module_analysis_tab.clear()
             cleared = True
         elif current_index == 3:
-            self.base_prompt_tab.clear()
+            self.base_prompt_tab.clear()  # type: ignore[no-untyped-call]
             cleared = True
         elif current_index == 4:
              self.show_status_message("Settings tab cannot be cleared this way.")
              return
         elif current_index == 5:
-            self.file_list_tab.clear()
+            self.file_list_tab.clear()  # type: ignore[no-untyped-call]
             cleared = True
         if cleared:
              self.show_status_message("Current tab content cleared.")
 
-    def clear_all(self):
+    def clear_all(self) -> None:
         if self.is_loading: self.show_status_message("Loading...", error=True); return
         if messagebox.askyesno("Confirm Clear All", "This will clear all loaded data, selections, and the current repository view. Are you sure?"):
-            self.repo_handler._clear_internal_state(clear_recent=False)
-            self.content_tab.clear()
-            self.structure_tab.clear()
+            self.repo_handler._clear_internal_state(clear_recent=False)  # type: ignore[no-untyped-call]
+            self.content_tab.clear()  # type: ignore[no-untyped-call]
+            self.structure_tab.clear()  # type: ignore[no-untyped-call]
             self.module_analysis_tab.clear()
-            self.base_prompt_tab.clear()
-            self.file_list_tab.clear()
-            self.repo_handler._update_ui_for_no_repo()
+            self.base_prompt_tab.clear()  # type: ignore[no-untyped-call]
+            self.file_list_tab.clear()  # type: ignore[no-untyped-call]
+            self.repo_handler._update_ui_for_no_repo()  # type: ignore[no-untyped-call]
             self.show_status_message("All data cleared.")
 
-    def save_app_settings(self):
+    def save_app_settings(self) -> None:
         try:
             self.settings.set('app', 'default_tab', self.settings_tab.default_tab_var.get())
             self.settings.set('app', 'prepend_prompt', self.prepend_var.get())
@@ -832,23 +958,23 @@ class RepoPromptGUI:
             logging.error(f"Error saving settings: {e}", exc_info=True)
             self.show_toast(f"Could not save settings: {e}", toast_type="error")
 
-    def apply_default_tab(self):
+    def apply_default_tab(self) -> None:
         default_tab_name = self.settings.get('app', 'default_tab', 'Content Preview')
         try:
-            for i in range(self.notebook.index('end')):
-                if self.notebook.tab(i, "text") == default_tab_name:
-                    self.notebook.select(i)
+            for i in range(self.notebook.index('end')):  # type: ignore[no-untyped-call]
+                if self.notebook.tab(i, "text") == default_tab_name:  # type: ignore[no-untyped-call]
+                    self.notebook.select(i)  # type: ignore[no-untyped-call]
                     break
         except tk.TclError:
              logging.warning("Could not select default tab, notebook might not be ready.")
 
-    def show_about(self):
+    def show_about(self) -> None:
         msg = (f"CodeBase v{self.version} — A tool to scan local code repositories, "
                "preview text files, and copy contents or structure to the clipboard. "
                "Developed by Mikael Sundh. License: MIT. © 2024-2025")
         self.show_toast(msg, toast_type="info", duration=6000)
 
-    def change_repo_color(self, event=None):
+    def change_repo_color(self, event: Any = None) -> None:
         if not self.current_repo_path:
             return
         current_color = self.header_frame.repo_name_label.cget("foreground")
@@ -861,7 +987,7 @@ class RepoPromptGUI:
             self.settings.save()
             self.show_status_message(f"Repository color updated to {color_code}")
 
-    def on_close(self):
+    def on_close(self) -> None:
         """Handle application shutdown with proper resource cleanup."""
         logging.info("Starting application shutdown...")
         
@@ -886,7 +1012,7 @@ class RepoPromptGUI:
         except Exception as e:
             logging.error(f"Error during window destruction: {e}")
     
-    def _cleanup_resources(self):
+    def _cleanup_resources(self) -> None:
         """Clean up all application resources."""
         logging.info("Cleaning up resources...")
         
@@ -928,7 +1054,7 @@ class RepoPromptGUI:
         except Exception as e:
             logging.error(f"Error clearing file lists: {e}")
     
-    def _wait_for_threads(self, timeout=5.0):
+    def _wait_for_threads(self, timeout: float = 5.0) -> None:
         """Wait for background threads to complete with timeout."""
         import time
         
@@ -944,19 +1070,19 @@ class RepoPromptGUI:
         else:
             logging.info("All background threads completed successfully.")
     
-    def register_background_thread(self, thread):
+    def register_background_thread(self, thread: threading.Thread) -> None:
         """Register a background thread for cleanup tracking."""
         self._background_threads.append(thread)
         logging.debug(f"Registered background thread: {thread.name}")
 
-    def bind_keys(self):
-        self.root.bind('<Control-r>', lambda e: self.repo_handler.select_repo())
-        self.root.bind('<Control-F5>', lambda e: self.repo_handler.refresh_repo())
+    def bind_keys(self) -> None:
+        self.root.bind('<Control-r>', lambda e: self.repo_handler.select_repo())  # type: ignore[no-untyped-call]
+        self.root.bind('<Control-F5>', lambda e: self.repo_handler.refresh_repo())  # type: ignore[no-untyped-call]
         self.root.bind('<Control-c>', lambda e: self.copy_handler.copy_contents())
         self.root.bind('<Control-s>', lambda e: self.copy_handler.copy_structure())
         self.root.bind('<Control-a>', lambda e: self.copy_handler.copy_all())
-        self.root.bind('<Control-t>', lambda e: self.base_prompt_tab.save_template())
-        self.root.bind('<Control-l>', lambda e: self.base_prompt_tab.load_template())
+        self.root.bind('<Control-t>', lambda e: self.base_prompt_tab.save_template())  # type: ignore[no-untyped-call]
+        self.root.bind('<Control-l>', lambda e: self.base_prompt_tab.load_template())  # type: ignore[no-untyped-call]
 if __name__ == "__main__":
     root = ttk.Window(themename="darkly")
     app = RepoPromptGUI(root)
