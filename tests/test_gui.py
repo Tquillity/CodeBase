@@ -67,13 +67,14 @@ def gui(mock_root):
 
         def right_panel_side_effect(parent, gui_instance):
             gui_instance.notebook = MagicMock()
-            gui_instance.notebook.index.side_effect = lambda x: 0 if x == 'current' else 5 if x == 'end' else None
+            gui_instance.notebook.index.side_effect = lambda x: 0 if x == 'current' else 6 if x == 'end' else None
             gui_instance.notebook.tab.side_effect = lambda i, option: {
                 0: "Content Preview",
                 1: "Folder Structure",
-                2: "Base Prompt",
-                3: "Settings",
-                4: "File List Selection"
+                2: "Module Analysis",
+                3: "Base Prompt",
+                4: "Settings",
+                5: "File List Selection"
             }.get(i, None) if option == "text" else None
             gui_instance.notebook.select = MagicMock()
 
@@ -86,6 +87,9 @@ def gui(mock_root):
             gui_instance.structure_tab.clear = MagicMock()
             gui_instance.structure_tab.tree = MagicMock()
             gui_instance.structure_tab.tree.get_children = MagicMock(return_value=["item"])
+
+            gui_instance.module_analysis_tab = MagicMock()
+            gui_instance.module_analysis_tab.clear = MagicMock()
 
             gui_instance.base_prompt_tab = MagicMock()
             gui_instance.base_prompt_tab.clear = MagicMock()
@@ -265,7 +269,7 @@ def test_clear_current_structure_tab_confirm(gui):
 
 
 def test_clear_current_no_action(gui):
-    gui.notebook.index.side_effect = lambda x: 3 if x == 'current' else 5 if x == 'end' else None
+    gui.notebook.index.side_effect = lambda x: 4 if x == 'current' else 6 if x == 'end' else None
     with patch.object(gui, 'show_status_message') as mock_status:
         gui.clear_current()
         mock_status.assert_called_with("Settings tab cannot be cleared this way.")

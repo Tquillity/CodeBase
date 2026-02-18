@@ -736,12 +736,15 @@ class RepoPromptGUI:
              else:
                  return
         elif current_index == 2:
-            self.base_prompt_tab.clear()
+            self.module_analysis_tab.clear()
             cleared = True
         elif current_index == 3:
+            self.base_prompt_tab.clear()
+            cleared = True
+        elif current_index == 4:
              self.show_status_message("Settings tab cannot be cleared this way.")
              return
-        elif current_index == 4:
+        elif current_index == 5:
             self.file_list_tab.clear()
             cleared = True
         if cleared:
@@ -753,6 +756,7 @@ class RepoPromptGUI:
             self.repo_handler._clear_internal_state(clear_recent=False)
             self.content_tab.clear()
             self.structure_tab.clear()
+            self.module_analysis_tab.clear()
             self.base_prompt_tab.clear()
             self.file_list_tab.clear()
             self.repo_handler._update_ui_for_no_repo()

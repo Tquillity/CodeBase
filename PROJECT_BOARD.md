@@ -1,6 +1,6 @@
 # CodeBase - Project Board
 
-**Version 6.7.0** — A Linux desktop tool for preparing codebase content for LLM prompts and code reviews. Scan repositories, select files, preview combined content, and copy to clipboard with one click.
+**Version 6.9.0** — A Linux desktop tool for preparing codebase content for LLM prompts and code reviews. Scan repositories, select files, preview combined content, and copy to clipboard with one click.
 
 ## Overview
 Linux desktop application for scanning local repositories, selecting files, and copying combined content to clipboard for LLM prompts and code reviews.
@@ -14,6 +14,7 @@ Linux desktop application for scanning local repositories, selecting files, and 
 ## Key Features
 - 🔍 Repository scanning with `.gitignore` support
 - 📁 File selection via tree view
+- 📊 **Module Analysis** — Multi-language dependency graph (Python, JS/TS, Rust, Java, C/C++, Go, etc.), regex-based imports, folder-as-module, impact scores, one-click module selection
 - 👁️ Content preview with syntax highlighting
 - 📋 Copy selected content/structure to clipboard
 - ⚙️ Configurable exclusions and settings
@@ -45,16 +46,20 @@ python3 main.py
 ✅ **#3 Full type hints + mypy --strict** — Comprehensive type hints across core modules (constants, exceptions, path_utils, lru_cache, settings, security, error_handler, content_manager, file_scanner); handlers and tabs started; `mypy.ini` with strict + explicit_package_bases; external libs use `# type: ignore[import-untyped]` where stubs missing.
 
 ## Changelog
+- **6.9.0** — Module Analysis multi-language: regex-based imports for Python, JS/TS, Rust, Java, C/C++, Go, etc.; folder-as-module heuristic; respects Settings text extensions; empty-state message when no supported files; in-degree centrality impact.
+- **6.8.0** — Sprint 1 ✅ Done: Module Analysis tab (Python dependency graph, impact scores, Select This Module → main tree + preview).
 - **6.7.0** — Full type hints (mypy --strict) on core modules; version bump for code quality gate.
 - **6.6.0** — Toast notifications (non-blocking); Git Status panel full-height + collapsible sections; graceful deleted/missing file handling (preview + copy); Cancel during preview + contextual loading messages; QC-audited.
 
 ## Next (optional)
-- Complete mypy --strict on remaining files (file_handler, gui, panels, widgets, tests); Sprint 1 (Dependency Graph Engine).
+- Complete mypy --strict on remaining files (file_handler, gui, panels, widgets, tests).
 - When typing `gui.py`: wrap all handler/tab imports in `if TYPE_CHECKING:` to avoid circular imports.
 
 ## Key Files
 - `main.py` - Application entry point
 - `gui.py` - Main GUI implementation
+- `module_analyzer.py` - Multi-language dependency graph engine (regex imports, folder-as-module, networkx)
+- `tabs/module_analysis_tab.py` - Module Analysis tab UI
 - `file_scanner.py` - Repository scanning
 - `content_manager.py` - Content generation
 - `handlers/` - Feature handlers (copy, git, repo, search)

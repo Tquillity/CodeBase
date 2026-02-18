@@ -3,6 +3,7 @@ import tkinter as tk
 from widgets import Tooltip
 from tabs.content_tab import ContentTab
 from tabs.structure_tab import StructureTab
+from tabs.module_analysis_tab import ModuleAnalysisTab
 from tabs.base_prompt_tab import BasePromptTab
 from tabs.settings_tab import SettingsTab
 from tabs.file_list_tab import FileListTab
@@ -246,6 +247,9 @@ class RightPanel(ttk.Frame):
 
         self.gui.structure_tab = StructureTab(self.gui.notebook, self.gui, self.gui.file_handler, self.gui.settings, self.gui.show_unloaded_var)
         self.gui.notebook.add(self.gui.structure_tab, text="Folder Structure")
+
+        self.gui.module_analysis_tab = ModuleAnalysisTab(self.gui.notebook, self.gui)
+        self.gui.notebook.add(self.gui.module_analysis_tab, text="Module Analysis")
 
         self.gui.base_prompt_tab = BasePromptTab(self.gui.notebook, self.gui, self.gui.template_dir)
         self.gui.notebook.add(self.gui.base_prompt_tab, text="Base Prompt")

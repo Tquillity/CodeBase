@@ -137,14 +137,14 @@ class FolderDialog:
                 self._create_list_item(folder)
 
     def _create_list_item(self, folder_path):
-        item_frame = ttk.Frame(self.list_frame)
+        item_frame = ttk.Frame(self.list_frame, bootstyle="secondary")
         item_frame.pack(fill="x", expand=True)
         item_frame.folder_path = folder_path
         delete_button = ttk.Button(item_frame, text="×", command=lambda p=folder_path, f=item_frame: self._delete_item(p, f),
                                   bootstyle="danger-outline", width=3)
         delete_button.pack(side=tk.LEFT, padx=(5, 10))
         Tooltip(delete_button, f"Remove '{folder_path}' from recent list")
-        path_label = ttk.Label(item_frame, text=folder_path, anchor="w")
+        path_label = ttk.Label(item_frame, text=folder_path, anchor="w", bootstyle="secondary")
         path_label.pack(side=tk.LEFT, fill="x", expand=True)
         item_frame.path_label = path_label
         path_label.bind("<Button-1>", lambda e, p=folder_path: self.on_label_click(p))
@@ -160,14 +160,16 @@ class FolderDialog:
         self.confirm()
 
     def _highlight_selected_item(self, selected_folder_path):
+        # Clear highlight from all items first, then set only the selected one.
+        # Using a neutral style for unselected ensures the previous primary highlight is removed.
         for widget in self.list_frame.winfo_children():
             if hasattr(widget, 'folder_path') and hasattr(widget, 'path_label'):
                 if widget.folder_path == selected_folder_path:
                     widget.configure(bootstyle="primary")
                     widget.path_label.configure(bootstyle="primary")
                 else:
-                    widget.configure(bootstyle="")
-                    widget.path_label.configure(bootstyle="")
+                    widget.configure(bootstyle="secondary")
+                    widget.path_label.configure(bootstyle="secondary")
 
     def _delete_item(self, folder_path, frame_widget):
         if self.on_delete_callback:

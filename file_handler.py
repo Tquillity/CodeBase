@@ -298,6 +298,45 @@ class FileHandler:
         if content_changed:
              self.gui.trigger_preview_update()
 
+    def select_files_by_paths(self, paths: List[str]) -> None:
+        """
+        Programmatically select multiple files in the main tree.
+        Updates loaded_files, refreshes checkboxes/strikethrough in StructureTab, and triggers preview update.
+        Paths should be absolute file paths (e.g. from module analyzer).
+        """
+        if not paths or not self.repo_path:
+            return
+        paths_norm: Set[str] = set()
+        for p in paths:
+            if not p or not os.path.isfile(p):
+                continue
+            paths_norm.add(normalize_for_cache(p))
+        with self.lock:
+            self.loaded_files.update(paths_norm)
+        tree = self.gui.structure_tab.tree
+
+        def update_item(item_id: str) -> None:
+            if not tree.exists(item_id):
+                return
+            item_data = tree.item(item_id)
+            values = item_data["values"]
+            tags = list(item_data["tags"])
+            if "folder" in tags or "dummy" in tags or "error" in tags or "empty" in tags:
+                for child in tree.get_children(item_id):
+                    update_item(child)
+                return
+            if values and len(values) >= 2:
+                item_path_norm = normalize_for_cache(values[0])
+                if item_path_norm in paths_norm:
+                    tree.item(item_id, values=(values[0], "☑"), tags=("file_selected",))
+            for child in tree.get_children(item_id):
+                update_item(child)
+
+        for root_id in tree.get_children(""):
+            update_item(root_id)
+        self.gui.structure_tab.update_tree_strikethrough()
+        self.gui.trigger_preview_update()
+
     def _update_folder_selection_recursive(self, item_id, selected):
         tree = self.gui.structure_tab.tree
         content_changed_flag = False

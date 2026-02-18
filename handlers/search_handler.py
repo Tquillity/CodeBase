@@ -8,11 +8,12 @@ class SearchHandler:
         query = self.gui.search_var.get()
         if not query: return
         current_index = self.gui.notebook.index(self.gui.notebook.select())
-        if current_index == 3: return  # Settings tab, no search
+        if current_index == 2: return  # Module Analysis tab, no search
+        if current_index == 4: return  # Settings tab, no search
 
         self._clear_search_highlights(current_index)
 
-        tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
+        tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.module_analysis_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
         tab = tab_instances[current_index]
         matches = tab.perform_search(query, self.gui.case_sensitive_var.get(), self.gui.whole_word_var.get())
 
@@ -40,7 +41,7 @@ class SearchHandler:
             self._highlight_match(current_index, new_index, is_focused=True)
             self.gui.current_match_index[current_index] = new_index
 
-            tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
+            tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.module_analysis_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
             tab = tab_instances[current_index]
             tab.center_match(matches[new_index])
             self.gui.search_count_label.config(text=f"{new_index + 1}/{len(matches)}")
@@ -57,7 +58,7 @@ class SearchHandler:
             self._highlight_match(current_index, new_index, is_focused=True)
             self.gui.current_match_index[current_index] = new_index
 
-            tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
+            tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.module_analysis_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
             tab = tab_instances[current_index]
             tab.center_match(matches[new_index])
             self.gui.search_count_label.config(text=f"{new_index + 1}/{len(matches)}")
@@ -66,11 +67,12 @@ class SearchHandler:
         query = self.gui.search_var.get()
         if not query: return
         current_index = self.gui.notebook.index(self.gui.notebook.select())
-        if current_index == 3: return  # Settings tab, no search
+        if current_index == 2: return  # Module Analysis tab, no search
+        if current_index == 4: return  # Settings tab, no search
 
         self._clear_search_highlights(current_index)
 
-        tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
+        tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.module_analysis_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
         tab = tab_instances[current_index]
         matches = tab.perform_search(query, self.gui.case_sensitive_var.get(), self.gui.whole_word_var.get())
 
@@ -86,7 +88,7 @@ class SearchHandler:
             self.gui.search_count_label.config(text="0 matches")
 
     def _clear_search_highlights(self, tab_index):
-        tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
+        tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.module_analysis_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
         tab = tab_instances[tab_index]
         tab.clear_highlights()
         if hasattr(self.gui, 'search_count_label'):
@@ -97,6 +99,6 @@ class SearchHandler:
         if not matches or match_index < 0 or match_index >= len(matches):
             return
 
-        tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
+        tab_instances = [self.gui.content_tab, self.gui.structure_tab, self.gui.module_analysis_tab, self.gui.base_prompt_tab, self.gui.settings_tab, self.gui.file_list_tab]
         tab = tab_instances[tab_index]
         tab.highlight_match(matches[match_index], is_focused)

@@ -1,347 +1,396 @@
-import ttkbootstrap as ttk
-import tkinter as tk
-from ttkbootstrap.widgets.scrolled import ScrolledText
+# tabs/module_analysis_tab.py
+# Module Analysis tab: dependency graph, impact scores, one-click module selection.
+from __future__ import annotations
+
 import logging
+import os
+import tkinter as tk
+from typing import Any, Dict, List, Optional, Tuple
+
+import ttkbootstrap as ttk
 from widgets import Tooltip
-from constants import ERROR_MESSAGE_DURATION
+
+from module_analyzer import (
+    IMPORT_PATTERNS,
+    MAX_GRAPH_NODES,
+    modules_with_impact,
+)
+
+logger = logging.getLogger(__name__)
+
+# Matplotlib: explicit TkAgg for Linux (Wayland/X11)
+try:
+    import matplotlib
+    matplotlib.use("TkAgg")
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    from matplotlib.figure import Figure
+    _HAS_MPL = True
+except ImportError:
+    _HAS_MPL = False
+
+try:
+    import networkx as nx  # type: ignore[import-untyped]
+except ImportError:
+    nx = None
+
 
 class ModuleAnalysisTab(ttk.Frame):
-    def __init__(self, parent, gui):
+    def __init__(self, parent: ttk.Frame, gui: Any) -> None:
         super().__init__(parent)
         self.gui = gui
-        # Colors now managed by ttkbootstrap theme
-        self.analysis_results = None
+        self._last_modules: List[Tuple[str, int, float]] = []
+        self._last_module_to_paths: Dict[str, List[str]] = {}
+        self._last_G: Any = None
+        self._last_py_files_by_rel: Dict[str, str] = {}
+        self._canvas: Optional[Any] = None
+        self._fallback_text: Optional[tk.Text] = None
+        self._fallback_var: Optional[tk.StringVar] = None
+        self._right_placeholder: Optional[Any] = None
+        self._right_container: Optional[ttk.Frame] = None
         self.setup_ui()
 
-    def setup_ui(self):
-        """Setup the module analysis tab UI components."""
-        # Main button frame
-        self.button_frame = ttk.Frame(self)
-        self.button_frame.pack(side=tk.TOP, fill='x', pady=5)
-
-        # Analysis button
-        self.analyze_button = self.gui.create_button(
-            self.button_frame, 
-            "Analyze Modules", 
-            self.start_analysis,
-            "Analyze repository for module dependencies and groupings"
+    def setup_ui(self) -> None:
+        toolbar = ttk.Frame(self)
+        toolbar.pack(side=tk.TOP, fill=tk.X, padx=8, pady=(8, 4))
+        self.analyze_btn = self.gui.create_button(
+            toolbar,
+            "Analyze Repository",
+            self._on_analyze,
+            "Scan repo and build dependency graph (Python, JS/TS, Rust, etc.)",
         )
-        self.analyze_button.pack(side=tk.LEFT, padx=10, pady=5)
-
-        # Clear button
-        self.clear_button = self.gui.create_button(
-            self.button_frame, 
-            "Clear Results", 
-            self.clear_results,
-            "Clear current analysis results"
-        )
-        self.clear_button.pack(side=tk.LEFT, padx=5, pady=5)
-
-        # Export button (initially disabled)
-        self.export_button = self.gui.create_button(
-            self.button_frame, 
-            "Export Modules", 
-            self.export_modules,
-            "Export module analysis results",
-            state=tk.DISABLED
-        )
-        self.export_button.pack(side=tk.LEFT, padx=5, pady=5)
-
-        # Progress frame
-        self.progress_frame = ttk.Frame(self)
-        self.progress_frame.pack(side=tk.TOP, fill='x', pady=5)
-
-        self.progress_label = ttk.Label(
-            self.progress_frame, 
-            text="Ready to analyze"
-        )
-        self.progress_label.pack(side=tk.LEFT, padx=10)
-
-        # Main content area with notebook for different views
-        self.content_notebook = ttk.Notebook(self)
-        self.content_notebook.pack(fill="both", expand=True, padx=5, pady=5)
-
-        # Module tree view
-        self.tree_frame = ttk.Frame(self.content_notebook)
-        self.content_notebook.add(self.tree_frame, text="Module Tree")
-
-        self.setup_tree_view()
-
-        # Dependency graph view
-        self.graph_frame = ttk.Frame(self.content_notebook)
-        self.content_notebook.add(self.graph_frame, text="Dependency Graph")
-
-        self.setup_graph_view()
-
-        # Analysis details view
-        self.details_frame = tk.Frame(self.content_notebook)
-        self.content_notebook.add(self.details_frame, text="Analysis Details")
-
-        self.setup_details_view()
-
-    def setup_tree_view(self):
-        """Setup the module tree view."""
-        # Tree view for modules
-        self.module_tree = ttk.Treeview(
-            self.tree_frame, 
-            columns=("files", "type", "dependencies"), 
-            show="tree headings"
-        )
-        self.module_tree.heading("#0", text="Module Name")
-        self.module_tree.heading("files", text="Files")
-        self.module_tree.heading("type", text="Type")
-        self.module_tree.heading("dependencies", text="Dependencies")
-
-        # Scrollbar for tree
-        tree_scrollbar = ttk.Scrollbar(self.tree_frame, orient="vertical", command=self.module_tree.yview)
-        self.module_tree.configure(yscrollcommand=tree_scrollbar.set)
-
-        # Pack tree and scrollbar
-        self.module_tree.pack(side="left", fill="both", expand=True, padx=5, pady=5)
-        tree_scrollbar.pack(side="right", fill="y")
-
-        # Bind double-click to show module details
-        self.module_tree.bind("<Double-1>", self.on_module_double_click)
-
-    def setup_graph_view(self):
-        """Setup the dependency graph view."""
-        self.graph_text = ScrolledText(
-            self.graph_frame,
-            wrap=tk.WORD,
-            font=("Arial", 10),
+        self.analyze_btn.pack(side=tk.LEFT, padx=(0, 8))
+        self.select_module_btn = self.gui.create_button(
+            toolbar,
+            "Select This Module",
+            self._on_select_module,
+            "Select all files of the chosen module in the main file tree",
             state=tk.DISABLED,
-            bootstyle="dark"
         )
-        self.graph_text.pack(fill="both", expand=True, padx=5, pady=5)
+        self.select_module_btn.pack(side=tk.LEFT, padx=(0, 8))
+        Tooltip(self.analyze_btn, "Build dependency graph from current repository")
+        Tooltip(self.select_module_btn, "Add this module's files to selection and update preview")
 
-    def setup_details_view(self):
-        """Setup the analysis details view."""
-        self.details_text = ScrolledText(
-            self.details_frame,
-            wrap=tk.WORD,
+        paned = ttk.Panedwindow(self, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True, padx=8, pady=(4, 8))
+
+        # Left: Treeview (module name, file count, impact)
+        left_frame = ttk.Frame(paned)
+        self._tree_scroll = ttk.Scrollbar(left_frame)
+        self.tree = ttk.Treeview(
+            left_frame,
+            columns=("files", "impact"),
+            show="tree headings",
+            selectmode="browse",
+            height=20,
+            yscrollcommand=self._tree_scroll.set,
+        )
+        self._tree_scroll.config(command=self.tree.yview)
+        self.tree.column("#0", width=220, anchor=tk.W)
+        self.tree.column("files", width=70, anchor=tk.E)
+        self.tree.column("impact", width=80, anchor=tk.E)
+        self.tree.heading("#0", text="Module / Package")
+        self.tree.heading("files", text="Files")
+        self.tree.heading("impact", text="Impact")
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0), pady=(0, 5))
+        self._tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        paned.add(left_frame, weight=1)
+
+        # Right: Graph or fallback text
+        right_frame = ttk.Frame(paned)
+        ph = ttk.Label(
+            right_frame,
+            text="Click 'Analyze Repository' to build the dependency graph.",
             font=("Arial", 10),
-            state=tk.DISABLED,
-            bootstyle="dark"
         )
-        self.details_text.pack(fill="both", expand=True, padx=5, pady=5)
+        ph.pack(expand=True)
+        paned.add(right_frame, weight=2)
 
+        self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
+        self._right_placeholder = ph
+        self._right_container = right_frame
+        self._left_empty_label: Optional[ttk.Label] = None
 
-    def start_analysis(self):
-        """Start the module analysis process."""
-        if not self.gui.current_repo_path:
-            self.gui.show_status_message("No repository loaded. Please select a repository first.", error=True)
-            return
-
-        if self.gui.is_loading:
-            self.gui.show_status_message("Another operation is in progress. Please wait.", error=True)
-            return
-
-        # Import here to avoid circular imports
-        from module_analyzer import ModuleAnalyzer  # type: ignore[import-not-found]
-        
-        self.analyze_button.config(state=tk.DISABLED)
-        self.progress_label.config(text="Analyzing modules...")
-        self.gui.show_loading_state("Analyzing module dependencies...")
-
-        # Create analyzer and start background analysis
-        analyzer = ModuleAnalyzer(self.gui)
-        analyzer.analyze_repository(
-            self.gui.current_repo_path,
-            self._on_analysis_complete
-        )
-
-    def _on_analysis_complete(self, results, errors):
-        """Handle completion of module analysis."""
-        self.gui.hide_loading_state()
-        self.analyze_button.config(state=tk.NORMAL)
-        
-        if errors:
-            error_msg = f"Analysis completed with {len(errors)} errors: {'; '.join(errors[:3])}"
-            self.gui.show_status_message(error_msg, error=True, duration=ERROR_MESSAGE_DURATION)
+    def _on_tree_select(self, event: tk.Event) -> None:
+        sel = self.tree.selection()
+        if sel:
+            self.select_module_btn.config(state=tk.NORMAL)
         else:
-            self.gui.show_status_message("Module analysis completed successfully.")
+            self.select_module_btn.config(state=tk.DISABLED)
 
-        self.analysis_results = results
-        self._display_results(results, errors)
-
-    def _display_results(self, results, errors):
-        """Display the analysis results in the UI."""
-        if not results:
-            self.progress_label.config(text="No modules found")
+    def _on_analyze(self) -> None:
+        if self.gui.is_loading:
+            self.gui.show_status_message("Another operation in progress.", error=True)
             return
+        repo = self.gui.current_repo_path
+        if not repo or not os.path.isdir(repo):
+            self.gui.show_status_message("No repository loaded.", error=True)
+            return
+        self.analyze_btn.config(state=tk.DISABLED)
+        self.gui.show_status_message("Analyzing modules...")
 
-        # Update progress label
-        module_count = len(results.get('modules', []))
-        self.progress_label.config(text=f"Found {module_count} modules")
+        # Use enabled text extensions from settings; fall back to all supported if not set
+        ext_settings = self.gui.settings.get("app", "text_extensions", {})
+        enabled_extensions = {
+            ext for ext, val in ext_settings.items()
+            if val == 1 and ext in IMPORT_PATTERNS
+        }
+        if not enabled_extensions:
+            enabled_extensions = set(IMPORT_PATTERNS.keys())
 
-        # Populate tree view
-        self._populate_module_tree(results)
-
-        # Update graph view
-        self._update_graph_view(results)
-
-        # Update details view
-        self._update_details_view(results, errors)
-
-        # Enable export button
-        self.export_button.config(state=tk.NORMAL)
-
-    def _populate_module_tree(self, results):
-        """Populate the module tree with results."""
-        # Clear existing items
-        for item in self.module_tree.get_children():
-            self.module_tree.delete(item)
-
-        modules = results.get('modules', [])
-        for i, module in enumerate(modules):
-            module_name = module.get('name', f'Module {i+1}')
-            files = module.get('files', [])
-            module_type = module.get('type', 'Unknown')
-            dependencies = module.get('dependencies', [])
-
-            # Insert module
-            module_id = self.module_tree.insert(
-                "", "end", 
-                text=module_name,
-                values=(len(files), module_type, len(dependencies)),
-                tags=('module',)
-            )
-
-            # Insert files under module
-            for file_path in files:
-                file_name = file_path.split('/')[-1] if '/' in file_path else file_path
-                self.module_tree.insert(
-                    module_id, "end",
-                    text=file_name,
-                    values=(file_path, "", ""),
-                    tags=('file',)
+        def worker() -> None:
+            try:
+                modules, G, py_files_by_rel, module_to_abs = modules_with_impact(
+                    repo, enabled_extensions=enabled_extensions
                 )
+                self.gui.task_queue.put(
+                    (self._apply_analysis_result, (modules, G, py_files_by_rel, module_to_abs))
+                )
+            except Exception as e:
+                logger.exception("Module analysis failed")
+                self.gui.task_queue.put((self._on_analysis_error, (str(e),)))
 
-    def _update_graph_view(self, results):
-        """Update the dependency graph view."""
-        # ttkbootstrap ScrolledText is always editable
-        self.graph_text.delete(1.0, tk.END)
+        t = __import__("threading").Thread(target=worker, daemon=True)
+        self.gui.register_background_thread(t)
+        t.start()
 
-        # Simple text representation of dependencies
-        graph_text = "Dependency Graph:\n\n"
-        
-        modules = results.get('modules', [])
-        for module in modules:
-            module_name = module.get('name', 'Unknown')
-            dependencies = module.get('dependencies', [])
-            
-            graph_text += f"Module: {module_name}\n"
-            if dependencies:
-                graph_text += f"  Dependencies: {', '.join(dependencies)}\n"
-            else:
-                graph_text += "  Dependencies: None (standalone)\n"
-            graph_text += "\n"
+    def _on_analysis_error(self, message: str) -> None:
+        self.analyze_btn.config(state=tk.NORMAL)
+        self.gui.show_status_message(f"Analysis failed: {message}", error=True)
+        self.gui.hide_loading_state()
 
-        self.graph_text.insert(1.0, graph_text)
-        # ttkbootstrap ScrolledText is always editable
-
-    def _update_details_view(self, results, errors):
-        """Update the analysis details view."""
-        # ttkbootstrap ScrolledText is always editable
-        self.details_text.delete(1.0, tk.END)
-
-        details = f"Module Analysis Results\n{'='*50}\n\n"
-        
-        # Summary statistics
-        modules = results.get('modules', [])
-        total_files = sum(len(module.get('files', [])) for module in modules)
-        
-        details += f"Total Modules: {len(modules)}\n"
-        details += f"Total Files Analyzed: {total_files}\n"
-        details += f"Standalone Modules: {len([m for m in modules if not m.get('dependencies', [])])}\n\n"
-
-        # Module details
-        for i, module in enumerate(modules):
-            module_name = module.get('name', f'Module {i+1}')
-            files = module.get('files', [])
-            dependencies = module.get('dependencies', [])
-            module_type = module.get('type', 'Unknown')
-            
-            details += f"Module: {module_name}\n"
-            details += f"  Type: {module_type}\n"
-            details += f"  Files: {len(files)}\n"
-            details += f"  Dependencies: {len(dependencies)}\n"
-            if dependencies:
-                details += f"    {', '.join(dependencies)}\n"
-            details += f"  Files:\n"
-            for file_path in files:
-                details += f"    - {file_path}\n"
-            details += "\n"
-
-        # Errors
-        if errors:
-            details += f"\nErrors:\n{'-'*20}\n"
-            for error in errors:
-                details += f"- {error}\n"
-
-        self.details_text.insert(1.0, details)
-        # ttkbootstrap ScrolledText is always editable
-
-    def on_module_double_click(self, event):
-        """Handle double-click on module tree item."""
-        item = self.module_tree.selection()[0]
-        tags = self.module_tree.item(item)['tags']
-        
-        if 'file' in tags:
-            # Jump to file in content tab
-            file_path = self.module_tree.item(item)['values'][0]
-            self.gui.notebook.select(0)  # Switch to content tab
-
-    def export_modules(self):
-        """Export module analysis results."""
-        if not self.analysis_results:
-            self.gui.show_status_message("No analysis results to export.", error=True)
+    def _apply_analysis_result(
+        self,
+        modules: List[Tuple[str, int, float]],
+        G: Any,
+        py_files_by_rel: Dict[str, str],
+        module_to_abs_paths: Dict[str, List[str]],
+    ) -> None:
+        self._last_modules = modules
+        self._last_module_to_paths = module_to_abs_paths
+        self._last_G = G
+        self._last_py_files_by_rel = py_files_by_rel
+        self.analyze_btn.config(state=tk.NORMAL)
+        if not modules:
+            self.gui.show_status_message("No supported source files found.")
+            self._show_empty_state()
             return
+        self.gui.show_status_message("Module analysis complete.")
+        self._refresh_tree()
+        self._show_graph_or_fallback()
 
-        self.gui.show_status_message("Export functionality coming soon!")
+    def _empty_state_message(self) -> str:
+        return (
+            "No supported source files found in this repository.\n\n"
+            "Module Analysis works with: Python, JavaScript/TypeScript, Rust, C/C++, Java, Go, etc.\n\n"
+            "Make sure your text extensions are enabled in Settings."
+        )
 
-    def clear_results(self):
-        """Clear the analysis results."""
-        self.analysis_results = None
-        
-        # Clear tree
-        for item in self.module_tree.get_children():
-            self.module_tree.delete(item)
+    def _show_empty_state(self) -> None:
+        """Show friendly empty-state message in both left and right panels."""
+        self.tree.delete(*self.tree.get_children())
+        # Left panel: hide tree and scrollbar, show centered message
+        left_parent = self.tree.master
+        self.tree.pack_forget()
+        self._tree_scroll.pack_forget()
+        if self._left_empty_label:
+            self._left_empty_label.destroy()
+        self._left_empty_label = ttk.Label(
+            left_parent,
+            text=self._empty_state_message(),
+            font=("Arial", 10),
+            wraplength=280,
+            justify=tk.CENTER,
+        )
+        self._left_empty_label.pack(fill=tk.BOTH, expand=True, pady=20, padx=10)
+        # Right panel
+        self._clear_right()
+        if self._right_container:
+            ph = ttk.Label(
+                self._right_container,
+                text=self._empty_state_message(),
+                font=("Arial", 10),
+                wraplength=400,
+                justify=tk.CENTER,
+            )
+            ph.pack(expand=True, fill=tk.BOTH, pady=20, padx=20)
+            self._right_placeholder = ph
+        self.select_module_btn.config(state=tk.DISABLED)
 
-        # Clear text views
-        # ttkbootstrap ScrolledText is always editable
-        self.graph_text.delete(1.0, tk.END)
-        # ttkbootstrap ScrolledText is always editable
+    def _refresh_tree(self) -> None:
+        if self._left_empty_label:
+            self._left_empty_label.destroy()
+            self._left_empty_label = None
+        # Restore tree and scrollbar if they were hidden by empty state
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0), pady=(0, 5))
+        self._tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tree.delete(*self.tree.get_children())
+        for name, count, impact in self._last_modules:
+            display_name = name.replace(os.sep, ".")
+            self.tree.insert(
+                "",
+                tk.END,
+                text=display_name,
+                values=(count, f"{impact:.3f}"),
+            )
+        if self._last_modules:
+            self.select_module_btn.config(state=tk.NORMAL)
 
-        # ttkbootstrap ScrolledText is always editable
-        self.details_text.delete(1.0, tk.END)
-        # ttkbootstrap ScrolledText is always editable
+    def _clear_right(self) -> None:
+        if self._canvas:
+            self._canvas.get_tk_widget().destroy()
+            self._canvas = None
+        if self._fallback_text:
+            self._fallback_text.destroy()
+            self._fallback_text = None
+        if self._fallback_var is not None:
+            self._fallback_var = None
+        container = self._right_container
+        if container:
+            for w in container.winfo_children():
+                w.destroy()
+            ph = ttk.Label(container, text="", font=("Arial", 10))
+            ph.pack(expand=True)
+            self._right_placeholder = ph
 
-        # Reset UI
-        self.progress_label.config(text="Ready to analyze")
-        self.export_button.config(state=tk.DISABLED)
-        self.gui.show_status_message("Analysis results cleared.")
+    def _show_graph_or_fallback(self) -> None:
+        self._clear_right()
+        G = self._last_G
+        n = G.number_of_nodes() if G is not None else 0
+        if n > MAX_GRAPH_NODES or not _HAS_MPL or nx is None:
+            self._show_fallback_text()
+            return
+        self._show_matplotlib_graph()
 
-    def perform_search(self, query, case_sensitive, whole_word):
-        """Search functionality for the module analysis tab."""
+    def _show_fallback_text(self) -> None:
+        if self._right_placeholder:
+            self._right_placeholder.destroy()
+            self._right_placeholder = None
+        # Searchable text: adjacency list or summary
+        filter_frame = ttk.Frame(self._right_container)
+        filter_frame.pack(fill=tk.X)
+        self._fallback_var = tk.StringVar()
+        ttk.Label(filter_frame, text="Filter:").pack(side=tk.LEFT, padx=(0, 4))
+        entry = ttk.Entry(filter_frame, textvariable=self._fallback_var, width=30)
+        entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        entry.bind("<KeyRelease>", self._on_fallback_filter)
+        sb = ttk.Scrollbar(self._right_container)
+        self._fallback_text = tk.Text(
+            self._right_container,
+            wrap=tk.WORD,
+            font=("Monospace", 9),
+            yscrollcommand=sb.set,
+            state=tk.DISABLED,
+        )
+        sb.config(command=self._fallback_text.yview)
+        self._fallback_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        lines: List[str] = []
+        if self._last_G is not None and nx is not None:
+            G = self._last_G
+            lines.append(f"Nodes: {G.number_of_nodes()}, Edges: {G.number_of_edges()}\n")
+            for u in sorted(G.nodes()):
+                succ = list(G.successors(u))
+                if succ:
+                    lines.append(f"{u} -> {', '.join(sorted(succ))}\n")
+                else:
+                    lines.append(f"{u}\n")
+        else:
+            lines.append("No graph (install networkx for dependency graph).\n")
+            for name, count, impact in self._last_modules:
+                lines.append(f"  {name}: {count} files, impact {impact:.3f}\n")
+        self._fallback_text.config(state=tk.NORMAL)
+        self._fallback_text.insert(tk.END, "".join(lines))
+        self._fallback_text.config(state=tk.DISABLED)
+        self._fallback_full_content = "".join(lines)
+
+    def _on_fallback_filter(self, event: tk.Event) -> None:
+        if not self._fallback_text or self._fallback_var is None:
+            return
+        q = self._fallback_var.get().strip().lower()
+        content = getattr(self, "_fallback_full_content", "")
+        if not q:
+            self._fallback_text.config(state=tk.NORMAL)
+            self._fallback_text.delete("1.0", tk.END)
+            self._fallback_text.insert(tk.END, content)
+            self._fallback_text.config(state=tk.DISABLED)
+            return
+        lines = [l for l in content.splitlines() if q in l.lower()]
+        self._fallback_text.config(state=tk.NORMAL)
+        self._fallback_text.delete("1.0", tk.END)
+        self._fallback_text.insert(tk.END, "\n".join(lines) or "(no matches)")
+        self._fallback_text.config(state=tk.DISABLED)
+
+    def _show_matplotlib_graph(self) -> None:
+        if not _HAS_MPL or nx is None or self._last_G is None:
+            return
+        if self._right_placeholder:
+            self._right_placeholder.destroy()
+            self._right_placeholder = None
+        fig = Figure(figsize=(6, 5), dpi=100)
+        ax = fig.add_subplot(111)
+        G = self._last_G
+        try:
+            pos = nx.spring_layout(G, k=0.5, iterations=50, seed=42)
+        except Exception:
+            pos = nx.shell_layout(G)
+        nx.draw_networkx_edges(G, pos, ax=ax, edge_color="gray", alpha=0.6, arrows=True)
+        nx.draw_networkx_nodes(G, pos, ax=ax, node_color="steelblue", node_size=80)
+        labels = {n: os.path.basename(n) if os.path.basename(n) else n for n in G.nodes()}
+        nx.draw_networkx_labels(G, pos, labels, ax=ax, font_size=6)
+        ax.axis("off")
+        fig.tight_layout()
+        self._canvas = FigureCanvasTkAgg(fig, master=self._right_container)
+        self._canvas.draw()
+        if self._right_container:
+            self._canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+    def _on_select_module(self) -> None:
+        sel = self.tree.selection()
+        if not sel or not self._last_module_to_paths:
+            self.gui.show_status_message("Select a module first.", error=True)
+            return
+        item = self.tree.item(sel[0])
+        display_name = item["text"]
+        # Tree shows display_name with . separator; keys in _last_module_to_paths use os.sep; "(root)" -> "."
+        key = "(root)" if display_name == "(root)" else display_name.replace(".", os.sep)
+        if key not in self._last_module_to_paths:
+            key = display_name
+        paths = self._last_module_to_paths.get(key, [])
+        if not paths:
+            self.gui.show_status_message("No files for this module.", error=True)
+            return
+        self.gui.file_handler.select_files_by_paths(paths)
+        self.gui.show_status_message(f"Selected {len(paths)} file(s) from {display_name}.")
+        self.gui.notebook.select(1)
+
+    def perform_search(self, query: str, case_sensitive: bool, whole_word: bool) -> List[Any]:
         return []
 
-    def highlight_all_matches(self, matches):
-        """Highlight search matches."""
+    def center_match(self, match_data: Any) -> None:
         pass
 
-    def highlight_match(self, match_data, is_focused=True):
-        """Highlight a specific match."""
+    def highlight_match(self, match_data: Any, is_focused: bool = True) -> None:
         pass
 
-    def center_match(self, match_data):
-        """Center on a specific match."""
+    def highlight_all_matches(self, matches: List[Any]) -> None:
         pass
 
-    def clear_highlights(self):
-        """Clear all highlights."""
+    def clear_highlights(self) -> None:
         pass
 
-    def clear(self):
-        """Clear the tab content."""
-        self.clear_results()
+    def clear(self) -> None:
+        self.tree.delete(*self.tree.get_children())
+        self._last_modules = []
+        self._last_module_to_paths = {}
+        self._last_G = None
+        self._last_py_files_by_rel = {}
+        self._clear_right()
+        if self._right_container:
+            ph = ttk.Label(
+                self._right_container,
+                text="Click 'Analyze Repository' to build the dependency graph.",
+                font=("Arial", 10),
+            )
+            ph.pack(expand=True)
+            self._right_placeholder = ph
+        self.select_module_btn.config(state=tk.DISABLED)
