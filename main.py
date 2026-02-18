@@ -1,15 +1,23 @@
-import ttkbootstrap as ttk
+from __future__ import annotations
+
+import logging
 import signal
 import sys
-import logging
+from typing import Any, Optional
+
 import tkinter as tk
-from tkinterdnd2 import TkinterDnD, DND_FILES
+import ttkbootstrap as ttk
+from tkinterdnd2 import DND_FILES, TkinterDnD  # type: ignore[import-untyped]
+
+from constants import DEFAULT_LOG_LEVEL, LOG_FILE_PATH, LOG_FORMAT, LOG_TO_CONSOLE, LOG_TO_FILE
 from gui import RepoPromptGUI
 from logging_config import setup_logging
-from constants import DEFAULT_LOG_LEVEL, LOG_FILE_PATH, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FORMAT
 
-class DnDWindow(ttk.Window, TkinterDnD.DnDWrapper):
-    def __init__(self, *args, **kwargs):
+
+class DnDWindow(ttk.Window, TkinterDnD.DnDWrapper):  # type: ignore[misc]
+    TkdndVersion: Optional[Any]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         # Set the window class name to match the .desktop file for Linux desktop integration
         if 'className' not in kwargs:
             kwargs['className'] = 'CodeBase'
@@ -20,12 +28,16 @@ class DnDWindow(ttk.Window, TkinterDnD.DnDWrapper):
         except (RuntimeError, tk.TclError) as e:
             logging.warning(f"Drag and drop library could not be loaded: {e}")
 
-def signal_handler(signum, frame):
+def signal_handler(signum: int, frame: Any) -> None:
     """Handle shutdown signals gracefully."""
     logging.info(f"Received signal {signum}, initiating graceful shutdown...")
-    if hasattr(signal_handler, 'app') and signal_handler.app:
-        signal_handler.app.on_close()
+    app = getattr(signal_handler, "app", None)
+    if app:
+        app.on_close()
     sys.exit(0)
+
+
+signal_handler.app = None  # type: ignore[attr-defined]
 
 if __name__ == "__main__":
     # Setup centralized logging configuration
@@ -41,6 +53,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, signal_handler)
     
     # Try to initialize with DnD support
+    root: Any
     try:
         # Pass className for desktop integration
         root = DnDWindow(themename="darkly")
@@ -54,7 +67,7 @@ if __name__ == "__main__":
     app = RepoPromptGUI(root)
     
     # Store app reference for signal handler
-    signal_handler.app = app
+    signal_handler.app = app  # type: ignore[attr-defined]
     
     try:
         root.mainloop()

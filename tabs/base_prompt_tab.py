@@ -1,22 +1,43 @@
-import ttkbootstrap as ttk
-import tkinter as tk
-from ttkbootstrap.widgets.scrolled import ScrolledText
-from tkinter import filedialog, messagebox
-import os
+from __future__ import annotations
+
 import logging
-from widgets import Tooltip
-from security import validate_template_file, validate_content_security, sanitize_content
+import os
+from tkinter import filedialog, messagebox
+from typing import TYPE_CHECKING, Any, List, Tuple
+
+import tkinter as tk
+import ttkbootstrap as ttk
+from ttkbootstrap.widgets.scrolled import ScrolledText
+
 from constants import SECURITY_ENABLED
+from security import sanitize_content, validate_content_security, validate_template_file
+from widgets import Tooltip
+
+if TYPE_CHECKING:
+    from gui import RepoPromptGUI
+
 
 class BasePromptTab(ttk.Frame):
-    def __init__(self, parent, gui, template_dir):
+    gui: RepoPromptGUI
+    template_dir: str
+    base_prompt_text: Any  # ttkbootstrap ScrolledText
+    base_prompt_button_frame: ttk.Frame
+    save_template_button: ttk.Button
+    load_template_button: ttk.Button
+    delete_template_button: ttk.Button
+
+    def __init__(
+        self,
+        parent: tk.Misc,
+        gui: RepoPromptGUI,
+        template_dir: str,
+    ) -> None:
         super().__init__(parent)
         self.gui = gui
         self.template_dir = template_dir
-        # Colors now managed by ttkbootstrap theme
         self.setup_ui()
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         self.base_prompt_text = ScrolledText(self, wrap=tk.WORD,
                                                           font=("Arial", 10), bootstyle="dark")
         self.base_prompt_text.pack(fill="both", expand=True, padx=5, pady=(5, 10))
@@ -35,8 +56,8 @@ class BasePromptTab(ttk.Frame):
              self.base_prompt_text.insert('1.0', default_prompt)
 
 
-    def perform_search(self, query, case_sensitive, whole_word):
-        matches = []
+    def perform_search(self, query: str, case_sensitive: bool, whole_word: bool) -> List[Tuple[str, str]]:
+        matches: List[Tuple[str, str]] = []
         start_pos = "1.0"
         while True:
             pos = self.base_prompt_text.search(query, start_pos, stopindex=tk.END,
@@ -48,19 +69,19 @@ class BasePromptTab(ttk.Frame):
             start_pos = end_pos
         return matches
 
-    def highlight_all_matches(self, matches):
+    def highlight_all_matches(self, matches: List[Tuple[str, str]]) -> None:
         for match_data in matches:
             pos, end_pos = match_data
             self.base_prompt_text.tag_add("highlight", pos, end_pos)
 
-    def highlight_match(self, match_data, is_focused=True):
+    def highlight_match(self, match_data: Tuple[str, str], is_focused: bool = True) -> None:
         highlight_tag = "focused_highlight" if is_focused else "highlight"
         other_highlight_tag = "highlight" if is_focused else "focused_highlight"
         pos, end_pos = match_data
         self.base_prompt_text.tag_remove(other_highlight_tag, pos, end_pos)
         self.base_prompt_text.tag_add(highlight_tag, pos, end_pos)
 
-    def center_match(self, match_data):
+    def center_match(self, match_data: Tuple[str, str]) -> None:
         pos, _ = match_data
         try:
             self.base_prompt_text.see(pos)
@@ -85,11 +106,11 @@ class BasePromptTab(ttk.Frame):
         except Exception as e:
              logging.error(f"Error centering match: {e}")
 
-    def clear_highlights(self):
+    def clear_highlights(self) -> None:
         self.base_prompt_text.tag_remove("highlight", "1.0", tk.END)
         self.base_prompt_text.tag_remove("focused_highlight", "1.0", tk.END)
 
-    def save_template(self):
+    def save_template(self) -> None:
         template_content = self.base_prompt_text.get(1.0, tk.END).strip()
         if not template_content:
              self.gui.show_status_message("Base Prompt is empty, nothing to save.", error=True)
@@ -110,7 +131,7 @@ class BasePromptTab(ttk.Frame):
                 logging.error(f"Error saving template {template_name}: {e}")
                 self.gui.show_toast(f"Could not save template: {e}", toast_type="error")
 
-    def load_template(self):
+    def load_template(self) -> None:
         template_file = filedialog.askopenfilename(
             initialdir=self.template_dir,
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
@@ -151,7 +172,7 @@ class BasePromptTab(ttk.Frame):
                 logging.error(f"Error loading template {template_file}: {e}")
                 self.gui.show_toast(f"Could not load template: {e}", toast_type="error")
 
-    def delete_template(self):
+    def delete_template(self) -> None:
         template_file = filedialog.askopenfilename(
             initialdir=self.template_dir,
             filetypes=[("Text files", "*.txt")],
@@ -166,5 +187,5 @@ class BasePromptTab(ttk.Frame):
                     logging.error(f"Error deleting template {template_file}: {e}")
                     self.gui.show_toast(f"Could not delete template: {e}", toast_type="error")
 
-    def clear(self):
+    def clear(self) -> None:
         self.base_prompt_text.delete(1.0, tk.END)

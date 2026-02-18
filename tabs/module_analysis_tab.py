@@ -35,7 +35,7 @@ except ImportError:
 
 
 class ModuleAnalysisTab(ttk.Frame):
-    def __init__(self, parent: ttk.Frame, gui: Any) -> None:
+    def __init__(self, parent: tk.Misc, gui: Any) -> None:
         super().__init__(parent)
         self.gui = gui
         self._last_modules: List[Tuple[str, int, float]] = []
@@ -339,10 +339,10 @@ class ModuleAnalysisTab(ttk.Frame):
         nx.draw_networkx_labels(G, pos, labels, ax=ax, font_size=6)
         ax.axis("off")
         fig.tight_layout()
-        self._canvas = FigureCanvasTkAgg(fig, master=self._right_container)
-        self._canvas.draw()
+        self._canvas = FigureCanvasTkAgg(fig, master=self._right_container)  # type: ignore[no-untyped-call]
+        self._canvas.draw()  # type: ignore[no-untyped-call]
         if self._right_container:
-            self._canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            self._canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)  # type: ignore[no-untyped-call]
 
     def _on_select_module(self) -> None:
         sel = self.tree.selection()

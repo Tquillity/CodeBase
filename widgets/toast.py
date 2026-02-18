@@ -1,11 +1,12 @@
 # widgets/toast.py
 # Non-blocking toast notifications for CodeBase (VS Code / Claude style).
+from __future__ import annotations
 
 import tkinter as tk
 import ttkbootstrap as ttk
 
 # Toast type -> (bootstyle key, default duration ms)
-TOAST_CONFIG = {
+TOAST_CONFIG: dict[str, tuple[str, int]] = {
     "success": ("success", 4000),
     "info": ("info", 4000),
     "warning": ("warning", 6000),
@@ -37,7 +38,7 @@ class ToastManager:
         style_key, default_duration = TOAST_CONFIG[toast_type]
         duration = duration if duration is not None else default_duration
 
-        style = ttk.Style()
+        style = ttk.Style()  # type: ignore[no-untyped-call]
         # Resolve theme color (ttkbootstrap uses style.colors)
         try:
             color = getattr(style.colors, style_key, None) or style.colors.primary

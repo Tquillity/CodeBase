@@ -1,4 +1,6 @@
 # tests/test_file_handler.py
+from __future__ import annotations
+
 import os
 import tempfile
 import tkinter as tk
@@ -8,9 +10,10 @@ from unittest.mock import MagicMock, patch, ANY
 from file_handler import FileHandler
 from file_scanner import is_text_file, is_ignored_path
 
+
 # Mock GUI class for FileHandler
 class MockGUI:
-    def __init__(self):
+    def __init__(self) -> None:
         # Create a mock for structure_tab that itself has a mock for tree
         self.structure_tab = MagicMock()
         self.structure_tab.tree = MagicMock()

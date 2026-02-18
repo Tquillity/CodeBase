@@ -1,20 +1,48 @@
-import os
-import tkinter as tk
-import threading
+from __future__ import annotations
+
 import logging
+import os
+import threading
 import time
-from widgets import FolderDialog
-from constants import TEXT_EXTENSIONS_DEFAULT, FILE_SEPARATOR, CACHE_MAX_SIZE, CACHE_MAX_MEMORY_MB, ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION, ERROR_HANDLING_ENABLED
+from typing import TYPE_CHECKING, Any, Callable, Optional, Set
+
+import tkinter as tk
+
+from constants import (
+    CACHE_MAX_MEMORY_MB,
+    CACHE_MAX_SIZE,
+    ERROR_HANDLING_ENABLED,
+    ERROR_MESSAGE_DURATION,
+    FILE_SEPARATOR,
+    STATUS_MESSAGE_DURATION,
+    TEXT_EXTENSIONS_DEFAULT,
+)
+from error_handler import handle_error
+from exceptions import FileOperationError, RepositoryError, SecurityError
+from file_scanner import is_text_file, parse_gitignore, yield_repo_files
 from lru_cache import ThreadSafeLRUCache
-from file_scanner import parse_gitignore, is_ignored_path, yield_repo_files, is_text_file
 from path_utils import normalize_for_cache
-from exceptions import RepositoryError, FileOperationError, SecurityError
-from error_handler import handle_error, safe_execute
+from widgets import FolderDialog
+
+if TYPE_CHECKING:
+    from gui import RepoPromptGUI
+
+
 class RepoHandler:
-    # Default text extensions (remains class variable for access in settings)
-    text_extensions_default = TEXT_EXTENSIONS_DEFAULT
-    FILE_SEPARATOR = FILE_SEPARATOR
-    def __init__(self, gui):
+    text_extensions_default: set[str] = TEXT_EXTENSIONS_DEFAULT
+    FILE_SEPARATOR: str = FILE_SEPARATOR
+
+    gui: RepoPromptGUI
+    repo_path: Optional[str]
+    loaded_files: set[str]
+    scanned_text_files: set[str]
+    ignore_patterns: list[str]
+    recent_folders: list[str]
+    content_cache: Any  # ThreadSafeLRUCache
+    lock: threading.Lock
+    read_errors: list[str]
+
+    def __init__(self, gui: RepoPromptGUI) -> None:
         self.gui = gui
         self.repo_path = None
         self.loaded_files = set()
@@ -25,7 +53,7 @@ class RepoHandler:
         self.lock = threading.Lock()
         self.read_errors = []
 
-    def select_repo(self):
+    def select_repo(self) -> None:
         """Opens a dialog to select a repository and loads it."""
         if self.gui.is_loading:
             self.gui.show_status_message("Loading...", error=True)
@@ -39,7 +67,7 @@ class RepoHandler:
             self.gui.show_loading_state("Scanning repository...", show_cancel=True)
             self.load_repo(folder, self.gui._queue_loading_progress, self._handle_load_completion)
 
-    def refresh_repo(self):
+    def refresh_repo(self) -> None:
         """
         Refreshes the current repository, preserving selections and expansion state.
         """
@@ -73,12 +101,12 @@ class RepoHandler:
         logging.info(f"Calling load_repo with path: {self.repo_path}")
         self.load_repo(self.repo_path, self.gui._queue_loading_progress, completion_callback)
 
-    def get_tree_expansion_state(self):
+    def get_tree_expansion_state(self) -> set[str]:
         """Traverses the tree and returns a set of paths for all open folders."""
-        open_folders = set()
+        open_folders: set[str] = set()
         tree = self.gui.structure_tab.tree
-       
-        def _traverse(item_id):
+
+        def _traverse(item_id: str) -> None:
             if not tree.exists(item_id):
                 return
             if tree.item(item_id, 'open'):
@@ -94,11 +122,11 @@ class RepoHandler:
            
         return open_folders
 
-    def apply_tree_expansion_state(self, expansion_state):
+    def apply_tree_expansion_state(self, expansion_state: set[str]) -> None:
         """Traverses the tree and re-opens folders based on the saved state."""
         tree = self.gui.structure_tab.tree
-       
-        def _traverse_and_apply(item_id):
+
+        def _traverse_and_apply(item_id: str) -> None:
             if not tree.exists(item_id):
                 return
                
@@ -118,7 +146,7 @@ class RepoHandler:
         logging.info("Finished applying tree expansion state.")
         self.gui.structure_tab.update_expand_collapse_button()
 
-    def _clear_internal_state(self, clear_ui=False, clear_recent=False):
+    def _clear_internal_state(self, clear_ui: bool = False, clear_recent: bool = False) -> None:
         """Clears the internal state of the handler."""
         self.repo_path = None
         with self.lock:
@@ -138,7 +166,7 @@ class RepoHandler:
             self.gui.root.after_cancel(self.gui._git_monitor_id)
             self.gui._git_monitor_id = None
 
-    def _update_ui_for_no_repo(self):
+    def _update_ui_for_no_repo(self) -> None:
         """Resets the UI to its initial state when no repo is loaded."""
         self.gui.header_frame.repo_name_label.config(text="None", foreground=self.gui.header_frame.LEGENDARY_GOLD)
         self.gui.info_label.config(text="Token Count: 0")
@@ -153,9 +181,8 @@ class RepoHandler:
         self.gui.current_token_count = 0
 
     @classmethod
-    def get_extension_groups(cls):
-        # (Content Unchanged - assuming it's correct)
-        groups = {
+    def get_extension_groups(cls) -> dict[str, list[str]]:
+        groups: dict[str, list[str]] = {
             "Programming Languages": [ '.py', '.java', '.cpp', '.c', '.h', '.js', '.ts', '.tsx', '.jsx', '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.kts', '.dart', '.groovy', '.scala', '.cs', '.fs', '.fsx', '.lua', '.pl', '.r', '.m', '.mm', '.asm', '.v', '.vhdl', '.verilog', '.s', '.clj', '.cljs', '.cljc', '.edn', '.rkt', '.jl', '.purs', '.elm', '.hs', '.lhs', '.agda', '.idr' ],
             "Markup": [ '.html', '.xml', '.md', '.mdx', '.rst', '.adoc', '.org', '.texinfo', '.astro' ],
             "Configuration": [ '.json', '.yml', '.yaml', '.toml', '.ini', '.properties', '.gitignore', '.dockerfile', '.make', '.conf', '.cfg', '.env', '.hcl', '.tf', '.nix', '.dhall' ],
@@ -170,14 +197,18 @@ class RepoHandler:
             groups["Other"].extend(sorted(other_extensions))
         return groups
 
-    def _scan_repo_worker(self, folder, progress_callback, completion_callback):
+    def _scan_repo_worker(
+        self,
+        folder: str,
+        progress_callback: Callable[..., None],
+        completion_callback: Callable[..., None],
+    ) -> None:
         """Worker function to run in a separate thread with detailed progress and cancel support."""
         try:
             logging.info(f"Starting repository scan for {folder}")
             if getattr(self.gui, '_shutdown_requested', False):
                 logging.info("Shutdown requested, aborting repository scan")
                 return
-            # Notify UI: scanning started
             progress_callback("Scanning files...", None, None)
 
             start_time = time.time()
@@ -194,7 +225,7 @@ class RepoHandler:
                 return
             repo_path = abs_path
             ignore_patterns = parse_gitignore(os.path.join(repo_path, '.gitignore'))
-            errors = []
+            errors: list[str] = []
 
             # --- Collect all non-ignored file paths (with cancel check) ---
             file_paths = []
@@ -240,7 +271,12 @@ class RepoHandler:
             self.gui.task_queue.put((completion_callback, (None, None, set(), set(), [f"Unexpected scan error: {e}"])))
 
 
-    def load_repo(self, folder, progress_callback, completion_callback):
+    def load_repo(
+        self,
+        folder: str,
+        progress_callback: Callable[..., None],
+        completion_callback: Callable[..., None],
+    ) -> None:
         """Starts the repository scan in a background thread."""
         thread = threading.Thread(target=self._scan_repo_worker, args=(folder, progress_callback, completion_callback), daemon=True)
         thread.name = f"RepoScan-{os.path.basename(folder)}"
@@ -248,7 +284,14 @@ class RepoHandler:
         thread.start()
 
 
-    def _handle_load_completion(self, repo_path, ignore_patterns, scanned_files, loaded_files, errors):
+    def _handle_load_completion(
+        self,
+        repo_path: Optional[str],
+        ignore_patterns: Optional[list[str]],
+        scanned_files: Set[str],
+        loaded_files: Set[str],
+        errors: list[str],
+    ) -> None:
         """Callback for the *initial* repo load. Keeps progress visible through tree build and preview."""
         logging.info(f"Handling initial load completion for {repo_path}")
         if errors or repo_path is None:
@@ -292,7 +335,15 @@ class RepoHandler:
         self.gui.show_status_message(f"Loaded {repo_name} successfully.", duration=STATUS_MESSAGE_DURATION)
         self.gui.start_git_status_monitor()
 
-    def _handle_refresh_completion(self, repo_path, ignore_patterns, scanned_files, errors, previous_selections, expansion_state):
+    def _handle_refresh_completion(
+        self,
+        repo_path: Optional[str],
+        ignore_patterns: Optional[list[str]],
+        scanned_files: Set[str],
+        errors: list[str],
+        previous_selections: Set[str],
+        expansion_state: set[str],
+    ) -> None:
         """Callback for repository refresh. Keeps progress visible through tree build and preview."""
         logging.info(f"Handling refresh completion for {repo_path}")
         if errors or repo_path is None:

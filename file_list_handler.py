@@ -1,16 +1,28 @@
-import os
+from __future__ import annotations
+
 import threading
+from typing import Any, Callable, Set
+
 from content_manager import generate_content
 
-def generate_list_content(gui, files_to_copy, repo_path, lock, completion_callback, content_cache, list_read_errors):
-    # FIX: Get format from settings
+
+def generate_list_content(
+    gui: Any,
+    files_to_copy: Set[str],
+    repo_path: str | None,
+    lock: Any,
+    completion_callback: Callable[[str, int, list[str]], None],
+    content_cache: Any,
+    list_read_errors: list[str],
+) -> None:
     current_format = gui.settings.get('app', 'copy_format', "Markdown (Grok)")
 
-    # FIX: Added 'gui' parameter to access task_queue in threaded callback
-    def wrapped_completion(content, token_count, errors):
-        # FIX: Queue the callback execution in the main thread
+    def wrapped_completion(content: str, token_count: int, errors: list[str]) -> None:
         gui.task_queue.put((completion_callback, (content, token_count, errors)))
 
-    # FIX: Pass current_format to generate_content
-    thread = threading.Thread(target=generate_content, args=(files_to_copy, repo_path, lock, wrapped_completion, content_cache, list_read_errors, None, gui, current_format), daemon=True)
+    thread = threading.Thread(
+        target=generate_content,
+        args=(files_to_copy, repo_path, lock, wrapped_completion, content_cache, list_read_errors, None, gui, current_format),
+        daemon=True,
+    )
     thread.start()

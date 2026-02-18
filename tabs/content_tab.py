@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import tkinter as tk
-from typing import Any
+from typing import Any, cast
 
 import ttkbootstrap as ttk
 from ttkbootstrap.widgets.scrolled import ScrolledText
@@ -18,16 +18,23 @@ from widgets import Tooltip
 
 
 class ContentTab(ttk.Frame):
-    def __init__(self, parent: ttk.Frame, gui: Any, file_handler: Any) -> None:
+    gui: Any
+    file_handler: Any
+    file_states: dict[str, bool]
+    content_expand_collapse_var: tk.BooleanVar
+    content_button_frame: ttk.Frame
+    content_expand_collapse_button: ttk.Button
+    content_text: Any  # ttkbootstrap ScrolledText
+
+    def __init__(self, parent: tk.Misc, gui: Any, file_handler: Any) -> None:
         super().__init__(parent)
         self.gui = gui
         self.file_handler = file_handler
-        # Colors now managed by ttkbootstrap theme
         self.file_states = {}
         self.content_expand_collapse_var = ttk.BooleanVar(value=True)
         self.setup_ui()
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         self.content_button_frame = ttk.Frame(self)
         self.content_button_frame.pack(side=tk.TOP, fill='x', pady=(10, 5))
         self.content_expand_collapse_button = self.gui.create_button(self.content_button_frame, "Expand All", self.toggle_content_all, "Expand/collapse all file content sections")
@@ -39,7 +46,7 @@ class ContentTab(ttk.Frame):
         self.content_text.pack(fill="both", expand=True, padx=5, pady=(0, 10))
 
         # Get theme colors from ttkbootstrap
-        style = ttk.Style()
+        style = ttk.Style()  # type: ignore[no-untyped-call]
         colors = style.colors
         
         self.content_text.tag_configure("filename", foreground=colors.danger, font=('Arial', 10, 'bold'))
@@ -52,8 +59,8 @@ class ContentTab(ttk.Frame):
         self.content_text.tag_bind("toggle", "<Leave>", lambda e: self.content_text.config(cursor=""))
 
 
-    def perform_search(self, query, case_sensitive, whole_word):
-        matches = []
+    def perform_search(self, query: str, case_sensitive: bool, whole_word: bool) -> list[tuple[str, str]]:
+        matches: list[tuple[str, str]] = []
         # ttkbootstrap ScrolledText is always editable
         start_pos = "1.0"
         while True:
@@ -66,13 +73,13 @@ class ContentTab(ttk.Frame):
             start_pos = end_pos
         return matches
 
-    def highlight_all_matches(self, matches):
+    def highlight_all_matches(self, matches: list[tuple[str, str]]) -> None:
         # ttkbootstrap ScrolledText is always editable
         for match_data in matches:
             pos, end_pos = match_data
             self.content_text.tag_add("highlight", pos, end_pos)
 
-    def highlight_match(self, match_data, is_focused=True):
+    def highlight_match(self, match_data: tuple[str, str], is_focused: bool = True) -> None:
         highlight_tag = "focused_highlight" if is_focused else "highlight"
         other_highlight_tag = "highlight" if is_focused else "focused_highlight"
         pos, end_pos = match_data
@@ -80,7 +87,7 @@ class ContentTab(ttk.Frame):
         self.content_text.tag_remove(other_highlight_tag, pos, end_pos)
         self.content_text.tag_add(highlight_tag, pos, end_pos)
 
-    def center_match(self, match_data):
+    def center_match(self, match_data: tuple[str, str]) -> None:
         pos, _ = match_data
         try:
             self.content_text.see(pos)
@@ -105,14 +112,14 @@ class ContentTab(ttk.Frame):
         except Exception as e:
              logging.error(f"Error centering match: {e}")
 
-    def clear_highlights(self):
+    def clear_highlights(self) -> None:
         # ttkbootstrap ScrolledText is always editable
         self.content_text.tag_remove("highlight", "1.0", tk.END)
         self.content_text.tag_remove("focused_highlight", "1.0", tk.END)
 
-    def _get_syntax_tags(self):
+    def _get_syntax_tags(self) -> dict[Any, str]:
         """Map Pygments tokens to ttkbootstrap theme colors."""
-        style = ttk.Style()
+        style = ttk.Style()  # type: ignore[no-untyped-call]
         colors = style.colors
         
         # Basic mapping - can be refined
@@ -128,7 +135,7 @@ class ContentTab(ttk.Frame):
             Token.Error: colors.danger
         }
 
-    def _highlight_code(self, content, filename):
+    def _highlight_code(self, content: str, filename: str) -> Any:
         """Highlight code using Pygments."""
         try:
             lexer = get_lexer_for_filename(filename)
@@ -138,7 +145,7 @@ class ContentTab(ttk.Frame):
         tokens = pygments.lex(content, lexer)
         return tokens
 
-    def _insert_content_chunked(self, text, tags):
+    def _insert_content_chunked(self, text: str, tags: str | tuple[str, ...]) -> None:
         """Insert large text in chunks to avoid UI freeze."""
         chunk_size = 2000
         chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
@@ -148,7 +155,13 @@ class ContentTab(ttk.Frame):
             if i > 0 and i % 5 == 0:
                 self.update_idletasks()
 
-    def _handle_preview_completion(self, generated_content, token_count, errors, deleted_files=None):
+    def _handle_preview_completion(
+        self,
+        generated_content: str | None,
+        token_count: int,
+        errors: list[str],
+        deleted_files: list[str] | None = None,
+    ) -> None:
         deleted_files = deleted_files or []
         self.gui.is_generating_preview = False
 
@@ -295,7 +308,7 @@ class ContentTab(ttk.Frame):
 
         self.update_content_expand_collapse_button()
 
-    def toggle_content_all(self):
+    def toggle_content_all(self) -> None:
         if not self.file_states: return
 
         new_state_expanded = not self.content_expand_collapse_var.get()
@@ -323,7 +336,7 @@ class ContentTab(ttk.Frame):
         status = "expanded" if new_state_expanded else "collapsed"
         self.gui.show_status_message(f"Content sections {status}.")
 
-    def toggle_content(self, file_id):
+    def toggle_content(self, file_id: str) -> None:
         if file_id not in self.file_states: return
 
         current_state = self.file_states[file_id]
@@ -345,7 +358,7 @@ class ContentTab(ttk.Frame):
 
         self.update_content_expand_collapse_button()
 
-    def update_content_expand_collapse_button(self):
+    def update_content_expand_collapse_button(self) -> None:
         if not self.file_states:
             is_expanded = True
             self.content_expand_collapse_button.config(state=tk.DISABLED)
@@ -356,15 +369,15 @@ class ContentTab(ttk.Frame):
         self.content_expand_collapse_var.set(is_expanded)
         self.content_expand_collapse_button.config(text="Collapse All" if is_expanded else "Expand All")
 
-    def clear(self):
+    def clear(self) -> None:
         # ttkbootstrap ScrolledText is always editable
         self.content_text.delete(1.0, tk.END)
         self.file_states.clear()
         self.update_content_expand_collapse_button()
 
-    def update_tag_colors(self):
+    def update_tag_colors(self) -> None:
         """Updates text tag colors to match the current theme."""
-        style = ttk.Style()
+        style = ttk.Style()  # type: ignore[no-untyped-call]
         colors = style.colors
 
         self.content_text.tag_configure("filename", foreground=colors.danger, font=('Arial', 10, 'bold'))

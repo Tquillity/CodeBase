@@ -1,25 +1,32 @@
 # tests/test_gui.py
+from __future__ import annotations
+
 import os
-import tkinter as tk
-from tkinter import messagebox, filedialog
-import pytest
 import tempfile
-from unittest.mock import MagicMock, patch, mock_open, ANY
+from typing import Any, Generator, cast
+from unittest.mock import ANY, MagicMock, mock_open, patch
+
+import pytest
+import ttkbootstrap as ttk
+import tkinter as tk
+from tkinter import filedialog, messagebox
+
+from constants import DEFAULT_WINDOW_SIZE, VERSION
+from file_scanner import is_text_file
 from gui import RepoPromptGUI
-from constants import VERSION, DEFAULT_WINDOW_SIZE
-from tabs.content_tab import ContentTab
-from tabs.structure_tab import StructureTab
-from tabs.base_prompt_tab import BasePromptTab
-from tabs.settings_tab import SettingsTab
-from tabs.file_list_tab import FileListTab
-from handlers.search_handler import SearchHandler
 from handlers.copy_handler import CopyHandler
 from handlers.repo_handler import RepoHandler
+from handlers.search_handler import SearchHandler
 from panels.panels import HeaderFrame, LeftPanel, RightPanel
-from file_scanner import is_text_file
+from tabs.base_prompt_tab import BasePromptTab
+from tabs.content_tab import ContentTab
+from tabs.file_list_tab import FileListTab
+from tabs.settings_tab import SettingsTab
+from tabs.structure_tab import StructureTab
+
 
 @pytest.fixture
-def mock_root():
+def mock_root() -> Generator[tk.Tk, None, None]:
     root = tk.Tk()
     root.withdraw()
     yield root
@@ -27,7 +34,7 @@ def mock_root():
     root.destroy()
 
 @pytest.fixture
-def temp_repo_for_gui_tests():
+def temp_repo_for_gui_tests() -> Generator[tuple[str, str, str, str], None, None]:
     with tempfile.TemporaryDirectory() as temp_dir:
         text_file = os.path.join(temp_dir, "test.txt")
         with open(text_file, 'w') as f:
@@ -46,7 +53,7 @@ def temp_repo_for_gui_tests():
         yield temp_dir, text_file, non_text_file, sub_file
 
 @pytest.fixture
-def gui(mock_root):
+def gui(mock_root: tk.Tk) -> Generator[RepoPromptGUI, None, None]:
     with (
         patch('gui.SettingsManager') as mock_settings_cls,
         patch('gui.FileHandler') as mock_file_handler,
@@ -56,7 +63,7 @@ def gui(mock_root):
     ):
 
         mock_settings_inst = mock_settings_cls.return_value
-        def get_side_effect(section, key, default=None):
+        def get_side_effect(section: str, key: str, default: Any = None) -> Any:
             if section == 'app':
                 if key == 'high_contrast': return 0
                 if key == 'prepend_prompt': return 1
@@ -65,7 +72,7 @@ def gui(mock_root):
             return default
         mock_settings_inst.get.side_effect = get_side_effect
 
-        def right_panel_side_effect(parent, gui_instance):
+        def right_panel_side_effect(parent: tk.Misc, gui_instance: RepoPromptGUI, row_offset: int = 0) -> MagicMock:
             gui_instance.notebook = MagicMock()
             gui_instance.notebook.index.side_effect = lambda x: 0 if x == 'current' else 6 if x == 'end' else None
             gui_instance.notebook.tab.side_effect = lambda i, option: {
@@ -117,12 +124,12 @@ def gui(mock_root):
 
         mock_right_cls.side_effect = right_panel_side_effect
         
-        app = RepoPromptGUI(mock_root)
+        app = RepoPromptGUI(cast(ttk.Window, mock_root))
 
         app.header_frame = mock_header_cls.return_value
         app.header_frame.repo_prefix_label = MagicMock()
         app.header_frame.repo_name_label = MagicMock()
-        app.header_separator = MagicMock()
+        setattr(app, 'header_separator', MagicMock())
         app.left_frame = mock_left_cls.return_value
         app.right_frame = mock_right_cls.return_value
         app.left_separator = MagicMock()
@@ -136,7 +143,7 @@ def gui(mock_root):
         app.clear_button_frame = MagicMock()
         app.clear_button = MagicMock()
         app.clear_all_button = MagicMock()
-        app.search_frame = MagicMock()
+        setattr(app, 'search_frame', MagicMock())
         app.search_entry = MagicMock()
         app.search_button = MagicMock()
         app.next_button = MagicMock()
@@ -146,30 +153,30 @@ def gui(mock_root):
         app.whole_word_checkbox = MagicMock()
         app.status_bar = MagicMock()
         
-        app.notebook.select.reset_mock()
+        (app.notebook.select).reset_mock()  # type: ignore[attr-defined]
         yield app
 
-def test_init(gui):
+def test_init(gui: RepoPromptGUI) -> None:
     assert gui.version == VERSION
     assert gui.high_contrast_mode.get() == 0
     assert gui.prepend_var.get() == 1
     assert gui.show_unloaded_var.get() == 0
 
-def test_load_recent_folders(gui):
+def test_load_recent_folders(gui: RepoPromptGUI) -> None:
     mock_file = mock_open(read_data="folder1\nfolder2\n")
     with patch('builtins.open', mock_file), \
          patch('os.path.exists', return_value=True):
         folders = gui.load_recent_folders()
         assert folders == ["folder1", "folder2"]
 
-def test_load_recent_folders_error(caplog, gui):
+def test_load_recent_folders_error(caplog: pytest.LogCaptureFixture, gui: RepoPromptGUI) -> None:
     with patch('os.path.exists', return_value=True), \
          patch('builtins.open', side_effect=Exception("Read error")):
         folders = gui.load_recent_folders()
         assert folders == []
         assert "Error loading recent folders" in caplog.text
 
-def test_save_recent_folders(gui):
+def test_save_recent_folders(gui: RepoPromptGUI) -> None:
     gui.recent_folders = ["folder1", "folder2"]
     mock_file = mock_open()
     with patch('builtins.open', mock_file):
@@ -177,7 +184,7 @@ def test_save_recent_folders(gui):
         mock_file().write.assert_any_call("folder1\n")
         mock_file().write.assert_called_with("folder2\n")
 
-def test_update_recent_folders(gui):
+def test_update_recent_folders(gui: RepoPromptGUI) -> None:
     gui.recent_folders = ["/old/folder"]
     with patch('os.path.exists', return_value=True), patch('os.path.isdir', return_value=True):
         gui.update_recent_folders("/new/folder")
@@ -189,7 +196,7 @@ def test_update_recent_folders(gui):
             gui.update_recent_folders(f"/repo/folder{i}")
     assert len(gui.recent_folders) == 20
 
-def test_select_repo(gui):
+def test_select_repo(gui: RepoPromptGUI) -> None:
     gui.is_loading = True
     with patch.object(gui, 'show_status_message') as mock_status:
         gui.repo_handler.select_repo()
@@ -208,7 +215,7 @@ def test_select_repo(gui):
             mock_show_loading.assert_called_with("Scanning folder...", show_cancel=True)
             mock_load_repo.assert_called_with("/selected/folder", gui.show_status_message, ANY)
 
-def test_refresh_repo(gui):
+def test_refresh_repo(gui: RepoPromptGUI) -> None:
     gui.current_repo_path = "/repo"
     gui.repo_handler.repo_path = "/repo"
     gui.is_loading = False
@@ -223,7 +230,7 @@ def test_refresh_repo(gui):
         mock_show_loading.assert_called_with("Refreshing repo...", show_cancel=True)
         mock_load_repo.assert_called_with("/repo", gui.show_status_message, ANY)
 
-def test_copy_contents(gui):
+def test_copy_contents(gui: RepoPromptGUI) -> None:
     gui.file_handler.loaded_files = {"file1"}
     gui.is_loading = False
     with patch.object(gui.base_prompt_tab.base_prompt_text, 'get', return_value="Prompt text\n"), \
@@ -235,60 +242,60 @@ def test_copy_contents(gui):
         mock_show_loading.assert_called_with("Preparing content for clipboard...")
         mock_gen.assert_called_with(set(["file1"]), gui.current_repo_path, ANY, ANY, ANY, ANY, None, gui, ANY)
 
-def test_load_file_list_empty_input(gui):
+def test_load_file_list_empty_input(gui: RepoPromptGUI) -> None:
     pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
 
-def test_load_file_list_relative_paths(gui, temp_repo_for_gui_tests, monkeypatch):
+def test_load_file_list_relative_paths(gui: RepoPromptGUI, temp_repo_for_gui_tests: tuple[str, str, str, str], monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
 
-def test_load_file_list_absolute_paths_valid(gui, temp_repo_for_gui_tests, monkeypatch):
+def test_load_file_list_absolute_paths_valid(gui: RepoPromptGUI, temp_repo_for_gui_tests: tuple[str, str, str, str], monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
 
-def test_load_file_list_absolute_paths_invalid(gui, monkeypatch):
+def test_load_file_list_absolute_paths_invalid(gui: RepoPromptGUI, monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
 
-def test_load_file_list_non_text_file(gui, temp_repo_for_gui_tests, monkeypatch):
+def test_load_file_list_non_text_file(gui: RepoPromptGUI, temp_repo_for_gui_tests: tuple[str, str, str, str], monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
 
-def test_load_file_list_no_repo_for_relative(gui, monkeypatch):
+def test_load_file_list_no_repo_for_relative(gui: RepoPromptGUI, monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
 
-def test_clear_current_content_tab(gui):
-    gui.notebook.index.side_effect = lambda x: 0 if x == 'current' else 5 if x == 'end' else None
+def test_clear_current_content_tab(gui: RepoPromptGUI) -> None:
+    cast(MagicMock, gui.notebook).index.side_effect = lambda x: 0 if x == 'current' else 5 if x == 'end' else None
     with patch.object(gui, 'show_status_message') as mock_status:
         gui.clear_current()
-        gui.content_tab.clear.assert_called_once()
-        mock_status.assert_called_with("Current tab content cleared.")
+        cast(MagicMock, gui.content_tab.clear).assert_called_once()
+        cast(MagicMock, mock_status).assert_called_with("Current tab content cleared.")
 
-def test_clear_current_structure_tab_confirm(gui):
-    gui.notebook.index.side_effect = lambda x: 1 if x == 'current' else 5 if x == 'end' else None
+def test_clear_current_structure_tab_confirm(gui: RepoPromptGUI) -> None:
+    cast(MagicMock, gui.notebook).index.side_effect = lambda x: 1 if x == 'current' else 5 if x == 'end' else None
     with patch('tkinter.messagebox.askyesno', return_value=True), \
          patch.object(gui, 'clear_all') as mock_clear_all:
         gui.clear_current()
-        mock_clear_all.assert_called_once()
+        cast(MagicMock, mock_clear_all).assert_called_once()
 
 
-def test_clear_current_no_action(gui):
-    gui.notebook.index.side_effect = lambda x: 4 if x == 'current' else 6 if x == 'end' else None
+def test_clear_current_no_action(gui: RepoPromptGUI) -> None:
+    cast(MagicMock, gui.notebook).index.side_effect = lambda x: 4 if x == 'current' else 6 if x == 'end' else None
     with patch.object(gui, 'show_status_message') as mock_status:
         gui.clear_current()
-        mock_status.assert_called_with("Settings tab cannot be cleared this way.")
+        cast(MagicMock, mock_status).assert_called_with("Settings tab cannot be cleared this way.")
 
-def test_clear_all_confirm(gui):
+def test_clear_all_confirm(gui: RepoPromptGUI) -> None:
     with patch('tkinter.messagebox.askyesno', return_value=True), \
          patch.object(gui.repo_handler, '_clear_internal_state') as mock_clear_state, \
          patch.object(gui.repo_handler, '_update_ui_for_no_repo') as mock_update_ui, \
          patch.object(gui, 'show_status_message') as mock_status:
         gui.clear_all()
-        mock_clear_state.assert_called_once_with(clear_recent=False)
-        gui.content_tab.clear.assert_called_once()
-        gui.structure_tab.clear.assert_called_once()
-        gui.base_prompt_tab.clear.assert_called_once()
-        gui.file_list_tab.clear.assert_called_once()
-        mock_update_ui.assert_called_once()
-        mock_status.assert_called_with("All data cleared.")
+        cast(MagicMock, mock_clear_state).assert_called_once_with(clear_recent=False)
+        cast(MagicMock, gui.content_tab.clear).assert_called_once()
+        cast(MagicMock, gui.structure_tab.clear).assert_called_once()
+        cast(MagicMock, gui.base_prompt_tab.clear).assert_called_once()
+        cast(MagicMock, gui.file_list_tab.clear).assert_called_once()
+        cast(MagicMock, mock_update_ui).assert_called_once()
+        cast(MagicMock, mock_status).assert_called_with("All data cleared.")
 
-def test_save_app_settings(gui):
+def test_save_app_settings(gui: RepoPromptGUI) -> None:
     gui.settings_tab.default_tab_var = MagicMock(get=MagicMock(return_value="Content Preview"))
     gui.prepend_var = MagicMock(get=MagicMock(return_value=1))
     gui.show_unloaded_var = MagicMock(get=MagicMock(return_value=0))
@@ -311,62 +318,63 @@ def test_save_app_settings(gui):
          patch.object(gui.root, 'after'), \
          patch.object(gui, 'show_status_message') as mock_status:
         gui.save_app_settings()
-        mock_set.assert_any_call('app', 'default_tab', "Content Preview")
-        mock_set.assert_any_call('app', 'prepend_prompt', 1)
-        mock_set.assert_any_call('app', 'show_unloaded', 0)
-        mock_set.assert_any_call('app', 'expansion', "Expanded")
-        mock_set.assert_any_call('app', 'levels', 2)
-        mock_set.assert_any_call('app', 'exclude_node_modules', 1)
-        mock_set.assert_any_call('app', 'exclude_dist', 1)
-        mock_set.assert_any_call('app', 'exclude_files', {'file1': 1})
-        mock_set.assert_any_call('app', 'search_case_sensitive', 0)
-        mock_set.assert_any_call('app', 'search_whole_word', 0)
-        mock_set.assert_any_call('app', 'include_icons', 1)
-        mock_set.assert_any_call('app', 'high_contrast', 0)
-        mock_set.assert_any_call('app', 'text_extensions', {'.txt': 1})
-        mock_status.assert_any_call("Settings saved successfully.")
-        mock_status.assert_called_with("Settings saved. Refreshing repository view...")
-        gui.root.after.assert_called_with(100, gui.repo_handler.refresh_repo)
+        mset = cast(MagicMock, mock_set)
+        mset.assert_any_call('app', 'default_tab', "Content Preview")
+        mset.assert_any_call('app', 'prepend_prompt', 1)
+        mset.assert_any_call('app', 'show_unloaded', 0)
+        mset.assert_any_call('app', 'expansion', "Expanded")
+        mset.assert_any_call('app', 'levels', 2)
+        mset.assert_any_call('app', 'exclude_node_modules', 1)
+        mset.assert_any_call('app', 'exclude_dist', 1)
+        mset.assert_any_call('app', 'exclude_files', {'file1': 1})
+        mset.assert_any_call('app', 'search_case_sensitive', 0)
+        mset.assert_any_call('app', 'search_whole_word', 0)
+        mset.assert_any_call('app', 'include_icons', 1)
+        mset.assert_any_call('app', 'high_contrast', 0)
+        mset.assert_any_call('app', 'text_extensions', {'.txt': 1})
+        cast(MagicMock, mock_status).assert_any_call("Settings saved successfully.")
+        cast(MagicMock, mock_status).assert_called_with("Settings saved. Refreshing repository view...")
+        cast(MagicMock, gui.root.after).assert_called_with(100, gui.repo_handler.refresh_repo)
 
-def test_apply_default_tab(gui):
+def test_apply_default_tab(gui: RepoPromptGUI) -> None:
     with patch.object(gui.settings, 'get', return_value="Folder Structure"):
         gui.apply_default_tab()
-        gui.notebook.select.assert_called_with(1)
+        cast(MagicMock, gui.notebook.select).assert_called_with(1)
 
-def test_show_about(gui):
+def test_show_about(gui: RepoPromptGUI) -> None:
     with patch('tkinter.messagebox.showinfo') as mock_info:
         gui.show_about()
-        mock_info.assert_called_with("About CodeBase", ANY)
+        cast(MagicMock, mock_info).assert_called_with("About CodeBase", ANY)
 
-def test_on_close(gui):
+def test_on_close(gui: RepoPromptGUI) -> None:
     with patch.object(gui.root, 'geometry', return_value="100x200+300+400"), \
          patch.object(gui.settings, 'set') as mock_set, \
          patch.object(gui.settings, 'save'), \
          patch.object(gui.root, 'destroy'):
         gui.on_close()
-        mock_set.assert_called_with('app', 'window_geometry', "100x200+300+400")
+        cast(MagicMock, mock_set).assert_called_with('app', 'window_geometry', "100x200+300+400")
 
-def test_reconfigure_ui_colors_propagation(gui):
+def test_reconfigure_ui_colors_propagation(gui: RepoPromptGUI) -> None:
     pytest.skip("ThemeManager/colors are no longer used; ttkbootstrap styling is applied directly.")
 
 # --- New tests for tab classes (basic smoke tests) ---
 
-def test_content_tab_init(mock_root, gui):
+def test_content_tab_init(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
     pytest.skip("Smoke test is obsolete; ttkbootstrap widgets are initialized directly.")
 
-def test_structure_tab_init(mock_root, gui):
+def test_structure_tab_init(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
     pytest.skip("Smoke test is obsolete; ttkbootstrap widgets are initialized directly.")
 
-def test_base_prompt_tab_init(mock_root, gui):
+def test_base_prompt_tab_init(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
     pytest.skip("Smoke test is obsolete; ttkbootstrap widgets are initialized directly.")
 
-def test_settings_tab_init(mock_root, gui):
+def test_settings_tab_init(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
     pytest.skip("Smoke test is obsolete; ttkbootstrap widgets are initialized directly.")
 
-def test_file_list_tab_init(mock_root, gui):
+def test_file_list_tab_init(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
     pytest.skip("Smoke test is obsolete; ttkbootstrap widgets are initialized directly.")
 
-def test_save_app_settings_invalid_levels(gui):
+def test_save_app_settings_invalid_levels(gui: RepoPromptGUI) -> None:
     # To prevent the 'save_app_settings' method from crashing on other missing
     # attributes, we provide minimal mocks for all the variables it tries to access.
     gui.settings_tab.default_tab_var = MagicMock(get=MagicMock(return_value="Content Preview"))
@@ -387,10 +395,10 @@ def test_save_app_settings_invalid_levels(gui):
     with patch('tkinter.messagebox.showerror') as mock_showerror:
         gui.save_app_settings()
         # Assert the popup was NOT called, because our mock setup is now complete
-        mock_showerror.assert_not_called()
+        cast(MagicMock, mock_showerror).assert_not_called()
 
     # The original assertion remains valid
-    gui.settings.set.assert_any_call('app', 'levels', 1)
+    cast(MagicMock, gui.settings.set).assert_any_call('app', 'levels', 1)
 
-def test_content_tab_perform_search(mock_root, gui):
+def test_content_tab_perform_search(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
     pytest.skip("ContentTab search behavior is covered by tabs/content_tab.py unit tests.")

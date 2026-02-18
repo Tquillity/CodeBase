@@ -1,25 +1,29 @@
 # logging_config.py
 # Centralized logging configuration for CodeBase application
+from __future__ import annotations
 
 import logging
 import os
 import sys
-from typing import Optional, Dict, Any
+from typing import Dict, Optional
+
 from constants import ERROR_LOGGING_LEVEL
+
 
 class LoggingConfig:
     """Centralized logging configuration manager."""
-    
-    _initialized = False
-    _loggers = {}
-    
+    _initialized: bool = False
+    _loggers: Dict[str, logging.Logger] = {}
+
     @classmethod
-    def setup_logging(cls, 
-                     level: str = None, 
-                     log_file: str = None, 
-                     console_output: bool = True,
-                     format_string: str = None,
-                     force: bool = False) -> None:
+    def setup_logging(
+        cls,
+        level: Optional[str] = None,
+        log_file: Optional[str] = None,
+        console_output: bool = True,
+        format_string: Optional[str] = None,
+        force: bool = False,
+    ) -> None:
         """
         Setup centralized logging configuration.
         
@@ -120,7 +124,7 @@ class LoggingConfig:
         logging.info(f"Logging level changed to: {level}")
     
     @classmethod
-    def add_file_handler(cls, log_file: str, level: str = None) -> None:
+    def add_file_handler(cls, log_file: str, level: Optional[str] = None) -> None:
         """
         Add a file handler to existing logging configuration.
         
@@ -187,7 +191,13 @@ class LoggingConfig:
         return root_logger.isEnabledFor(logging.DEBUG)
 
 # Convenience functions
-def setup_logging(level: str = None, log_file: str = None, console_output: bool = True, format_string: str = None, force: bool = False) -> None:
+def setup_logging(
+    level: Optional[str] = None,
+    log_file: Optional[str] = None,
+    console_output: bool = True,
+    format_string: Optional[str] = None,
+    force: bool = False,
+) -> None:
     """Convenience function to setup logging."""
     LoggingConfig.setup_logging(level, log_file, console_output, format_string, force)
 

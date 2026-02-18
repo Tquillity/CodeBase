@@ -3,7 +3,7 @@ import tempfile
 import pytest
 from unittest.mock import MagicMock, patch, ANY
 from tkinter import messagebox
-import pyperclip
+import pyperclip  # type: ignore[import-untyped]
 from handlers.copy_handler import CopyHandler
 from content_manager import generate_content
 

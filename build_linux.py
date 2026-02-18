@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import shutil
 import subprocess
@@ -19,7 +21,7 @@ ASSETS_DIR = "assets"
 DIST_DIR = "dist"
 BUILD_DIR = "build_staging"  # Assembly directory for RPM structure
 
-def run_command(command):
+def run_command(command: list[str]) -> None:
     print(f"Running: {' '.join(command)}")
     try:
         subprocess.check_call(command)
@@ -27,14 +29,15 @@ def run_command(command):
         print(f"Error command failed: {e}")
         sys.exit(1)
 
-def clean():
+
+def clean() -> None:
     print("Cleaning previous builds...")
     if os.path.exists(DIST_DIR): shutil.rmtree(DIST_DIR)
     if os.path.exists("build"): shutil.rmtree("build")
     if os.path.exists(BUILD_DIR): shutil.rmtree(BUILD_DIR)
     if os.path.exists(f"{APP_NAME}.spec"): os.remove(f"{APP_NAME}.spec")
 
-def build_binary():
+def build_binary() -> None:
     print("Compiling Python to Binary with PyInstaller...")
     
     # Check if PyInstaller is installed first
@@ -64,7 +67,7 @@ def build_binary():
     ]
     run_command(cmd)
 
-def create_linux_structure():
+def create_linux_structure() -> None:
     print("Creating Linux directory structure...")
     
     # Define paths inside the package
@@ -103,7 +106,7 @@ StartupWMClass={APP_NAME}
     with open(os.path.join(usr_share_apps, f"{APP_NAME.lower()}.desktop"), "w") as f:
         f.write(desktop_content)
 
-def build_rpm():
+def build_rpm() -> None:
     print("Packaging RPM...")
     cmd = [
         "fpm",

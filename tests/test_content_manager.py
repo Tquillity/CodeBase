@@ -39,7 +39,7 @@ def test_get_file_content_success(temp_repo):
     temp_dir, file1_path, _, _, _ = temp_repo
     content_cache = ThreadSafeLRUCache(100, 10)  # Small cache for testing
     lock = threading.Lock()
-    read_errors = []
+    read_errors: list[str] = []
 
     content = get_file_content(file1_path, content_cache, lock, read_errors)
     assert content == "Content of file1"
@@ -51,7 +51,7 @@ def test_get_file_content_cached(temp_repo):
     content_cache = ThreadSafeLRUCache(100, 10)
     content_cache.put(os.path.normcase(file1_path), "Cached content")
     lock = threading.Lock()
-    read_errors = []
+    read_errors: list[str] = []
 
     content = get_file_content(file1_path, content_cache, lock, read_errors)
     assert content == "Cached content"
@@ -61,7 +61,7 @@ def test_get_file_content_missing_file(temp_repo):
     temp_dir, _, _, _, missing_path = temp_repo
     content_cache = ThreadSafeLRUCache(100, 10)
     lock = threading.Lock()
-    read_errors = []
+    read_errors: list[str] = []
 
     content = get_file_content(missing_path, content_cache, lock, read_errors)
     assert content is None
@@ -71,7 +71,7 @@ def test_get_file_content_permission_denied(monkeypatch, temp_repo):
     temp_dir, file1_path, _, _, _ = temp_repo
     content_cache = ThreadSafeLRUCache(100, 10)
     lock = threading.Lock()
-    read_errors = []
+    read_errors: list[str] = []
 
     # Mock open to raise PermissionError
     def mock_open(*args, **kwargs):
@@ -87,7 +87,7 @@ def test_get_file_content_binary_file(temp_repo):
     temp_dir, _, _, binary_path, _ = temp_repo
     content_cache = ThreadSafeLRUCache(100, 10)
     lock = threading.Lock()
-    read_errors = []
+    read_errors: list[str] = []
 
     content = get_file_content(binary_path, content_cache, lock, read_errors)
     assert content is not None  # With 'ignore', it reads, but content may have missing chars.
@@ -97,7 +97,7 @@ def test_get_file_content_general_error(monkeypatch, temp_repo):
     temp_dir, file1_path, _, _, _ = temp_repo
     content_cache = ThreadSafeLRUCache(100, 10)
     lock = threading.Lock()
-    read_errors = []
+    read_errors: list[str] = []
 
     # Mock open to raise a general Exception
     def mock_open(*args, **kwargs):
@@ -114,11 +114,11 @@ def test_generate_content_success(temp_repo):
     files_to_include = {file1_path, file2_path}
     lock = threading.Lock()
     content_cache = ThreadSafeLRUCache(100, 10)
-    read_errors = []
+    read_errors: list[str] = []
 
     generated_content = []
     token_counts = []
-    local_errors = []
+    local_errors: list[str] = []
 
     def completion_callback(content, token_count, errors, deleted_files=None):
         generated_content.append(content)
@@ -145,11 +145,11 @@ def test_generate_content_with_errors(temp_repo):
     files_to_include = {missing_path}
     lock = threading.Lock()
     content_cache = ThreadSafeLRUCache(100, 10)
-    read_errors = []
+    read_errors: list[str] = []
 
     generated_content = []
-    local_errors = []
-    local_deleted = []
+    local_errors: list[str] = []
+    local_deleted: list[str] = []
 
     def completion_callback(content, token_count, errors, deleted_files=None):
         generated_content.append(content)
@@ -171,7 +171,7 @@ def test_generate_content_sorted_order(temp_repo):
     files_to_include = {file1_path, file2_path, file0_path}
     lock = threading.Lock()
     content_cache = ThreadSafeLRUCache(100, 10)
-    read_errors = []
+    read_errors: list[str] = []
 
     generated_content = []
 
@@ -194,7 +194,7 @@ def test_generate_content_token_count(temp_repo):
     files_to_include = {file1_path}
     lock = threading.Lock()
     content_cache = ThreadSafeLRUCache(100, 10)
-    read_errors = []
+    read_errors: list[str] = []
 
     token_counts = []
 
@@ -212,7 +212,7 @@ def test_generate_content_performance(caplog, temp_repo):
     files_to_include = {file1_path, file2_path}
     lock = threading.Lock()
     content_cache = ThreadSafeLRUCache(100, 10)
-    read_errors = []
+    read_errors: list[str] = []
 
     def completion_callback(*args):
         pass

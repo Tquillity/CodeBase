@@ -1,11 +1,16 @@
 # tests/test_file_scanner.py
+from __future__ import annotations
+
+import logging
 import os
 import tempfile
-import time
-import logging
-import pytest
 import threading
+import time
+from typing import cast
+
+import pytest
 from unittest.mock import MagicMock, patch, ANY
+
 from file_scanner import scan_repo, parse_gitignore, is_ignored_path, is_text_file
 
 @pytest.fixture
@@ -105,7 +110,7 @@ def test_is_ignored_path_directory_patterns_match_nested_files(monkeypatch):
 
 def test_is_ignored_path_settings_excludes(monkeypatch):
     repo_root = "/repo"
-    ignore_list = []
+    ignore_list: list[str] = []
     gui = MagicMock()
     gui.settings.get.side_effect = lambda sec, key, default: 1 if key in ['exclude_node_modules', 'exclude_dist'] else default
 
@@ -115,7 +120,7 @@ def test_is_ignored_path_settings_excludes(monkeypatch):
 
 def test_is_text_file_extensions():
     gui = MagicMock()
-    gui.settings.get.side_effect = lambda sec, key, default: {'exclude_files': {}} if key == 'exclude_files' else {'.txt': 1, '.py': 1, '.bin': 0}
+    gui.settings.get.side_effect = lambda sec, key, default: cast("dict[str, int]", {}) if key == 'exclude_files' else {'.txt': 1, '.py': 1, '.bin': 0}
 
     with patch('os.path.getsize', return_value=100):
         assert is_text_file("file.txt", gui) == True
@@ -125,7 +130,7 @@ def test_is_text_file_extensions():
 
 def test_is_text_file_mime_type(monkeypatch):
     gui = MagicMock()
-    gui.settings.get.side_effect = lambda sec, key, default: {'exclude_files': {}} if key == 'exclude_files' else {}
+    gui.settings.get.side_effect = lambda sec, key, default: cast("dict[str, int]", {}) if key == 'exclude_files' else cast("dict[str, int]", {})
     
     def mock_guess_type(path):
         if path.endswith(".md"):
@@ -149,7 +154,7 @@ def test_is_text_file_exclude_files():
 def test_is_text_file_binary_extensions():
     gui = MagicMock()
     # Mock settings.get to return an empty dict for text_extensions so it falls through to ext check
-    gui.settings.get.side_effect = lambda sec, key, default: {} if key == 'text_extensions' else {'exclude_files': {}}
+    gui.settings.get.side_effect = lambda sec, key, default: cast("dict[str, int]", {}) if key == 'text_extensions' else cast("dict[str, int]", {})
     
     with patch('os.path.getsize', return_value=100):
         # These should be rejected even if text_extensions says they are text, or if they bypass MIME check
@@ -160,7 +165,7 @@ def test_is_text_file_binary_extensions():
 def test_is_text_file_size_limit():
     from constants import MAX_FILE_SIZE
     gui = MagicMock()
-    gui.settings.get.side_effect = lambda sec, key, default: {'.txt': 1} if key == 'text_extensions' else {'exclude_files': {}}
+    gui.settings.get.side_effect = lambda sec, key, default: {'.txt': 1} if key == 'text_extensions' else cast("dict[str, int]", {})
     
     with patch('os.path.getsize', return_value=MAX_FILE_SIZE + 1):
         assert is_text_file("large.txt", gui) == False
@@ -170,7 +175,7 @@ def test_is_text_file_size_limit():
 
 def test_is_ignored_path_venv(monkeypatch):
     repo_root = "/repo"
-    ignore_list = []
+    ignore_list: list[str] = []
     gui = MagicMock()
     gui.settings.get.side_effect = lambda sec, key, default: 0 # Disable other ignores
     

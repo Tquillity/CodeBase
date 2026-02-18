@@ -24,6 +24,8 @@ from security import (
     validate_file_size,
 )
 
+__all__ = ["get_file_content", "generate_content", "FILE_SEPARATOR"]
+
 try:
     tokenizer: Optional[Any] = tiktoken.get_encoding("cl100k_base")
 except Exception as e:

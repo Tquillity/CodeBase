@@ -1,24 +1,39 @@
-import ttkbootstrap as ttk
-import tkinter as tk
-from ttkbootstrap.widgets.scrolled import ScrolledText
-from widgets import Tooltip
+from __future__ import annotations
+
 import logging
 import os
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
+
+import tkinter as tk
+import ttkbootstrap as ttk
+from ttkbootstrap.widgets.scrolled import ScrolledText
+
+from constants import SECURITY_ENABLED
 from file_list_handler import generate_list_content
 from file_scanner import is_text_file
-from path_utils import normalize_path, is_path_within_base, ensure_absolute_path
-from exceptions import FileOperationError, SecurityError, UIError
-from error_handler import handle_error, safe_execute
-from constants import ERROR_HANDLING_ENABLED, SECURITY_ENABLED
-from security import validate_file_path, validate_file_size, validate_content_security
+from path_utils import ensure_absolute_path, is_path_within_base, normalize_path
+from security import validate_file_size
+from widgets import Tooltip
+
+if TYPE_CHECKING:
+    from gui import RepoPromptGUI
+
+
 class FileListTab(ttk.Frame):
-    def __init__(self, parent, gui):
+    gui: RepoPromptGUI
+    file_list_text: Any  # ttkbootstrap ScrolledText
+    context_menu: tk.Menu
+    load_list_button: ttk.Button
+    copy_list_button: ttk.Button
+    clear_list_button: ttk.Button
+    error_label: ttk.Label
+
+    def __init__(self, parent: tk.Misc, gui: RepoPromptGUI) -> None:
         super().__init__(parent)
         self.gui = gui
-        # Colors now managed by ttkbootstrap theme
         self.setup_ui()
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         self.file_list_text = ScrolledText(self, wrap=tk.NONE,
                                                       font=("Arial", 10), bootstyle="dark", height=10)
         self.file_list_text.pack(fill="both", expand=True, padx=5, pady=(5, 10))
@@ -60,8 +75,8 @@ class FileListTab(ttk.Frame):
         self.error_label.pack(fill="x", pady=(0, 10))
 
 
-    def perform_search(self, query, case_sensitive, whole_word):
-        matches = []
+    def perform_search(self, query: str, case_sensitive: bool, whole_word: bool) -> List[Tuple[str, str]]:
+        matches: List[Tuple[str, str]] = []
         start_pos = "1.0"
         while True:
             pos = self.file_list_text.search(query, start_pos, stopindex=tk.END,
@@ -73,19 +88,19 @@ class FileListTab(ttk.Frame):
             start_pos = end_pos
         return matches
 
-    def highlight_all_matches(self, matches):
+    def highlight_all_matches(self, matches: List[Tuple[str, str]]) -> None:
         for match_data in matches:
             pos, end_pos = match_data
             self.file_list_text.tag_add("highlight", pos, end_pos)
 
-    def highlight_match(self, match_data, is_focused=True):
+    def highlight_match(self, match_data: Tuple[str, str], is_focused: bool = True) -> None:
         highlight_tag = "focused_highlight" if is_focused else "highlight"
         other_highlight_tag = "highlight" if is_focused else "focused_highlight"
         pos, end_pos = match_data
         self.file_list_text.tag_remove(other_highlight_tag, pos, end_pos)
         self.file_list_text.tag_add(highlight_tag, pos, end_pos)
 
-    def center_match(self, match_data):
+    def center_match(self, match_data: Tuple[str, str]) -> None:
         pos, _ = match_data
         try:
             self.file_list_text.see(pos)
@@ -108,17 +123,17 @@ class FileListTab(ttk.Frame):
         except Exception as e:
              logging.error(f"Error centering match: {e}")
 
-    def clear_highlights(self):
+    def clear_highlights(self) -> None:
         self.file_list_text.tag_remove("highlight", "1.0", tk.END)
         self.file_list_text.tag_remove("focused_highlight", "1.0", tk.END)
 
-    def clear(self):
+    def clear(self) -> None:
         self.file_list_text.delete("1.0", tk.END)
         self.gui.list_selected_files.clear()
         self.copy_list_button.config(state=tk.DISABLED)
         self.error_label.config(text="")
 
-    def clear_file_list(self):
+    def clear_file_list(self) -> None:
         """Clear the file list text area and reset state."""
         self.file_list_text.delete("1.0", tk.END)
         with self.gui.file_handler.lock:
@@ -128,7 +143,7 @@ class FileListTab(ttk.Frame):
         self.error_label.config(text="")
         self.gui.show_status_message("File list cleared.")
 
-    def load_file_list(self):
+    def load_file_list(self) -> None:
         if self.gui.is_loading:
             self.gui.show_status_message("Loading...", error=True)
             return
@@ -196,7 +211,7 @@ class FileListTab(ttk.Frame):
         # Ensure text area remains editable after loading
         # ttkbootstrap ScrolledText is always editable
 
-    def _paste_text(self, event=None):
+    def _paste_text(self, event: Optional[tk.Event[Any]] = None) -> None:
         """Handle paste operation for the text widget."""
         try:
             # Ensure the widget is in normal state for editing
@@ -217,7 +232,7 @@ class FileListTab(ttk.Frame):
         except Exception as e:
             logging.warning(f"Error pasting text: {e}")
 
-    def _show_context_menu(self, event):
+    def _show_context_menu(self, event: tk.Event[Any]) -> None:
         """Show right-click context menu for text editing."""
         try:
             # Show context menu at cursor position
@@ -227,7 +242,7 @@ class FileListTab(ttk.Frame):
         finally:
              self.context_menu.grab_release()
 
-    def _cut_text(self):
+    def _cut_text(self) -> None:
         """Cut selected text to clipboard."""
         try:
             if self.file_list_text.selection_get():
@@ -236,7 +251,7 @@ class FileListTab(ttk.Frame):
         except tk.TclError:
             pass  # No text selected
 
-    def _copy_text(self):
+    def _copy_text(self) -> None:
         """Copy selected text to clipboard."""
         try:
             if self.file_list_text.selection_get():
@@ -245,17 +260,17 @@ class FileListTab(ttk.Frame):
         except tk.TclError:
             pass  # No text selected
 
-    def _select_all(self):
+    def _select_all(self) -> None:
         """Select all text in the widget."""
         self.file_list_text.tag_add(tk.SEL, "1.0", tk.END)
         self.file_list_text.mark_set(tk.INSERT, "1.0")
         self.file_list_text.see(tk.INSERT)
 
-    def _clear_text(self):
+    def _clear_text(self) -> None:
         """Clear all text in the widget."""
         self.file_list_text.delete("1.0", tk.END)
 
-    def copy_from_list(self):
+    def copy_from_list(self) -> None:
         if self.gui.is_loading:
             self.gui.show_status_message("Loading...", error=True)
             return
@@ -264,7 +279,7 @@ class FileListTab(ttk.Frame):
             return
         self.gui.show_loading_state("Preparing list content for clipboard...")
         prompt = self.gui.base_prompt_tab.base_prompt_text.get("1.0", tk.END).strip() if self.gui.prepend_var.get() else ""
-        def completion_callback(content, token_count, errors):
+        def completion_callback(content: str, token_count: int, errors: List[str]) -> None:
             self.gui.copy_handler._handle_copy_completion_final(prompt=prompt, content=content, structure=None, errors=errors,
                                                 status_message="Copied from file list" if not errors else "Copy failed with errors")
         # FIX: Pass self.gui to generate_list_content for queue access

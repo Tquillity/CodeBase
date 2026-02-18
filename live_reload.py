@@ -1,13 +1,18 @@
+from __future__ import annotations
+
+import logging
 import os
+import signal
+import subprocess
 import sys
 import time
-import subprocess
-from watchdog.observers import Observer
+from typing import Any, Optional
+
 from watchdog.events import FileSystemEventHandler
-import signal
-import logging
-from logging_config import setup_logging, get_logger
-from constants import DEFAULT_LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE, LOG_FILE_PATH, LOG_FORMAT
+from watchdog.observers import Observer
+
+from constants import DEFAULT_LOG_LEVEL, LOG_FILE_PATH, LOG_FORMAT, LOG_TO_CONSOLE, LOG_TO_FILE
+from logging_config import get_logger, setup_logging
 
 # Files to ignore during live reload to prevent unnecessary restarts
 IGNORE_PATTERNS = [
@@ -33,16 +38,16 @@ setup_logging(
 )
 
 class RestartHandler(FileSystemEventHandler):
-    def __init__(self, script_to_watch, script_to_run):
+    def __init__(self, script_to_watch: Optional[str], script_to_run: str) -> None:
         self.script_to_watch = script_to_watch
         self.script_to_run = script_to_run
-        self.process = None
+        self.process: Optional[subprocess.Popen[Any]] = None
         self.logger = get_logger(__name__)
-        self.last_restart_time = 0
+        self.last_restart_time: float = 0.0
         self.debounce_delay = 2
         self.start_script()
-        
-    def should_ignore_file(self, file_path):
+
+    def should_ignore_file(self, file_path: str) -> bool:
         """Check if a file should be ignored based on patterns."""
         import fnmatch
         for pattern in IGNORE_PATTERNS:
@@ -50,7 +55,7 @@ class RestartHandler(FileSystemEventHandler):
                 return True
         return False
 
-    def start_script(self):
+    def start_script(self) -> None:
         self.stop_script()
         try:
             logging.info(f"Starting {self.script_to_run}...")
@@ -67,7 +72,7 @@ class RestartHandler(FileSystemEventHandler):
             logging.error(f"Error starting script {self.script_to_run}: {e}")
             sys.exit(1)
 
-    def stop_script(self):
+    def stop_script(self) -> None:
         if self.process and self.process.poll() is None:
             logging.info(f"Attempting to terminate process {self.process.pid}...")
             try:
@@ -89,7 +94,7 @@ class RestartHandler(FileSystemEventHandler):
             finally:
                 self.process = None
 
-    def on_modified(self, event):
+    def on_modified(self, event: Any) -> None:
         if not event.is_directory:
             if self.should_ignore_file(event.src_path):
                 return

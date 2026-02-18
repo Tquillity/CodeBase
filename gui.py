@@ -145,7 +145,7 @@ class RepoPromptGUI:
         
         # --- FORCE ROOT BACKGROUND COLOR ---
         # Set root window background to match theme to prevent flickering during padding adjustments
-        style = ttk.Style()
+        style = ttk.Style()  # type: ignore[no-untyped-call]
         self.root.configure(background=style.colors.bg)
         # ----------------------------------------
         
@@ -180,9 +180,9 @@ class RepoPromptGUI:
         self.is_generating_preview = False
         self.current_token_count = 0
         self.file_handler = FileHandler(self)
-        self.search_handler = SearchHandler(self)  # type: ignore[no-untyped-call]
+        self.search_handler = SearchHandler(self)
         self.copy_handler = CopyHandler(self)
-        self.repo_handler = RepoHandler(self)  # type: ignore[no-untyped-call]
+        self.repo_handler = RepoHandler(self)
         self.git_handler = GitHandler(self)
         self.setup_ui()
         self.bind_keys()
@@ -240,9 +240,9 @@ class RepoPromptGUI:
             if os.path.isdir(path):
                 self.show_status_message(f"Loading dropped repository: {path}")
                 self.update_recent_folders(path)
-                self.repo_handler._clear_internal_state(clear_ui=True)  # type: ignore[no-untyped-call]
+                self.repo_handler._clear_internal_state(clear_ui=True)
                 self.show_loading_state("Scanning repository...", show_cancel=True)
-                self.repo_handler.load_repo(path, self._queue_loading_progress, self.repo_handler._handle_load_completion)  # type: ignore[no-untyped-call]
+                self.repo_handler.load_repo(path, self._queue_loading_progress, self.repo_handler._handle_load_completion)
             else:
                 self.show_status_message("Please drop a folder, not a file.", error=True)
                 
@@ -263,7 +263,7 @@ class RepoPromptGUI:
             # Update logging configuration
             LoggingConfig.setup_logging(
                 level=log_level,
-                log_file=LOG_FILE_PATH if log_to_file else None,  # type: ignore[arg-type]
+                log_file=LOG_FILE_PATH if log_to_file else None,
                 console_output=log_to_console,
                 format_string=LOG_FORMAT,
                 force=True,
@@ -326,7 +326,7 @@ class RepoPromptGUI:
         self.copy_button.config(state=tk.DISABLED)
         self.copy_all_button.config(state=tk.DISABLED)
 
-        self.file_handler.generate_and_update_preview(None, self.content_tab._handle_preview_completion)  # type: ignore[no-untyped-call]
+        self.file_handler.generate_and_update_preview(None, self.content_tab._handle_preview_completion)
 
     def load_recent_folders(self) -> list[str]:
         if os.path.exists(self.recent_folders_file):
@@ -404,13 +404,13 @@ class RepoPromptGUI:
         self.root.grid_columnconfigure(3, weight=0, minsize=8)
         self.root.grid_columnconfigure(4, weight=0, minsize=240)
 
-        self.header_frame = HeaderFrame(self.root, title="CodeBase", version=self.version, row_offset=row_offset)  # type: ignore[no-untyped-call]
+        self.header_frame = HeaderFrame(self.root, title="CodeBase", version=self.version, row_offset=row_offset)
         self.header_frame.repo_name_label.bind("<Button-1>", self.change_repo_color)
-        self.left_frame = LeftPanel(self.root, self, row_offset=row_offset)  # type: ignore[no-untyped-call]
+        self.left_frame = LeftPanel(self.root, self, row_offset=row_offset)
         self.left_separator = ttk.Frame(self.root, width=2)
         self.left_separator.grid(row=2 + row_offset, column=1, padx=4, pady=15, sticky="ns")
-        self.right_frame = RightPanel(self.root, self, row_offset=row_offset)  # type: ignore[no-untyped-call]
-        self.git_panel = GitStatusPanel(self.root, self)  # type: ignore[no-untyped-call]
+        self.right_frame = RightPanel(self.root, self, row_offset=row_offset)
+        self.git_panel = GitStatusPanel(self.root, self)
         self.git_panel.grid(row=2 + row_offset, column=4, padx=(4, 10), pady=10, sticky="nsew")
         self.setup_status_bar()
         # === LOADING OVERLAY (centered on main area only) ===
@@ -436,7 +436,7 @@ class RepoPromptGUI:
     ) -> ttk.Button:
         btn = ttk.Button(parent, text=text, command=command, state=state, bootstyle=bootstyle)
         if tooltip_text:
-            Tooltip(btn, tooltip_text)  # type: ignore[no-untyped-call]
+            Tooltip(btn, tooltip_text)
         return btn
 
     def setup_status_bar(self) -> None:
@@ -766,10 +766,10 @@ class RepoPromptGUI:
             
             # Force a complete reload of the repository with the new setting
             repo_path = self.current_repo_path  # Preserve the path before clearing
-            self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)  # type: ignore[no-untyped-call]
+            self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)
             self.show_loading_state("Refreshing repository...", show_cancel=True)
-            self.repo_handler.load_repo(repo_path, self._queue_loading_progress, self.repo_handler._handle_load_completion)  # type: ignore[no-untyped-call]
-                
+            self.repo_handler.load_repo(repo_path, self._queue_loading_progress, self.repo_handler._handle_load_completion)
+
         except Exception as e:
             logging.error(f"Error toggling test files exclusion: {e}")
             self.show_status_message("Error updating test files setting", error=True)
@@ -823,10 +823,10 @@ class RepoPromptGUI:
             
             # Force a complete reload of the repository with the new setting
             repo_path = self.current_repo_path  # Preserve the path before clearing
-            self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)  # type: ignore[no-untyped-call]
+            self.repo_handler._clear_internal_state(clear_ui=False, clear_recent=False)
             self.show_loading_state("Refreshing repository...", show_cancel=True)
-            self.repo_handler.load_repo(repo_path, self._queue_loading_progress, self.repo_handler._handle_load_completion)  # type: ignore[no-untyped-call]
-                
+            self.repo_handler.load_repo(repo_path, self._queue_loading_progress, self.repo_handler._handle_load_completion)
+
         except Exception as e:
             logging.error(f"Error toggling lock files exclusion: {e}")
             self.show_status_message("Error updating lock files setting", error=True)
@@ -853,7 +853,7 @@ class RepoPromptGUI:
         current_index = self.notebook.index('current')  # type: ignore[no-untyped-call]
         cleared = False
         if current_index == 0:
-            self.content_tab.clear()  # type: ignore[no-untyped-call]
+            self.content_tab.clear()
             cleared = True
         elif current_index == 1:
              if messagebox.askyesno("Confirm Clear", "Clearing the structure requires reloading the repository. Proceed?"):
@@ -865,13 +865,13 @@ class RepoPromptGUI:
             self.module_analysis_tab.clear()
             cleared = True
         elif current_index == 3:
-            self.base_prompt_tab.clear()  # type: ignore[no-untyped-call]
+            self.base_prompt_tab.clear()
             cleared = True
         elif current_index == 4:
              self.show_status_message("Settings tab cannot be cleared this way.")
              return
         elif current_index == 5:
-            self.file_list_tab.clear()  # type: ignore[no-untyped-call]
+            self.file_list_tab.clear()
             cleared = True
         if cleared:
              self.show_status_message("Current tab content cleared.")
@@ -879,13 +879,13 @@ class RepoPromptGUI:
     def clear_all(self) -> None:
         if self.is_loading: self.show_status_message("Loading...", error=True); return
         if messagebox.askyesno("Confirm Clear All", "This will clear all loaded data, selections, and the current repository view. Are you sure?"):
-            self.repo_handler._clear_internal_state(clear_recent=False)  # type: ignore[no-untyped-call]
-            self.content_tab.clear()  # type: ignore[no-untyped-call]
-            self.structure_tab.clear()  # type: ignore[no-untyped-call]
+            self.repo_handler._clear_internal_state(clear_recent=False)
+            self.content_tab.clear()
+            self.structure_tab.clear()
             self.module_analysis_tab.clear()
-            self.base_prompt_tab.clear()  # type: ignore[no-untyped-call]
-            self.file_list_tab.clear()  # type: ignore[no-untyped-call]
-            self.repo_handler._update_ui_for_no_repo()  # type: ignore[no-untyped-call]
+            self.base_prompt_tab.clear()
+            self.file_list_tab.clear()
+            self.repo_handler._update_ui_for_no_repo()
             self.show_status_message("All data cleared.")
 
     def save_app_settings(self) -> None:
@@ -1076,13 +1076,13 @@ class RepoPromptGUI:
         logging.debug(f"Registered background thread: {thread.name}")
 
     def bind_keys(self) -> None:
-        self.root.bind('<Control-r>', lambda e: self.repo_handler.select_repo())  # type: ignore[no-untyped-call]
-        self.root.bind('<Control-F5>', lambda e: self.repo_handler.refresh_repo())  # type: ignore[no-untyped-call]
+        self.root.bind('<Control-r>', lambda e: self.repo_handler.select_repo())
+        self.root.bind('<Control-F5>', lambda e: self.repo_handler.refresh_repo())
         self.root.bind('<Control-c>', lambda e: self.copy_handler.copy_contents())
         self.root.bind('<Control-s>', lambda e: self.copy_handler.copy_structure())
         self.root.bind('<Control-a>', lambda e: self.copy_handler.copy_all())
-        self.root.bind('<Control-t>', lambda e: self.base_prompt_tab.save_template())  # type: ignore[no-untyped-call]
-        self.root.bind('<Control-l>', lambda e: self.base_prompt_tab.load_template())  # type: ignore[no-untyped-call]
+        self.root.bind('<Control-t>', lambda e: self.base_prompt_tab.save_template())
+        self.root.bind('<Control-l>', lambda e: self.base_prompt_tab.load_template())
 if __name__ == "__main__":
     root = ttk.Window(themename="darkly")
     app = RepoPromptGUI(root)

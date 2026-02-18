@@ -1,15 +1,41 @@
-import ttkbootstrap as ttk
-import tkinter as tk
-from widgets import Tooltip
+from __future__ import annotations
+
 import logging
 import os
-from path_utils import normalize_for_cache, get_relative_path
-from exceptions import UIError, FileOperationError
-from error_handler import handle_error, safe_execute
+from typing import Any, List, Tuple
+
+import tkinter as tk
+import ttkbootstrap as ttk
+
 from constants import ERROR_HANDLING_ENABLED
+from error_handler import handle_error, safe_execute
+from exceptions import FileOperationError, UIError
+from path_utils import get_relative_path, normalize_for_cache
+from widgets import Tooltip
+
 
 class StructureTab(ttk.Frame):
-    def __init__(self, parent, gui, file_handler, settings, show_unloaded_var):
+    gui: Any
+    file_handler: Any
+    settings: Any
+    show_unloaded_var: tk.IntVar
+    expand_collapse_var: tk.BooleanVar
+    structure_button_frame: ttk.Frame
+    expand_collapse_button: ttk.Button
+    show_unloaded_checkbox: ttk.Checkbutton
+    filter_var: tk.StringVar
+    filter_entry: ttk.Entry
+    tree: ttk.Treeview
+    filter_timer: Any
+
+    def __init__(
+        self,
+        parent: tk.Misc,
+        gui: Any,
+        file_handler: Any,
+        settings: Any,
+        show_unloaded_var: tk.IntVar,
+    ) -> None:
         super().__init__(parent)
         self.gui = gui
         self.file_handler = file_handler
@@ -19,7 +45,7 @@ class StructureTab(ttk.Frame):
         self.expand_collapse_var = ttk.BooleanVar(value=True)
         self.setup_ui()
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         self.structure_button_frame = ttk.Frame(self)
         self.structure_button_frame.pack(side=tk.TOP, fill='x', pady=(10, 5))
 
@@ -52,10 +78,10 @@ class StructureTab(ttk.Frame):
         self.tree.heading("checkbox", text="Sel")
 
         # Get theme colors from ttkbootstrap
-        style = ttk.Style()
+        style = ttk.Style()  # type: ignore[no-untyped-call]
         colors = style.colors
-        
-        unloaded_font = ('TkDefaultFont', -1, 'overstrike') if self.gui.high_contrast_mode.get() else (None, -10, 'overstrike')
+
+        unloaded_font: Any = ('TkDefaultFont', -1, 'overstrike') if self.gui.high_contrast_mode.get() else (None, -10, 'overstrike')
         self.tree.tag_configure('folder', foreground=colors.info)
         self.tree.tag_configure('file_selected', foreground=colors.success)
         self.tree.tag_configure('file_unloaded', foreground=colors.secondary, font=unloaded_font)
@@ -78,18 +104,18 @@ class StructureTab(ttk.Frame):
         
         self.filter_timer = None
 
-    def _on_filter_change(self, event):
+    def _on_filter_change(self, event: tk.Event[Any]) -> None:
         """Debounce filter input."""
         if self.filter_timer:
             self.after_cancel(self.filter_timer)
         self.filter_timer = self.after(300, self._apply_filter)
         
-    def _apply_filter(self):
+    def _apply_filter(self) -> None:
         query = self.filter_var.get().strip()
         self.file_handler.apply_filter(query)
 
 
-    def populate_tree(self, root_dir):
+    def populate_tree(self, root_dir: str) -> None:
         logging.info(f"StructureTab: Populating tree with root: {root_dir}")
         self.tree.delete(*self.tree.get_children())
         if not root_dir or not os.path.exists(root_dir):
@@ -102,7 +128,7 @@ class StructureTab(ttk.Frame):
         self.tree.insert(root_id, "end", text="Loading...", tags=('dummy',))
         self.apply_initial_expansion()
 
-    def apply_initial_expansion(self):
+    def apply_initial_expansion(self) -> None:
         if not self.tree.get_children(): return
 
         expansion_mode = self.settings.get('app', 'expansion', 'Collapsed')
@@ -127,7 +153,7 @@ class StructureTab(ttk.Frame):
 
         self.update_expand_collapse_button()
 
-    def handle_tree_click(self, event):
+    def handle_tree_click(self, event: tk.Event[Any]) -> None:
         region = self.tree.identify_region(event.x, event.y)
         if region != "cell": return
 
@@ -139,7 +165,7 @@ class StructureTab(ttk.Frame):
 
         self.file_handler.toggle_selection(event)
 
-    def handle_tree_double_click(self, event):
+    def handle_tree_double_click(self, event: tk.Event[Any]) -> None:
         region = self.tree.identify_region(event.x, event.y)
         item_id = self.tree.identify_row(event.y)
         if not item_id: return
@@ -153,13 +179,13 @@ class StructureTab(ttk.Frame):
             elif any(t in tags for t in ['file_selected', 'file_default', 'file_unloaded', 'file_nontext']):
                  self.jump_to_file_content(item_id)
 
-    def handle_tree_open(self, event):
+    def handle_tree_open(self, event: tk.Event[Any]) -> None:
         item_id = self.tree.focus()
         logging.debug(f"Tree open event for {item_id}")
         if item_id and 'folder' in self.tree.item(item_id)['tags']:
             self.file_handler.expand_folder(item_id)
 
-    def jump_to_file_content(self, item_id):
+    def jump_to_file_content(self, item_id: str) -> None:
         if self.gui.is_loading:
             self.gui.show_status_message("Loading in progress...", error=True); return
         try:
@@ -194,7 +220,7 @@ class StructureTab(ttk.Frame):
              logging.error(f"Error jumping to file content: {e}")
              self.gui.show_status_message("Error jumping to content.", error=True)
 
-    def toggle_expand_collapse(self):
+    def toggle_expand_collapse(self) -> None:
         if self.gui.is_loading: self.gui.show_status_message("Loading...", error=True); return
         if not self.tree.get_children(): return
 
@@ -214,7 +240,7 @@ class StructureTab(ttk.Frame):
             self.expand_collapse_button.config(text="Collapse All")
             self.gui.show_status_message("Folders expanded.")
 
-    def generate_folder_structure_text(self):
+    def generate_folder_structure_text(self) -> str:
         root_items = self.tree.get_children("")
         if not root_items:
             return ""
@@ -224,7 +250,7 @@ class StructureTab(ttk.Frame):
 
         structure_lines = []
 
-        def traverse(item_id, indent="", prefix=""):
+        def traverse(item_id: str, indent: str = "", prefix: str = "") -> None:
             item_info = self.tree.item(item_id)
             item_text_raw = item_info["text"]
             item_tags = item_info["tags"]
@@ -260,7 +286,7 @@ class StructureTab(ttk.Frame):
 
         return "\n".join(structure_lines)
 
-    def update_tree_strikethrough(self):
+    def update_tree_strikethrough(self) -> None:
         if not self.tree.get_children(): return
 
         show_unloaded = self.show_unloaded_var.get() == 1
@@ -269,7 +295,7 @@ class StructureTab(ttk.Frame):
         with self.file_handler.lock:
             loaded_files_copy = set(self.file_handler.loaded_files)
 
-        def update_item(item_id):
+        def update_item(item_id: str) -> None:
             if not self.tree.exists(item_id): return
 
             item_data = self.tree.item(item_id)
@@ -306,7 +332,7 @@ class StructureTab(ttk.Frame):
         for root_item in self.tree.get_children(""):
             update_item(root_item)
 
-    def update_expand_collapse_button(self):
+    def update_expand_collapse_button(self) -> None:
         if not self.tree.get_children():
             self.expand_collapse_button.config(text="Expand All", state=tk.DISABLED)
             return
@@ -320,10 +346,10 @@ class StructureTab(ttk.Frame):
         else:
             self.expand_collapse_button.config(text="Expand All")
 
-    def perform_search(self, query, case_sensitive, whole_word):
-        matches = []
+    def perform_search(self, query: str, case_sensitive: int, whole_word: int) -> List[str]:
+        matches: List[str] = []
         if self.tree.get_children():
-             def collect_matches(item):
+             def collect_matches(item: str) -> None:
                  item_text = self.tree.item(item)["text"]
                  search_in = item_text.lower() if not case_sensitive else item_text
                  query_term = query.lower() if not case_sensitive else query
@@ -334,11 +360,11 @@ class StructureTab(ttk.Frame):
              collect_matches(self.tree.get_children("")[0])
         return matches
 
-    def highlight_all_matches(self, matches):
+    def highlight_all_matches(self, matches: List[str]) -> None:
         for i, match_data in enumerate(matches):
             self.highlight_match(match_data, is_focused=False)
 
-    def highlight_match(self, match_data, is_focused=True):
+    def highlight_match(self, match_data: str, is_focused: bool = True) -> None:
         highlight_tag = "focused_highlight" if is_focused else "highlight"
         other_highlight_tag = "highlight" if is_focused else "focused_highlight"
         item_id = match_data
@@ -347,14 +373,14 @@ class StructureTab(ttk.Frame):
         if highlight_tag not in tags: tags.append(highlight_tag)
         self.tree.item(item_id, tags=tuple(tags))
 
-    def center_match(self, match_data):
+    def center_match(self, match_data: str) -> None:
         item_id = match_data
         self.tree.see(item_id)
         self.tree.selection_set(item_id)
 
-    def clear_highlights(self):
+    def clear_highlights(self) -> None:
         if self.tree.get_children():
-             def clear_recursive(item):
+             def clear_recursive(item: str) -> None:
                  tags = list(self.tree.item(item)["tags"])
                  updated = False
                  if "highlight" in tags: tags.remove("highlight"); updated = True
@@ -364,18 +390,18 @@ class StructureTab(ttk.Frame):
                      clear_recursive(child)
              clear_recursive(self.tree.get_children("")[0])
 
-    def clear(self):
+    def clear(self) -> None:
         self.tree.delete(*self.tree.get_children())
 
-    def update_tag_colors(self):
+    def update_tag_colors(self) -> None:
         """Updates treeview tag colors to match the current theme."""
-        style = ttk.Style()
+        style = ttk.Style()  # type: ignore[no-untyped-call]
         colors = style.colors
 
-        unloaded_font = ('TkDefaultFont', -1, 'overstrike') if self.gui.high_contrast_mode.get() else (None, -10, 'overstrike')
+        unloaded_font_attr: Any = ('TkDefaultFont', -1, 'overstrike') if self.gui.high_contrast_mode.get() else (None, -10, 'overstrike')
         self.tree.tag_configure('folder', foreground=colors.info)
         self.tree.tag_configure('file_selected', foreground=colors.success)
-        self.tree.tag_configure('file_unloaded', foreground=colors.secondary, font=unloaded_font)
+        self.tree.tag_configure('file_unloaded', foreground=colors.secondary, font=unloaded_font_attr)
         self.tree.tag_configure('file_default', foreground=colors.fg)
         self.tree.tag_configure('file_nontext', foreground=colors.fg)
         self.tree.tag_configure('error', foreground=colors.danger)

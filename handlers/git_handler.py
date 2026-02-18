@@ -4,16 +4,21 @@ import logging
 import os
 import subprocess
 import threading
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import pyperclip  # type: ignore[import-untyped]
 from content_manager import generate_content
 from exceptions import RepositoryError
 
+if TYPE_CHECKING:
+    from gui import RepoPromptGUI
+
 
 class GitHandler:
+    gui: Any
+
     def __init__(self, gui: Any) -> None:
-        self.gui: Any = gui
+        self.gui = gui
 
     def get_git_diff(self, repo_path: str) -> str:
         """
@@ -48,53 +53,55 @@ class GitHandler:
         """
         Runs get_git_diff in a background thread and copies result to clipboard.
         """
-        if not self.gui.current_repo_path:
-            self.gui.show_status_message("No repository loaded.", error=True)
+        gui = cast("RepoPromptGUI", self.gui)
+        if not gui.current_repo_path:
+            gui.show_status_message("No repository loaded.", error=True)
             return
 
-        self.gui.show_loading_state("Generating git diff...")
-        
-        def _worker() -> None:
-            try:
-                diff_content = self.get_git_diff(self.gui.current_repo_path)
-                
-                if not diff_content.strip():
-                    self.gui.task_queue.put((self.gui.show_status_message, ("No changes detected (git diff is empty).",)))
-                    self.gui.task_queue.put((self.gui.hide_loading_state, ()))
-                    return
+        gui.show_loading_state("Generating git diff...")
 
-                # Success - copy to clipboard (must happen in main thread usually, but pyperclip is often thread safe enough or we can queue it)
-                # Better to queue the copy action to be safe and UI update
-                self.gui.task_queue.put((self._finish_copy, (diff_content,)))
-                
+        def _worker() -> None:
+            g = cast("RepoPromptGUI", self.gui)
+            repo_path = g.current_repo_path
+            if not repo_path:
+                return
+            try:
+                diff_content = self.get_git_diff(repo_path)
+                if not diff_content.strip():
+                    g.task_queue.put((g.show_status_message, ("No changes detected (git diff is empty).",)))
+                    g.task_queue.put((g.hide_loading_state, ()))
+                    return
+                g.task_queue.put((self._finish_copy, (diff_content,)))
             except RepositoryError as e:
-                self.gui.task_queue.put((self.gui.show_status_message, (str(e), 5000, True)))
-                self.gui.task_queue.put((self.gui.hide_loading_state, ()))
+                g.task_queue.put((g.show_status_message, (str(e), 5000, True)))
+                g.task_queue.put((g.hide_loading_state, ()))
             except Exception as e:
                 logging.error(f"Error in copy_diff worker: {e}")
-                self.gui.task_queue.put((self.gui.show_status_message, (f"Error generating diff: {e}", 5000, True)))
-                self.gui.task_queue.put((self.gui.hide_loading_state, ()))
+                g.task_queue.put((g.show_status_message, (f"Error generating diff: {e}", 5000, True)))
+                g.task_queue.put((g.hide_loading_state, ()))
 
         thread = threading.Thread(target=_worker, daemon=True)
-        self.gui.register_background_thread(thread)
+        gui.register_background_thread(thread)
         thread.start()
 
     def _finish_copy(self, content: str) -> None:
         """
         Called from main thread via task_queue to actually copy content and update UI.
         """
+        gui = cast("RepoPromptGUI", self.gui)
         try:
             pyperclip.copy(content)
-            self.gui.show_status_message("Git diff copied to clipboard!")
+            gui.show_status_message("Git diff copied to clipboard!")
         except Exception as e:
-            self.gui.show_status_message(f"Failed to copy to clipboard: {e}", error=True)
+            gui.show_status_message(f"Failed to copy to clipboard: {e}", error=True)
         finally:
-            self.gui.hide_loading_state()
+            gui.hide_loading_state()
 
     def get_git_status(self, repo_path: str | None = None) -> dict[str, Any]:
         """Return clean status dict for UI + copy operations."""
+        gui = cast("RepoPromptGUI", self.gui)
         if repo_path is None:
-            repo_path = self.gui.current_repo_path
+            repo_path = gui.current_repo_path
         if not repo_path or not os.path.exists(os.path.join(repo_path, '.git')):
             return {'staged': [], 'changes': [], 'staged_deleted': set(), 'changes_deleted': set(), 'branch': '—'}
 
@@ -150,44 +157,47 @@ class GitHandler:
     def copy_staged_changes(self) -> None:
         """Copy full content of all staged files (formatted)."""
         status = self.get_git_status()
+        gui = cast("RepoPromptGUI", self.gui)
         if not status['staged']:
-            self.gui.show_status_message("No staged changes to copy", error=True)
+            gui.show_status_message("No staged changes to copy", error=True)
             return
         self._copy_file_list(status['staged'], "Staged Changes")
 
     def copy_unstaged_changes(self) -> None:
         """Copy full content of all unstaged changes."""
         status = self.get_git_status()
+        gui = cast("RepoPromptGUI", self.gui)
         if not status['changes']:
-            self.gui.show_status_message("No unstaged changes to copy", error=True)
+            gui.show_status_message("No unstaged changes to copy", error=True)
             return
         self._copy_file_list(status['changes'], "Unstaged Changes")
 
     def _copy_file_list(self, file_paths: list[str], title: str) -> None:
         """Shared helper — uses existing content pipeline (threaded)."""
+        gui = cast("RepoPromptGUI", self.gui)
         if not file_paths:
             return
-        if not self.gui.current_repo_path:
-            self.gui.show_status_message("No repository loaded.", error=True)
+        if not gui.current_repo_path:
+            gui.show_status_message("No repository loaded.", error=True)
             return
-        repo_path = self.gui.current_repo_path
-        current_format = self.gui.settings.get('app', 'copy_format', "Markdown (Grok)")
-        fh = self.gui.file_handler
+        repo_path = gui.current_repo_path
+        current_format = gui.settings.get('app', 'copy_format', "Markdown (Grok)")
+        fh = gui.file_handler
         count = len(file_paths)
         title_lower = title.lower()
 
         def _finish(content: str, errors: list[str]) -> None:
-            self.gui.hide_loading_state()
+            gui.hide_loading_state()
             if errors:
-                self.gui.show_status_message("Failed to copy changes", error=True)
+                gui.show_status_message("Failed to copy changes", error=True)
             else:
                 try:
                     pyperclip.copy(content)
-                    self.gui.show_status_message(f"Copied {count} {title_lower} to clipboard", duration=3000)
+                    gui.show_status_message(f"Copied {count} {title_lower} to clipboard", duration=3000)
                     logging.info(f"Copied {count} files ({title})")
                 except Exception as e:
                     logging.error(f"Copy to clipboard failed: {e}")
-                    self.gui.show_status_message("Failed to copy to clipboard", error=True)
+                    gui.show_status_message("Failed to copy to clipboard", error=True)
 
         def completion(
             content: str,
@@ -195,14 +205,14 @@ class GitHandler:
             errors: list[str],
             deleted_files: Optional[list[str]] = None,
         ) -> None:
-            self.gui.task_queue.put((_finish, (content, errors)))
+            gui.task_queue.put((_finish, (content, errors)))
 
-        self.gui.show_loading_state(f"Preparing {title_lower}...")
+        gui.show_loading_state(f"Preparing {title_lower}...")
         thread = threading.Thread(
             target=generate_content,
-            args=(set(file_paths), repo_path, fh.lock, completion, fh.content_cache, fh.read_errors, None, self.gui, current_format),
+            args=(set(file_paths), repo_path, fh.lock, completion, fh.content_cache, fh.read_errors, None, gui, current_format),
             daemon=True
         )
-        self.gui.register_background_thread(thread)
+        gui.register_background_thread(thread)
         thread.start()
 

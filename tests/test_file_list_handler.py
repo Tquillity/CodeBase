@@ -45,7 +45,7 @@ def test_generate_list_content_success(temp_repo, mock_gui):
     lock = threading.Lock()
     from lru_cache import ThreadSafeLRUCache
     content_cache = ThreadSafeLRUCache(100, 10)
-    list_read_errors = []
+    list_read_errors: list[str] = []
 
     generated_contents = []
     token_counts = []
@@ -79,7 +79,7 @@ def test_generate_list_content_with_missing_file(temp_repo, mock_gui):
     lock = threading.Lock()
     from lru_cache import ThreadSafeLRUCache
     content_cache = ThreadSafeLRUCache(100, 10)
-    list_read_errors = []
+    list_read_errors: list[str] = []
 
     generated_contents = []
     errors_list = []
