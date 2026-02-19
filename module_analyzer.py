@@ -267,15 +267,12 @@ def _condensed_distance_from_graph(
         Gu = G.to_undirected()
     except Exception:
         Gu = G
-    node_to_idx = {nd: i for i, nd in enumerate(nodes)}
     condensed: List[float] = [0.0] * (n * (n - 1) // 2)
+    all_paths = dict(nx.all_pairs_shortest_path_length(Gu))
     for i in range(n):
         for j in range(i + 1, n):
             u, v = nodes[i], nodes[j]
-            try:
-                length = nx.shortest_path_length(Gu, u, v)
-            except (nx.NetworkXNoPath, nx.NodeNotFound, Exception):
-                length = disconnected_distance
+            length = all_paths.get(u, {}).get(v, disconnected_distance)
             k = (i * (2 * n - i - 1)) // 2 + (j - i - 1)
             condensed[k] = float(length)
     return condensed

@@ -63,7 +63,7 @@ class RestartHandler(FileSystemEventHandler):
             # Set environment variable to indicate this is a live reload instance
             env = os.environ.copy()
             env['CODEBASE_LIVE_RELOAD'] = '1'
-            self.process = subprocess.Popen(["python3", self.script_to_run], env=env)
+            self.process = subprocess.Popen([sys.executable, self.script_to_run], env=env)
             logging.info(f"Started process {self.process.pid}")
         except FileNotFoundError:
             logging.error(f"Error: Could not find Python executable '{sys.executable}' or script '{self.script_to_run}'")

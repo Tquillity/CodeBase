@@ -165,7 +165,8 @@ def test_init(gui: RepoPromptGUI) -> None:
 def test_load_recent_folders(gui: RepoPromptGUI) -> None:
     mock_file = mock_open(read_data="folder1\nfolder2\n")
     with patch('builtins.open', mock_file), \
-         patch('os.path.exists', return_value=True):
+         patch('os.path.exists', return_value=True), \
+         patch('os.path.isdir', return_value=True):
         folders = gui.load_recent_folders()
         assert folders == ["folder1", "folder2"]
 
@@ -193,7 +194,7 @@ def test_update_recent_folders(gui: RepoPromptGUI) -> None:
 
     with patch('os.path.exists', return_value=True), patch('os.path.isdir', return_value=True):
         for i in range(25):
-            gui.update_recent_folders(f"/repo/folder{i}")
+            gui.update_recent_folders(f"/repo/path{i}")
     assert len(gui.recent_folders) == 20
 
 def test_select_repo(gui: RepoPromptGUI) -> None:

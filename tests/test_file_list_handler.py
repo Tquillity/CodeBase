@@ -14,6 +14,7 @@ def mock_gui():
     gui.settings = MagicMock()
     gui.settings.get.return_value = "Markdown (Grok)"
     gui._shutdown_requested = False
+    gui._scan_cancel_requested = False
     # Make the task_queue.put method call the callback directly for testing
     def mock_put(task):
         if isinstance(task, tuple) and len(task) == 2:
@@ -51,7 +52,7 @@ def test_generate_list_content_success(temp_repo, mock_gui):
     token_counts = []
     errors_list = []
 
-    def completion_callback(content, token_count, errors):
+    def completion_callback(content, token_count, errors, deleted_files=None):
         generated_contents.append(content)
         token_counts.append(token_count)
         errors_list.extend(errors)
@@ -83,17 +84,21 @@ def test_generate_list_content_with_missing_file(temp_repo, mock_gui):
 
     generated_contents = []
     errors_list = []
+    deleted_list = []
 
-    def completion_callback(content, token_count, errors):
+    def completion_callback(content, token_count, errors, deleted_files=None):
         generated_contents.append(content)
         errors_list.extend(errors)
+        if deleted_files:
+            deleted_list.extend(deleted_files)
 
     generate_list_content(mock_gui, files_to_copy, temp_dir, lock, completion_callback, content_cache, list_read_errors)
 
     time.sleep(0.5)
 
     assert generated_contents[0] == ""
-    assert "Not Found: " in errors_list[0]
+    # Missing file is reported in deleted_files (or read_errors in older behavior)
+    assert deleted_list or (errors_list and "Not Found: " in errors_list[0])
 
 def test_generate_list_content_threading(mock_gui):
     # Test that it starts a thread

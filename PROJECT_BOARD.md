@@ -48,7 +48,7 @@ python3 main.py
 ✅ **#3 Full type hints + mypy --strict** — Comprehensive type hints across core modules (constants, exceptions, path_utils, lru_cache, settings, security, error_handler, content_manager, file_scanner); handlers and tabs started; `mypy.ini` with strict + explicit_package_bases; external libs use `# type: ignore[import-untyped]` where stubs missing.
 
 ## Changelog
-- **7.1.0** — SQLite Knowledge Graph, persistent copy history, knapsack-style optimal prompt building, and local module recommendations (Insights panel). Grok API removed; local heuristics retained.
+- **7.1.0** — SQLite Knowledge Graph, persistent copy history, knapsack-style optimal prompt building, and local module recommendations (Insights panel). Git Status panel selection checkboxes (selective copy for staged/unstaged files). Grok API removed; local heuristics retained.
 - **7.0.0** — Module Analysis Sprint 2: hierarchical clusters, dendrogram, Select This Cluster.
 - **6.9.0** — Module Analysis multi-language: regex-based imports for Python, JS/TS, Rust, Java, C/C++, Go, etc.; folder-as-module heuristic; in-degree centrality impact.
 - **6.8.0** — Sprint 1: Module Analysis tab (dependency graph, impact scores, Select This Module).
@@ -56,6 +56,7 @@ python3 main.py
 - **6.6.0** — Toast notifications; Git Status panel; deleted-file handling; Cancel during preview.
 
 ## Next (optional)
+- Sprint 4: Cross-Repository Semantic Search (local embeddings).
 - Further "Offline Intelligence" features; optional UI polish.
 
 ## Key Files

@@ -41,7 +41,9 @@ class GitHandler:
             )
             return result.stdout
         except subprocess.CalledProcessError as e:
-            # git command returned non-zero exit code
+            err = (e.stderr or "")
+            if "bad revision 'HEAD'" in err or "ambiguous argument 'HEAD'" in err:
+                return "No commits yet. Initial commit pending."
             raise RepositoryError(f"Git command failed: {e.stderr}", repo_path=repo_path)
         except FileNotFoundError:
             # git executable not found
@@ -155,22 +157,22 @@ class GitHandler:
             return {'staged': [], 'changes': [], 'staged_deleted': set(), 'changes_deleted': set(), 'branch': 'error'}
 
     def copy_staged_changes(self) -> None:
-        """Copy full content of all staged files (formatted)."""
-        status = self.get_git_status()
+        """Copy full content of staged files that are currently selected (☑) in the Git Status panel."""
         gui = cast("RepoPromptGUI", self.gui)
-        if not status['staged']:
-            gui.show_status_message("No staged changes to copy", error=True)
+        paths = gui.git_panel.get_selected_staged_paths()
+        if not paths:
+            gui.show_status_message("No staged files selected to copy", error=True)
             return
-        self._copy_file_list(status['staged'], "Staged Changes")
+        self._copy_file_list(paths, "Staged Changes")
 
     def copy_unstaged_changes(self) -> None:
-        """Copy full content of all unstaged changes."""
-        status = self.get_git_status()
+        """Copy full content of unstaged change files that are currently selected (☑) in the Git Status panel."""
         gui = cast("RepoPromptGUI", self.gui)
-        if not status['changes']:
-            gui.show_status_message("No unstaged changes to copy", error=True)
+        paths = gui.git_panel.get_selected_changes_paths()
+        if not paths:
+            gui.show_status_message("No unstaged files selected to copy", error=True)
             return
-        self._copy_file_list(status['changes'], "Unstaged Changes")
+        self._copy_file_list(paths, "Unstaged Changes")
 
     def _copy_file_list(self, file_paths: list[str], title: str) -> None:
         """Shared helper — uses existing content pipeline (threaded)."""

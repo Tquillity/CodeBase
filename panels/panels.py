@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import os
+from typing import TYPE_CHECKING, Any, List, Set
 
 import tkinter as tk
 import ttkbootstrap as ttk
@@ -280,11 +281,20 @@ class RightPanel(ttk.Frame):
         self.gui.notebook.add(self.gui.file_list_tab, text="File List Selection")
 
 
+CHECKED = "☑ "
+UNCHECKED = "☐ "
+
 class GitStatusPanel(ttk.Frame):
     """Dedicated right sidebar for Git Status (VSCode-style). Full height, collapsible sections."""
     gui: RepoPromptGUI
     _staged_expanded: bool
     _changes_expanded: bool
+    _staged_paths: List[str]
+    _changes_paths: List[str]
+    _staged_selected: Set[str]
+    _changes_selected: Set[str]
+    _staged_deleted: Set[str]
+    _changes_deleted: Set[str]
     git_branch_label: ttk.Label
     staged_label: ttk.Label
     staged_body: ttk.Frame
@@ -304,7 +314,71 @@ class GitStatusPanel(ttk.Frame):
         self.config(width=240)
         self._staged_expanded = True
         self._changes_expanded = True
+        self._staged_paths = []
+        self._changes_paths = []
+        self._staged_selected = set()
+        self._changes_selected = set()
+        self._staged_deleted = set()
+        self._changes_deleted = set()
         self.setup_ui()
+
+    def _staged_item_display(self, path: str) -> str:
+        cb = CHECKED if path in self._staged_selected else UNCHECKED
+        prefix = "D " if path in self._staged_deleted else "• "
+        return f"{cb}{prefix}{os.path.basename(path)}"
+
+    def _changes_item_display(self, path: str) -> str:
+        cb = CHECKED if path in self._changes_selected else UNCHECKED
+        prefix = "D " if path in self._changes_deleted else "• "
+        return f"{cb}{prefix}{os.path.basename(path)}"
+
+    def set_staged(self, paths: List[str], deleted: Set[str]) -> None:
+        """Set staged file list; default all to selected (☑). Preserves D (deleted) markers."""
+        self._staged_paths = list(paths)
+        self._staged_deleted = set(deleted)
+        self._staged_selected = set(paths)
+        self.staged_list.delete(0, tk.END)
+        for path in self._staged_paths:
+            self.staged_list.insert(tk.END, self._staged_item_display(path))
+
+    def set_changes(self, paths: List[str], deleted: Set[str]) -> None:
+        """Set unstaged changes list; default all to selected (☑). Preserves D (deleted) markers."""
+        self._changes_paths = list(paths)
+        self._changes_deleted = set(deleted)
+        self._changes_selected = set(paths)
+        self.changes_list.delete(0, tk.END)
+        for path in self._changes_paths:
+            self.changes_list.insert(tk.END, self._changes_item_display(path))
+
+    def _on_staged_click(self, event: tk.Event[Any]) -> None:
+        idx = self.staged_list.nearest(event.y)  # type: ignore[no-untyped-call]
+        if idx < 0 or idx >= len(self._staged_paths):
+            return
+        path = self._staged_paths[idx]
+        if path in self._staged_selected:
+            self._staged_selected.discard(path)
+        else:
+            self._staged_selected.add(path)
+        self.staged_list.delete(idx)
+        self.staged_list.insert(idx, self._staged_item_display(path))
+
+    def _on_changes_click(self, event: tk.Event[Any]) -> None:
+        idx = self.changes_list.nearest(event.y)  # type: ignore[no-untyped-call]
+        if idx < 0 or idx >= len(self._changes_paths):
+            return
+        path = self._changes_paths[idx]
+        if path in self._changes_selected:
+            self._changes_selected.discard(path)
+        else:
+            self._changes_selected.add(path)
+        self.changes_list.delete(idx)
+        self.changes_list.insert(idx, self._changes_item_display(path))
+
+    def get_selected_staged_paths(self) -> List[str]:
+        return [p for p in self._staged_paths if p in self._staged_selected]
+
+    def get_selected_changes_paths(self) -> List[str]:
+        return [p for p in self._changes_paths if p in self._changes_selected]
 
     def _toggle_staged(self) -> None:
         self._staged_expanded = not self._staged_expanded
@@ -385,8 +459,9 @@ class GitStatusPanel(ttk.Frame):
         staged_sb.config(command=self.staged_list.yview)
         self.staged_list.grid(row=0, column=0, sticky="nsew")
         staged_sb.grid(row=0, column=1, sticky="ns")
+        self.staged_list.bind("<Button-1>", self._on_staged_click)
         self.staged_list_frame.bind("<Configure>", self._on_staged_configure)
-        ttk.Button(self.staged_body, text="Copy All Staged", bootstyle="success-outline",
+        ttk.Button(self.staged_body, text="Copy Selected Staged", bootstyle="success-outline",
                    command=self.gui.copy_staged_changes).grid(row=1, column=0, sticky="ew", pady=(2, 6), padx=4)
         self.staged_body.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(row, weight=1)
@@ -418,8 +493,9 @@ class GitStatusPanel(ttk.Frame):
         changes_sb.config(command=self.changes_list.yview)
         self.changes_list.grid(row=0, column=0, sticky="nsew")
         changes_sb.grid(row=0, column=1, sticky="ns")
+        self.changes_list.bind("<Button-1>", self._on_changes_click)
         self.changes_list_frame.bind("<Configure>", self._on_changes_configure)
-        ttk.Button(self.changes_body, text="Copy All Changes", bootstyle="warning-outline",
+        ttk.Button(self.changes_body, text="Copy Selected Changes", bootstyle="warning-outline",
                    command=self.gui.copy_unstaged_changes).grid(row=1, column=0, sticky="ew", pady=(2, 6), padx=4)
         self.changes_body.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(row, weight=1)

@@ -256,21 +256,24 @@ class ContentTab(ttk.Frame):
                     # Cap at 500KB for highlighting to prevent freeze
                     if len(content) < 500 * 1024:
                         tokens = self._highlight_code(content, rel_path)
+                        current_tag = None
+                        current_text: list[str] = []
                         for token_type, token_text in tokens:
-                            # Map specific token types to generic ones if needed
                             tag = str(token_type)
                             while tag not in syntax_colors and token_type.parent:
                                 token_type = token_type.parent
                                 tag = str(token_type)
-                            
                             if tag not in syntax_colors:
                                 tag = str(Token.Text)
-                                
-                            self.content_text.insert(tk.END, token_text, (content_tag, tag))
-                            
-                            # Periodic update for responsiveness
-                            if len(token_text) > 1000:
-                                self.update_idletasks()
+                            if tag == current_tag:
+                                current_text.append(token_text)
+                            else:
+                                if current_text:
+                                    self.content_text.insert(tk.END, "".join(current_text), (content_tag, current_tag))
+                                current_tag = tag
+                                current_text = [token_text]
+                        if current_text:
+                            self.content_text.insert(tk.END, "".join(current_text), (content_tag, current_tag))
                     else:
                         # Fallback for large files
                         self._insert_content_chunked(content, content_tag)

@@ -211,26 +211,16 @@ class FileListTab(ttk.Frame):
         # Ensure text area remains editable after loading
         # ttkbootstrap ScrolledText is always editable
 
-    def _paste_text(self, event: Optional[tk.Event[Any]] = None) -> None:
+    def _paste_text(self, event: Optional[tk.Event[Any]] = None) -> Optional[str]:
         """Handle paste operation for the text widget."""
         try:
-            # Ensure the widget is in normal state for editing
-            # ttkbootstrap ScrolledText is always editable
-            
-            # Get clipboard content
             clipboard_content = self.file_list_text.clipboard_get()
-            
-            # Insert at cursor position
             self.file_list_text.insert(tk.INSERT, clipboard_content)
-            
-            # Keep widget editable
-            # ttkbootstrap ScrolledText is always editable
-            
         except tk.TclError:
-            # Clipboard might be empty or contain non-text data
             pass
         except Exception as e:
             logging.warning(f"Error pasting text: {e}")
+        return "break"
 
     def _show_context_menu(self, event: tk.Event[Any]) -> None:
         """Show right-click context menu for text editing."""
@@ -242,29 +232,32 @@ class FileListTab(ttk.Frame):
         finally:
              self.context_menu.grab_release()
 
-    def _cut_text(self) -> None:
+    def _cut_text(self, event: Optional[tk.Event[Any]] = None) -> Optional[str]:
         """Cut selected text to clipboard."""
         try:
             if self.file_list_text.selection_get():
                 self._copy_text()
                 self.file_list_text.delete(tk.SEL_FIRST, tk.SEL_LAST)
         except tk.TclError:
-            pass  # No text selected
+            pass
+        return "break"
 
-    def _copy_text(self) -> None:
+    def _copy_text(self, event: Optional[tk.Event[Any]] = None) -> Optional[str]:
         """Copy selected text to clipboard."""
         try:
             if self.file_list_text.selection_get():
                 self.file_list_text.clipboard_clear()
                 self.file_list_text.clipboard_append(self.file_list_text.selection_get())
         except tk.TclError:
-            pass  # No text selected
+            pass
+        return "break"
 
-    def _select_all(self) -> None:
+    def _select_all(self, event: Optional[tk.Event[Any]] = None) -> Optional[str]:
         """Select all text in the widget."""
         self.file_list_text.tag_add(tk.SEL, "1.0", tk.END)
         self.file_list_text.mark_set(tk.INSERT, "1.0")
         self.file_list_text.see(tk.INSERT)
+        return "break"
 
     def _clear_text(self) -> None:
         """Clear all text in the widget."""
@@ -279,7 +272,7 @@ class FileListTab(ttk.Frame):
             return
         self.gui.show_loading_state("Preparing list content for clipboard...")
         prompt = self.gui.base_prompt_tab.base_prompt_text.get("1.0", tk.END).strip() if self.gui.prepend_var.get() else ""
-        def completion_callback(content: str, token_count: int, errors: List[str]) -> None:
+        def completion_callback(content: str, token_count: int, errors: List[str], deleted_files: List[str] | None = None) -> None:
             self.gui.copy_handler._handle_copy_completion_final(prompt=prompt, content=content, structure=None, errors=errors,
                                                 status_message="Copied from file list" if not errors else "Copy failed with errors")
         # FIX: Pass self.gui to generate_list_content for queue access

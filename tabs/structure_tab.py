@@ -103,6 +103,7 @@ class StructureTab(ttk.Frame):
         self.tree.bind('<<TreeviewOpen>>', self.handle_tree_open)
         
         self.filter_timer = None
+        self._saved_expansion_state: set[str] = set()
 
     def _on_filter_change(self, event: tk.Event[Any]) -> None:
         """Debounce filter input."""
@@ -112,7 +113,15 @@ class StructureTab(ttk.Frame):
         
     def _apply_filter(self) -> None:
         query = self.filter_var.get().strip()
-        self.file_handler.apply_filter(query)
+        if query:
+            if not self._saved_expansion_state:
+                self._saved_expansion_state = self.gui.repo_handler.get_tree_expansion_state()
+            self.file_handler.apply_filter(query)
+        else:
+            self.file_handler.apply_filter("")
+            if self.gui.current_repo_path and self._saved_expansion_state:
+                self.gui.repo_handler.apply_tree_expansion_state(self._saved_expansion_state)
+                self._saved_expansion_state = set()
 
 
     def populate_tree(self, root_dir: str) -> None:

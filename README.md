@@ -11,6 +11,7 @@ CodeBase is a Linux desktop application that scans a local source repository, le
 - **Module Analysis** — Multi-language dependency graph (Python, JavaScript/TypeScript, Rust, Java, C/C++, Go, etc.): regex-based import detection, folder-as-module grouping, impact scores (in-degree centrality), hierarchical clustering, and one-click selection of modules or clusters in the file tree
 - **Persistent Knowledge Graph** — SQLite-backed memory of repos, clusters, and copy history (path hashes only) for local recommendations without external APIs
 - **Optimal Prompt Builder** — Knapsack-style selection of highest-impact files within a token budget (e.g. 80% of max content length) for efficient LLM prompting
+- **Selective Git Copy** — Choose specific staged or unstaged files to include in prompts (checkboxes in the Git Status panel)
 - Content preview with syntax highlighting
 - Copy selected content / structure to clipboard
 - Live reload utility for development (`live_reload.py`)

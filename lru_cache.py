@@ -28,7 +28,7 @@ class ThreadSafeLRUCache:
         """
         self.max_size: int = max_size
         self.max_memory_bytes: int = max_memory_mb * 1024 * 1024
-        self.cache: OrderedDict[str, Any] = OrderedDict()
+        self.cache: OrderedDict[str, Any] = OrderedDict[str, Any]()
         self.lock: threading.RLock = threading.RLock()
         self.current_memory_bytes: int = 0
 
