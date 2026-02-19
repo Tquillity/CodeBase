@@ -13,6 +13,8 @@ from constants import (
     CACHE_MAX_MEMORY_MB,
     CACHE_MAX_SIZE,
     FILE_SEPARATOR,
+    MAX_CONTENT_LENGTH,
+    MAX_PROMPT_TOKEN_BUDGET_PERCENT,
     TREE_SAFETY_LIMIT,
     TREE_UI_UPDATE_INTERVAL,
     TEXT_EXTENSIONS_DEFAULT,
@@ -21,6 +23,7 @@ from error_handler import handle_error, safe_execute
 from exceptions import FileOperationError, ThreadingError, UIError
 from file_scanner import is_ignored_path, is_text_file
 from lru_cache import ThreadSafeLRUCache
+from module_analyzer import compute_optimal_prompt_paths
 from path_utils import is_same_path, normalize_for_cache
 
 if TYPE_CHECKING:
@@ -37,7 +40,7 @@ class FileHandler:
     scanned_text_files: set[str]
     ignore_patterns: list[str]
     recent_folders: list[str]
-    content_cache: Any  # ThreadSafeLRUCache (no Generic in lru_cache)
+    content_cache: ThreadSafeLRUCache
     lock: threading.Lock
     read_errors: list[str]
     _expanding_items: set[str]
@@ -364,6 +367,24 @@ class FileHandler:
         Reuses the same logic as select_files_by_paths (cluster = list of file paths).
         """
         self.select_files_by_paths(cluster_paths)
+
+    def build_optimal_prompt(
+        self,
+        module_to_abs_paths: dict[str, list[str]],
+        centrality: dict[str, float],
+    ) -> list[str]:
+        """
+        Return a minimal, highest-value set of file paths (knapsack-style by impact, within content budget).
+        Uses up to MAX_PROMPT_TOKEN_BUDGET_PERCENT of MAX_CONTENT_LENGTH. Call from Module Analysis after analysis.
+        """
+        if not module_to_abs_paths or not centrality:
+            return []
+        max_bytes = (MAX_CONTENT_LENGTH * MAX_PROMPT_TOKEN_BUDGET_PERCENT) // 100
+        return compute_optimal_prompt_paths(
+            module_to_abs_paths,
+            centrality,
+            max_bytes,
+        )
 
     def _update_folder_selection_recursive(self, item_id: str, selected: bool) -> bool:
         gui = cast("RepoPromptGUI", self.gui)

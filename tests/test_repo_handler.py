@@ -71,7 +71,7 @@ def test_select_repo_success(repo_handler, mock_gui):
             repo_handler.select_repo()
             mock_gui.update_recent_folders.assert_called_with("/selected")
             mock_clear.assert_called_with(clear_ui=True)
-            mock_gui.show_loading_state.assert_called_with("Scanning selected...", show_cancel=True)
+            mock_gui.show_loading_state.assert_called_with("Scanning repository...", show_cancel=True)
             mock_load.assert_called_with("/selected", mock_gui._queue_loading_progress, repo_handler._handle_load_completion)
 
 def test_refresh_repo_no_path(repo_handler, mock_gui):
@@ -86,7 +86,7 @@ def test_refresh_repo_success(repo_handler, mock_gui):
          patch.object(mock_gui.file_handler.content_cache, 'clear'), \
          patch.object(repo_handler, 'load_repo') as mock_load:
         repo_handler.refresh_repo()
-        mock_gui.show_loading_state.assert_called_with("Refreshing repo...", show_cancel=True)
+        mock_gui.show_loading_state.assert_called_with("Refreshing repository...", show_cancel=True)
         mock_load.assert_called_with("/repo", mock_gui._queue_loading_progress, ANY)  # refresh_completion lambda
 
 def test_handle_load_completion_success(repo_handler, mock_gui):

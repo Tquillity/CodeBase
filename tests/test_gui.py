@@ -212,7 +212,7 @@ def test_select_repo(gui: RepoPromptGUI) -> None:
             gui.repo_handler.select_repo()
             mock_dialog.assert_called()
             # FIX: Change assertion to match the actual implementation string.
-            mock_show_loading.assert_called_with("Scanning folder...", show_cancel=True)
+            mock_show_loading.assert_called_with("Scanning repository...", show_cancel=True)
             mock_load_repo.assert_called_with("/selected/folder", gui.show_status_message, ANY)
 
 def test_refresh_repo(gui: RepoPromptGUI) -> None:
@@ -223,12 +223,10 @@ def test_refresh_repo(gui: RepoPromptGUI) -> None:
          patch.object(gui.repo_handler, 'get_tree_expansion_state', return_value=set()), \
          patch.object(gui.file_handler, 'content_cache', new_callable=MagicMock), \
          patch.object(gui.repo_handler, 'load_repo') as mock_load_repo:
-        
-        gui.file_handler.content_cache.clear = MagicMock()
-        
+        # content_cache is patched with MagicMock; its .clear is already a MagicMock
         gui.repo_handler.refresh_repo()
-        mock_show_loading.assert_called_with("Refreshing repo...", show_cancel=True)
-        mock_load_repo.assert_called_with("/repo", gui.show_status_message, ANY)
+        mock_show_loading.assert_called_with("Refreshing repository...", show_cancel=True)
+        mock_load_repo.assert_called_with("/repo", gui._queue_loading_progress, ANY)
 
 def test_copy_contents(gui: RepoPromptGUI) -> None:
     gui.file_handler.loaded_files = {"file1"}

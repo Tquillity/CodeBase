@@ -13,6 +13,7 @@ from widgets import Tooltip
 from module_analyzer import (
     IMPORT_PATTERNS,
     MAX_GRAPH_NODES,
+    get_recommendations,
     modules_with_impact,
 )
 
@@ -62,9 +63,12 @@ class ModuleAnalysisTab(ttk.Frame):
     _fallback_var: Optional[tk.StringVar]
     _right_placeholder: Optional[Any]
     _right_container: Optional[ttk.Frame]
+    _insights_frame: Optional[Any]
+    _insights_cards_frame: Optional[ttk.Frame]
     _left_empty_label: Optional[ttk.Label]
     _selected_cluster_name: Optional[str]
     select_cluster_btn: ttk.Button
+    build_optimal_prompt_btn: ttk.Button
 
     def __init__(self, parent: tk.Misc, gui: Any) -> None:
         super().__init__(parent)
@@ -81,6 +85,8 @@ class ModuleAnalysisTab(ttk.Frame):
         self._fallback_var = None
         self._right_placeholder = None
         self._right_container = None
+        self._insights_frame = None
+        self._insights_cards_frame = None
         self._left_empty_label = None
         self._selected_cluster_name = None
         self.setup_ui()
@@ -140,20 +146,37 @@ class ModuleAnalysisTab(ttk.Frame):
         self._tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         paned.add(left_frame, weight=1)
 
-        # Right: Graph or fallback text
+        # Right: Graph/fallback + Insights panel
         right_frame = ttk.Frame(paned)
+        content_frame = ttk.Frame(right_frame)
+        content_frame.pack(fill=tk.BOTH, expand=True)
         ph = ttk.Label(
-            right_frame,
+            content_frame,
             text="Click 'Analyze Repository' to build the dependency graph.",
             font=("Arial", 10),
         )
         ph.pack(expand=True)
+        insights_frame = ttk.Labelframe(right_frame, text="Insights")
+        insights_frame.pack(fill=tk.X, pady=(4, 0), padx=2)
+        self._build_optimal_prompt_btn = self.gui.create_button(
+            insights_frame,
+            "Build Optimal Prompt",
+            self._on_build_optimal_prompt,
+            "Auto-select highest-impact files within content budget (80%)",
+            state=tk.DISABLED,
+        )
+        self._build_optimal_prompt_btn.pack(pady=(4, 4))
+        Tooltip(self._build_optimal_prompt_btn, "Select minimal, highest-value set of files for prompting")
+        self._insights_cards_frame = ttk.Frame(insights_frame)
+        self._insights_cards_frame.pack(fill=tk.BOTH, expand=True)
         paned.add(right_frame, weight=2)
 
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
         self._right_placeholder = ph
-        self._right_container = right_frame
-        self._left_empty_label: Optional[ttk.Label] = None
+        self._right_container = content_frame
+        self._insights_frame = insights_frame
+        self._left_empty_label = None
+        self.build_optimal_prompt_btn = self._build_optimal_prompt_btn
 
     def _on_tree_select(self, event: tk.Event[Any]) -> None:
         self._on_tree_select_impl()
@@ -254,6 +277,16 @@ class ModuleAnalysisTab(ttk.Frame):
         self.gui.show_status_message("Module analysis complete.")
         self._refresh_tree()
         self._show_graph_or_fallback()
+        repo = getattr(self.gui, "current_repo_path", None)
+        if repo and clusters:
+            try:
+                import knowledge_graph as kg
+                kg.record_repo_seen(repo)
+                kg.record_clusters(repo, clusters)
+            except Exception as e:
+                logger.debug("Could not record clusters to knowledge graph: %s", e)
+        self._refresh_insights()
+        self.build_optimal_prompt_btn.config(state=tk.NORMAL)
 
     def _empty_state_message(self) -> str:
         return (
@@ -293,6 +326,7 @@ class ModuleAnalysisTab(ttk.Frame):
             self._right_placeholder = ph
         self.select_module_btn.config(state=tk.DISABLED)
         self.select_cluster_btn.config(state=tk.DISABLED)
+        self.build_optimal_prompt_btn.config(state=tk.DISABLED)
 
     def _refresh_tree(self) -> None:
         if self._left_empty_label:
@@ -509,6 +543,79 @@ class ModuleAnalysisTab(ttk.Frame):
         gui.show_status_message(f"Selected {len(paths)} file(s) from {cname}.")
         gui.notebook.select(1)  # type: ignore[no-untyped-call]
 
+    def _refresh_insights(self) -> None:
+        """Populate Insights panel with recommendation cards from knowledge graph."""
+        if self._insights_cards_frame is None:
+            return
+        for w in self._insights_cards_frame.winfo_children():
+            w.destroy()
+        repo = getattr(self.gui, "current_repo_path", None)
+        if not repo or not os.path.isdir(repo):
+            return
+        gui = cast("RepoPromptGUI", self.gui)
+        current_paths: List[str] = []
+        with gui.file_handler.lock:
+            current_paths = list(gui.file_handler.loaded_files)
+        recs = get_recommendations(repo, current_paths or None)
+        for rec in recs:
+            card = ttk.Frame(self._insights_cards_frame)
+            card.pack(fill=tk.X, pady=2, padx=4)
+            ttk.Label(card, text=rec.get("title", ""), font=("Arial", 9, "bold")).pack(anchor=tk.W)
+            if "description" in rec:
+                ttk.Label(card, text=rec["description"], font=("Arial", 8), wraplength=320).pack(anchor=tk.W)
+            paths = rec.get("paths", [])
+            if paths:
+                def add_paths(p: List[str]) -> None:
+                    def do() -> None:
+                        g = cast("RepoPromptGUI", self.gui)
+                        g.file_handler.select_files_by_paths(p)
+                        g.show_status_message(f"Added {len(p)} file(s) from recommendation.")
+                        g.notebook.select(1)  # type: ignore[no-untyped-call]
+                    gui.task_queue.put((do, ()))
+
+                btn = ttk.Button(card, text="Add to selection", command=lambda p=paths: add_paths(p))
+                btn.pack(anchor=tk.W, pady=(0, 4))
+
+    def _on_build_optimal_prompt(self) -> None:
+        gui = cast("RepoPromptGUI", self.gui)
+        if not self._last_module_to_paths or not self._last_modules:
+            gui.show_status_message("Run Analyze Repository first.", error=True)
+            return
+        # Keys in _last_module_to_paths are module names (e.g. "." for root); display in _last_modules uses "(root)" for root
+        centrality = {}
+        for name, _count, impact in self._last_modules:
+            key = "." if name == "(root)" else name
+            centrality[key] = impact
+        module_to_abs = self._last_module_to_paths
+        self.build_optimal_prompt_btn.config(state=tk.DISABLED)
+
+        def worker() -> None:
+            try:
+                paths = gui.file_handler.build_optimal_prompt(module_to_abs, centrality)
+                self.gui.task_queue.put((self._on_build_optimal_prompt_done, (paths,)))
+            except Exception as e:
+                logger.exception("Build optimal prompt failed")
+                self.gui.task_queue.put((self._on_build_optimal_prompt_error, (str(e),)))
+
+        t = __import__("threading").Thread(target=worker, daemon=True)
+        gui.register_background_thread(t)
+        t.start()
+
+    def _on_build_optimal_prompt_done(self, paths: List[str]) -> None:
+        gui = cast("RepoPromptGUI", self.gui)
+        self.build_optimal_prompt_btn.config(state=tk.NORMAL)
+        if not paths:
+            gui.show_status_message("No files selected (budget or threshold).", error=True)
+            return
+        gui.file_handler.select_files_by_paths(paths)
+        gui.show_status_message(f"Build Optimal Prompt: selected {len(paths)} file(s).")
+        gui.notebook.select(1)  # type: ignore[no-untyped-call]
+
+    def _on_build_optimal_prompt_error(self, message: str) -> None:
+        gui = cast("RepoPromptGUI", self.gui)
+        self.build_optimal_prompt_btn.config(state=tk.NORMAL)
+        gui.show_status_message(f"Build failed: {message}", error=True)
+
     def perform_search(self, query: str, case_sensitive: bool, whole_word: bool) -> List[Any]:
         return []
 
@@ -544,3 +651,7 @@ class ModuleAnalysisTab(ttk.Frame):
             self._right_placeholder = ph
         self.select_module_btn.config(state=tk.DISABLED)
         self.select_cluster_btn.config(state=tk.DISABLED)
+        self.build_optimal_prompt_btn.config(state=tk.DISABLED)
+        if self._insights_cards_frame is not None:
+            for w in self._insights_cards_frame.winfo_children():
+                w.destroy()

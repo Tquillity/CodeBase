@@ -46,7 +46,9 @@ class CopyHandler:
             structure=None,
             errors=errors,
             status_message="Copied selected file contents" if not errors else "Copy failed with errors",
-            deleted_files=deleted_files or []
+            deleted_files=deleted_files or [],
+            files_copied=list(files_to_copy),
+            repo_path=repo_path,
         )
 
         generate_content(files_to_copy, repo_path, gui.file_handler.lock, completion_lambda, gui.file_handler.content_cache, gui.file_handler.read_errors, None, gui, current_format)
@@ -94,16 +96,18 @@ class CopyHandler:
         with gui.file_handler.lock:
             files_to_copy = set(gui.file_handler.loaded_files) if not no_files else set()
 
+        repo_path = gui.current_repo_path
+
         completion_lambda = lambda content, token_count, errors, deleted_files=None: self._handle_copy_completion_final(
             prompt=prompt,
             content=content,
             structure=structure,
             errors=errors,
             status_message="Copied All (Prompt, Content, Structure)" if not errors else "Copy All failed with errors",
-            deleted_files=deleted_files or []
+            deleted_files=deleted_files or [],
+            files_copied=list(files_to_copy) if files_to_copy else None,
+            repo_path=repo_path,
         )
-
-        repo_path = gui.current_repo_path
         if files_to_copy:
             if not repo_path:
                 gui.hide_loading_state()
@@ -111,7 +115,7 @@ class CopyHandler:
                 return
             generate_content(files_to_copy, repo_path, gui.file_handler.lock, completion_lambda, gui.file_handler.content_cache, gui.file_handler.read_errors, None, gui, current_format)
         else:
-            self._handle_copy_completion_final(prompt=prompt, content="", structure=structure, errors=[], status_message="Copied All (Prompt, Structure)", deleted_files=[])
+            self._handle_copy_completion_final(prompt=prompt, content="", structure=structure, errors=[], status_message="Copied All (Prompt, Structure)", deleted_files=[], files_copied=None, repo_path=repo_path)
 
     def _handle_copy_completion_final(
         self,
@@ -121,10 +125,19 @@ class CopyHandler:
         errors: list[str],
         status_message: str,
         deleted_files: Optional[list[str]] = None,
+        files_copied: Optional[list[str]] = None,
+        repo_path: Optional[str] = None,
     ) -> None:
         deleted_files = deleted_files or []
         gui = cast("RepoPromptGUI", self.gui)
         gui.hide_loading_state()
+
+        if not errors and files_copied and repo_path:
+            try:
+                import knowledge_graph as kg
+                kg.record_copy_event(repo_path, files_copied)
+            except Exception:
+                pass
 
         if errors:
             error_msg = "Errors occurred during content preparation for copy."

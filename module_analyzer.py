@@ -336,6 +336,96 @@ def _hierarchical_clusters(
     return result, Z
 
 
+def compute_optimal_prompt_paths(
+    module_to_abs_paths: Dict[str, List[str]],
+    centrality: Dict[str, float],
+    max_bytes: int,
+    impact_threshold: float = 0.0,
+) -> List[str]:
+    """
+    Knapsack-style: select highest-impact modules first, add all their files until max_bytes.
+    Returns list of absolute paths. Does not read file contents; uses file size as proxy for content length.
+    """
+    try:
+        from constants import INTELLIGENT_PROMPT_THRESHOLD
+    except ImportError:
+        INTELLIGENT_PROMPT_THRESHOLD = 0.01
+    thresh = impact_threshold if impact_threshold > 0 else INTELLIGENT_PROMPT_THRESHOLD
+    # (module_display, total_size, paths)
+    module_sizes: List[Tuple[str, int, List[str]]] = []
+    for mod, paths in module_to_abs_paths.items():
+        impact = centrality.get(mod, 0.0)
+        if impact < thresh:
+            continue
+        total = 0
+        for p in paths:
+            try:
+                total += os.path.getsize(p)
+            except OSError:
+                pass
+        if paths:
+            module_sizes.append((mod, total, paths))
+    module_sizes.sort(key=lambda x: (-centrality.get(x[0], 0.0), -x[1], x[0]))
+    out: List[str] = []
+    used = 0
+    for _mod, size, paths in module_sizes:
+        if used + size > max_bytes:
+            break
+        used += size
+        out.extend(paths)
+    return out
+
+
+def get_recommendations(
+    repo_root: str,
+    current_paths: Optional[List[str]] = None,
+    max_often_copied: int = 10,
+    max_high_impact: int = 5,
+    max_similar: int = 5,
+) -> List[Dict[str, Any]]:
+    """
+    Smart local recommendations using knowledge graph (no external AI).
+    Returns list of dicts: {"type": str, "title": str, "paths": List[str]} or {"type", "title", "description"}.
+    paths are absolute for current repo.
+    """
+    try:
+        import knowledge_graph as kg
+    except ImportError:
+        return []
+    recs: List[Dict[str, Any]] = []
+    current_hashes = []
+    if current_paths:
+        for p in current_paths:
+            current_hashes.append(kg.path_hash(p))
+    often = kg.get_files_often_copied_together(repo_root, current_hashes, limit=max_often_copied)
+    if often:
+        paths_abs = [os.path.join(repo_root, rel) for rel in often if not rel.startswith("..")]
+        paths_abs = [p for p in paths_abs if os.path.isfile(p)]
+        if paths_abs:
+            recs.append({
+                "type": "often_copied",
+                "title": "Files often copied together",
+                "paths": paths_abs,
+            })
+    high_impact = kg.get_high_impact_cluster_names_from_history(repo_root, limit=max_high_impact)
+    if high_impact:
+        recs.append({
+            "type": "high_impact_clusters",
+            "title": "High-impact clusters (from history)",
+            "description": ", ".join(f"{n} ({i:.2f})" for n, i in high_impact[:5]),
+        })
+    if current_paths:
+        # "Similar clusters from other repos" — use first path to guess a cluster name or use "current selection"
+        similar = kg.get_similar_clusters_from_other_repos(repo_root, "Cluster 1", limit=max_similar)
+        if similar:
+            recs.append({
+                "type": "similar_clusters",
+                "title": "Similar clusters in other repos",
+                "description": f"{len(similar)} repo(s) have matching cluster pattern.",
+            })
+    return recs
+
+
 def modules_with_impact(
     repo_root: str,
     enabled_extensions: Optional[Set[str]] = None,

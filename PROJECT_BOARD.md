@@ -1,6 +1,6 @@
 # CodeBase - Project Board
 
-**Version 6.9.0** — A Linux desktop tool for preparing codebase content for LLM prompts and code reviews. Scan repositories, select files, preview combined content, and copy to clipboard with one click.
+**Version 7.1.0** — A Linux desktop tool for preparing codebase content for LLM prompts and code reviews. Scan repositories, select files, preview combined content, and copy to clipboard with one click.
 
 ## Overview
 Linux desktop application for scanning local repositories, selecting files, and copying combined content to clipboard for LLM prompts and code reviews.
@@ -36,7 +36,9 @@ python3 main.py
 ✅ Core functionality complete  
 ✅ Test suite available (`pytest`)  
 ✅ Security checks implemented (`security.py`)  
-✅ Settings management (`settings.py`)
+✅ Settings management (`settings.py`)  
+✅ **Sprint 2: Hierarchical Clustering** — scipy-based clustering, dendrogram, Select This Cluster.  
+✅ **Sprint 3: Knowledge Graph & Intelligent Prompt Builder** — SQLite persistent memory, knapsack-style optimal prompt, local recommendations (Insights panel).
 
 ## Quick Polish (Priority)
 ✅ **#7 Toast Notifications** — Modern, non-blocking toast notifications (success / info / warning / error); thread-safe via task_queue; replaced blocking messagebox for errors/warnings where appropriate.
@@ -46,14 +48,15 @@ python3 main.py
 ✅ **#3 Full type hints + mypy --strict** — Comprehensive type hints across core modules (constants, exceptions, path_utils, lru_cache, settings, security, error_handler, content_manager, file_scanner); handlers and tabs started; `mypy.ini` with strict + explicit_package_bases; external libs use `# type: ignore[import-untyped]` where stubs missing.
 
 ## Changelog
-- **6.9.0** — Module Analysis multi-language: regex-based imports for Python, JS/TS, Rust, Java, C/C++, Go, etc.; folder-as-module heuristic; respects Settings text extensions; empty-state message when no supported files; in-degree centrality impact.
-- **6.8.0** — Sprint 1 ✅ Done: Module Analysis tab (Python dependency graph, impact scores, Select This Module → main tree + preview).
-- **6.7.0** — Full type hints (mypy --strict) on core modules; version bump for code quality gate.
-- **6.6.0** — Toast notifications (non-blocking); Git Status panel full-height + collapsible sections; graceful deleted/missing file handling (preview + copy); Cancel during preview + contextual loading messages; QC-audited.
+- **7.1.0** — SQLite Knowledge Graph, persistent copy history, knapsack-style optimal prompt building, and local module recommendations (Insights panel). Grok API removed; local heuristics retained.
+- **7.0.0** — Module Analysis Sprint 2: hierarchical clusters, dendrogram, Select This Cluster.
+- **6.9.0** — Module Analysis multi-language: regex-based imports for Python, JS/TS, Rust, Java, C/C++, Go, etc.; folder-as-module heuristic; in-degree centrality impact.
+- **6.8.0** — Sprint 1: Module Analysis tab (dependency graph, impact scores, Select This Module).
+- **6.7.0** — Full type hints (mypy --strict) on core modules.
+- **6.6.0** — Toast notifications; Git Status panel; deleted-file handling; Cancel during preview.
 
 ## Next (optional)
-- Complete mypy --strict on remaining files (file_handler, gui, panels, widgets, tests).
-- When typing `gui.py`: wrap all handler/tab imports in `if TYPE_CHECKING:` to avoid circular imports.
+- Further "Offline Intelligence" features; optional UI polish.
 
 ## Key Files
 - `main.py` - Application entry point

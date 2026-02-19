@@ -36,7 +36,7 @@ TEXT_EXTENSIONS_DEFAULT = {
 FILE_SEPARATOR = "===FILE_SEPARATOR===\n"
 
 # Application version
-VERSION = "7.0.0"
+VERSION = "7.1.0"
 
 # Cache configuration
 CACHE_MAX_SIZE = 1000  # Maximum number of cached files
@@ -79,6 +79,12 @@ TREE_SAFETY_LIMIT = 10000  # Safety limit to prevent infinite loops
 MAX_CLUSTER_SIZE = 50  # Max modules per cluster for display; larger clusters are still computed
 CLUSTER_IMPACT_THRESHOLD = 0.0  # Min aggregate impact to show cluster (sum of in-degree centrality)
 CLUSTER_DISCONNECTED_DISTANCE = 1000.0  # Distance assigned between disconnected components for linkage
+
+# Sprint 3 — Intelligent Prompt Builder + Cross-Repository Memory
+KNOWLEDGE_DB_FILENAME = "knowledge.db"  # SQLite DB under appdirs user_data_dir (CodeBase)
+INTELLIGENT_PROMPT_THRESHOLD = 0.01  # Min in-degree centrality to consider a module for optimal prompt
+MAX_PROMPT_TOKEN_BUDGET_PERCENT = 80  # Use up to 80% of MAX_CONTENT_LENGTH for file content (rest for Base Prompt + Structure)
+RECOMMENDATION_HISTORY_DAYS = 90  # How many days of copy/selection history to use for recommendations
 
 # UI Configuration
 LEGENDARY_GOLD = "#FFD700"
