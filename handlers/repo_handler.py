@@ -22,6 +22,7 @@ from exceptions import FileOperationError, RepositoryError, SecurityError
 from file_scanner import is_text_file, parse_gitignore, yield_repo_files
 from lru_cache import ThreadSafeLRUCache
 from path_utils import normalize_for_cache
+from security import is_repo_path_allowed
 from widgets import FolderDialog
 
 if TYPE_CHECKING:
@@ -213,15 +214,31 @@ class RepoHandler:
 
             start_time = time.time()
             abs_path = os.path.abspath(folder)
-            if not os.path.commonpath([abs_path, os.path.expanduser("~")]).startswith(os.path.expanduser("~")):
+            is_allowed, allowed_roots = is_repo_path_allowed(
+                abs_path,
+                self.gui.settings,
+            )
+            if not is_allowed:
                 error = SecurityError(
-                    "Access outside user directory is not allowed",
+                    "Access outside allowed repository roots is not allowed",
                     attempted_path=abs_path,
-                    details={"user_home": os.path.expanduser("~"), "attempted_path": abs_path}
+                    details={
+                        "allowed_roots": allowed_roots,
+                        "attempted_path": abs_path,
+                    }
                 )
                 if ERROR_HANDLING_ENABLED:
                     handle_error(error, "_scan_repo_worker", show_ui=True)
-                self.gui.task_queue.put((completion_callback, (None, None, set(), set(), ["Security Error: Access outside user directory is not allowed."])))
+                self.gui.task_queue.put((
+                    completion_callback,
+                    (
+                        None,
+                        None,
+                        set(),
+                        set(),
+                        ["Security Error: Access outside allowed repository roots is not allowed."],
+                    ),
+                ))
                 return
             repo_path = abs_path
             ignore_patterns = parse_gitignore(os.path.join(repo_path, '.gitignore'))

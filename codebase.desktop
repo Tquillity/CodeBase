@@ -1,7 +1,7 @@
 [Desktop Entry]
-Version=6.6.0
-Name=CodeBase v6.6.0
-Comment=Code repository browser and file manager
+Version=7.2.0
+Name=CodeBase v7.2.0
+Comment=Code repository browser and file manager (v7.2.0)
 Exec=/home/digislinger/.local/bin/CodeBase
 Icon=codebase
 Type=Application

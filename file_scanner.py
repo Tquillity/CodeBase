@@ -12,6 +12,7 @@ from path_utils import get_relative_path, normalize_path
 from exceptions import RepositoryError, SecurityError
 from error_handler import handle_error
 from constants import ERROR_HANDLING_ENABLED, MAX_FILE_SIZE
+from security import is_repo_path_allowed
 
 
 def yield_repo_files(
@@ -42,8 +43,17 @@ def scan_repo(
     try:
         start_time = time.time()
         abs_path = os.path.abspath(folder)
-        if not os.path.commonpath([abs_path, os.path.expanduser("~")]).startswith(os.path.expanduser("~")):
-            gui.root.after(0, completion_callback, None, None, set(), set(), ["Security Error: Access outside user directory is not allowed."])
+        is_allowed, _ = is_repo_path_allowed(abs_path, getattr(gui, "settings", None))
+        if not is_allowed:
+            gui.root.after(
+                0,
+                completion_callback,
+                None,
+                None,
+                set(),
+                set(),
+                ["Security Error: Access outside allowed repository roots is not allowed."],
+            )
             return
 
         repo_path = abs_path
