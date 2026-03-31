@@ -17,6 +17,8 @@ def test_load_settings_defaults(temp_settings_file):
     settings = manager.load_settings()
     assert settings['app']['prepend_prompt'] == 1
     assert settings['app']['exclude_files']['package-lock.json'] == 1
+    assert os.path.expanduser("~") in settings['app']['allowed_repo_roots']
+    assert "/mnt/Storage" in settings['app']['allowed_repo_roots']
 
 def test_load_settings_from_file(temp_settings_file):
     with open(temp_settings_file, 'w') as f:

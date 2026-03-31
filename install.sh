@@ -145,6 +145,12 @@ if [ "$INSTALL_DESKTOP" = true ]; then
     EXEC_DEST_ESCAPED=$(printf '%s\n' "$WRAPPER_SCRIPT_DEST" | sed 's@[&/@\]@\\&@g')
     ICON_DEST_ESCAPED=$(printf '%s\n' "$APP_NAME" | sed 's@[&/@\]@\\&@g')
 
+    # Version for Arc Menu / Dash (Name and Comment show in menu and mouse-over tooltip)
+    VERSION=$(python3 -c "import sys; sys.path.insert(0, \"$SOURCE_DIR\"); from constants import VERSION as V; print(V)")
+    sed -i "s@^Version=.*@Version=$VERSION@" "$DESKTOP_DEST"
+    sed -i "s@^Name=.*@Name=CodeBase v$VERSION@" "$DESKTOP_DEST"
+    sed -i "s@^Comment=.*@Comment=Code repository browser and file manager (v$VERSION)@" "$DESKTOP_DEST"
+
     sed -i "s@^Exec=.*@Exec=$EXEC_DEST_ESCAPED@" "$DESKTOP_DEST"
     sed -i "s@^Icon=.*@Icon=$ICON_DEST_ESCAPED@" "$DESKTOP_DEST"
     # Add TryExec for robustness

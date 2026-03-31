@@ -66,7 +66,11 @@ class SettingsManager:
                 # URL sanitization settings
                 "sanitize_urls": 0,
                 # Folder selection settings
-                "default_start_folder": os.path.expanduser("~")
+                "default_start_folder": os.path.expanduser("~"),
+                "allowed_repo_roots": [
+                    os.path.expanduser("~"),
+                    "/mnt/Storage",
+                ],
             },
             "repo": {}
         }

@@ -190,6 +190,9 @@ def test_scan_repo_success(caplog, temp_repo, monkeypatch):
     gui = MagicMock()
     progress_callback = MagicMock()
     completion_callback = MagicMock()
+    gui.settings.get.side_effect = (
+        lambda sec, key, default: [temp_dir] if key == 'allowed_repo_roots' else default
+    )
 
     # Mock root.after to execute immediately
     def mock_after(delay, func, *args):
@@ -203,11 +206,6 @@ def test_scan_repo_success(caplog, temp_repo, monkeypatch):
 
     def mock_text(p, g):
         return p.endswith(".txt") or p.endswith(".py")
-
-    def mock_commonpath(paths):
-        return '/home/user/tmp'  # Starts with home
-    monkeypatch.setattr('os.path.commonpath', mock_commonpath)
-    monkeypatch.setattr('os.path.expanduser', lambda x: '/home/user')
 
     with patch('file_scanner.is_ignored_path', mock_ignored), \
          patch('file_scanner.is_text_file', mock_text), \
@@ -234,6 +232,9 @@ def test_scan_repo_security_error():
     gui = MagicMock()
     completion_callback = MagicMock()
     forbidden_path = "/system/root"  # Outside user home
+    gui.settings.get.side_effect = (
+        lambda sec, key, default: ["/home/user", "/mnt/Storage"] if key == 'allowed_repo_roots' else default
+    )
 
     # Mock root.after to execute immediately
     def mock_after(delay, func, *args):
@@ -241,16 +242,53 @@ def test_scan_repo_security_error():
 
     gui.root.after.side_effect = mock_after
 
-    with patch('os.path.expanduser', return_value="/home/user"), \
-         patch('os.path.commonpath', return_value="/system"):
+    scan_repo(forbidden_path, gui, MagicMock(), completion_callback, threading.Lock())
 
-        scan_repo(forbidden_path, gui, MagicMock(), completion_callback, threading.Lock())
+    completion_callback.assert_called_with(
+        None,
+        None,
+        set(),
+        set(),
+        ["Security Error: Access outside allowed repository roots is not allowed."],
+    )
 
-    completion_callback.assert_called_with(None, None, set(), set(), ["Security Error: Access outside user directory is not allowed."])
+
+def test_scan_repo_allows_configured_storage_root():
+    gui = MagicMock()
+    completion_callback = MagicMock()
+    gui.settings.get.side_effect = (
+        lambda sec, key, default: ["/home/user", "/mnt/Storage"] if key == 'allowed_repo_roots' else default
+    )
+
+    def mock_after(delay, func, *args):
+        func(*args)
+
+    gui.root.after.side_effect = mock_after
+
+    with patch('file_scanner.parse_gitignore', return_value=['.git']), \
+         patch('file_scanner.yield_repo_files', return_value=iter(())):
+        scan_repo(
+            "/mnt/Storage/project",
+            gui,
+            MagicMock(),
+            completion_callback,
+            threading.Lock(),
+        )
+
+    completion_callback.assert_called_once_with(
+        "/mnt/Storage/project",
+        ['.git'],
+        set(),
+        set(),
+        [],
+    )
 
 def test_scan_repo_exception(caplog):
     gui = MagicMock()
     completion_callback = MagicMock()
+    gui.settings.get.side_effect = (
+        lambda sec, key, default: ["/fake"] if key == 'allowed_repo_roots' else default
+    )
 
     # Mock root.after to execute immediately
     def mock_after(delay, func, *args):
@@ -258,9 +296,7 @@ def test_scan_repo_exception(caplog):
 
     gui.root.after.side_effect = mock_after
 
-    with patch('os.path.expanduser', return_value="/home/user"), \
-         patch('os.path.commonpath', return_value="/home/user"), \
-         patch('os.walk', side_effect=Exception("Walk error")):
+    with patch('os.walk', side_effect=Exception("Walk error")):
 
         scan_repo("/fake", gui, MagicMock(), completion_callback, threading.Lock())
 

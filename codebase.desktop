@@ -1,6 +1,6 @@
 [Desktop Entry]
-Version=7.1.0
-Name=CodeBase v7.1.0
+Version=7.2.0
+Name=CodeBase v7.2.0
 Comment=Code repository browser and content generator for LLM prompts
 Exec=/home/digislinger/.local/bin/CodeBase
 Icon=CodeBase

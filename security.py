@@ -5,11 +5,64 @@ from __future__ import annotations
 import os
 import re
 import logging
-from typing import List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 from path_utils import normalize_path, is_path_within_base
 from exceptions import SecurityError
 from error_handler import handle_error
 from constants import ERROR_HANDLING_ENABLED
+
+DEFAULT_ALLOWED_REPO_ROOTS = [
+    os.path.expanduser("~"),
+    "/mnt/Storage",
+]
+
+
+def get_allowed_repo_roots(settings_manager: Optional[Any] = None) -> list[str]:
+    """Return normalized absolute repository roots allowed for selection."""
+    configured_roots: Any = DEFAULT_ALLOWED_REPO_ROOTS
+    if settings_manager is not None:
+        try:
+            configured_roots = settings_manager.get(
+                "app",
+                "allowed_repo_roots",
+                DEFAULT_ALLOWED_REPO_ROOTS,
+            )
+        except Exception:
+            configured_roots = DEFAULT_ALLOWED_REPO_ROOTS
+
+    if isinstance(configured_roots, str):
+        candidate_roots = [configured_roots]
+    elif isinstance(configured_roots, (list, tuple, set)):
+        candidate_roots = list(configured_roots)
+    else:
+        candidate_roots = list(DEFAULT_ALLOWED_REPO_ROOTS)
+
+    normalized_roots: list[str] = []
+    for root in candidate_roots:
+        root_str = str(root).strip()
+        if not root_str:
+            continue
+        normalized_root = normalize_path(os.path.abspath(os.path.expanduser(root_str)))
+        if normalized_root not in normalized_roots:
+            normalized_roots.append(normalized_root)
+
+    return normalized_roots or [
+        normalize_path(os.path.abspath(os.path.expanduser(root)))
+        for root in DEFAULT_ALLOWED_REPO_ROOTS
+    ]
+
+
+def is_repo_path_allowed(
+    repo_path: Union[str, os.PathLike[str]],
+    settings_manager: Optional[Any] = None,
+) -> Tuple[bool, list[str]]:
+    """Check whether a repository path is within an allowed root."""
+    normalized_path = normalize_path(os.path.abspath(os.path.expanduser(str(repo_path))))
+    allowed_roots = get_allowed_repo_roots(settings_manager)
+    return any(
+        is_path_within_base(normalized_path, allowed_root)
+        for allowed_root in allowed_roots
+    ), allowed_roots
 
 class SecurityValidator:
     """Comprehensive security validation for file operations and content."""
@@ -264,7 +317,9 @@ class SecurityValidator:
             return content
     
     def validate_repository_access(
-        self, repo_path: Union[str, os.PathLike[str]]
+        self,
+        repo_path: Union[str, os.PathLike[str]],
+        settings_manager: Optional[Any] = None,
     ) -> Tuple[bool, str]:
         """
         Validate repository access for security.
@@ -277,11 +332,16 @@ class SecurityValidator:
         """
         try:
             normalized_path = normalize_path(repo_path)
-            user_home = normalize_path(os.path.expanduser("~"))
-            
-            # Ensure repository is within user's home directory
-            if not is_path_within_base(normalized_path, user_home):
-                return False, f"Repository outside user directory: {repo_path}"
+            is_allowed, allowed_roots = is_repo_path_allowed(
+                normalized_path,
+                settings_manager,
+            )
+
+            if not is_allowed:
+                return False, (
+                    "Repository outside allowed roots: "
+                    f"{repo_path} (allowed: {', '.join(allowed_roots)})"
+                )
             
             # Check for dangerous repository names
             dangerous_names = ['.git', '.svn', '.hg', 'node_modules', '__pycache__']
@@ -355,6 +415,17 @@ def validate_template_file(
 ) -> Tuple[bool, str]:
     """Convenience function to validate template file."""
     return get_security_validator().validate_template_file(file_path)
+
+
+def validate_repository_access(
+    repo_path: Union[str, os.PathLike[str]],
+    settings_manager: Optional[Any] = None,
+) -> Tuple[bool, str]:
+    """Convenience function to validate repository access."""
+    return get_security_validator().validate_repository_access(
+        repo_path,
+        settings_manager,
+    )
 
 def validate_file_size(
     file_path: Union[str, os.PathLike[str]],
