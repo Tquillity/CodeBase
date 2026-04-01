@@ -114,6 +114,23 @@ def parse_gitignore(gitignore_path: str) -> list[str]:
     logging.debug(f"Parsed ignore patterns: {ignore_patterns}")
     return default_ignores + ignore_patterns
 
+def _matches_root_anchored_pattern(rel_path: str, pattern: str) -> bool:
+    """
+    Match gitignore patterns anchored to the repository root, like '/dist/'.
+    """
+    normalized_pattern = pattern[1:]
+    normalized_prefix = normalized_pattern.rstrip('/')
+    if not normalized_prefix:
+        return False
+
+    if rel_path == normalized_prefix or rel_path.startswith(f"{normalized_prefix}/"):
+        return True
+
+    return (
+        fnmatch.fnmatch(rel_path, normalized_pattern)
+        or fnmatch.fnmatch(rel_path, normalized_prefix)
+    )
+
 def is_ignored_path(
     path: str,
     repo_root: Optional[str],
@@ -132,6 +149,12 @@ def is_ignored_path(
         path_basename = os.path.basename(path)
 
         for pattern in ignore_list:
+            if pattern.startswith('/'):
+                if _matches_root_anchored_pattern(rel_path, pattern):
+                    logging.debug(f"Ignored '{path}' due to root-anchored pattern: {pattern}")
+                    return True
+                continue
+
             # Check if pattern matches basename or full relative path
             if fnmatch.fnmatch(path_basename, pattern) or fnmatch.fnmatch(rel_path, pattern):
                 logging.debug(f"Ignored '{path}' due to pattern: {pattern}")

@@ -1,10 +1,12 @@
 [Desktop Entry]
-Version=7.2.0
-Name=CodeBase v7.2.0
-Comment=Code repository browser and content generator for LLM prompts
-Exec=/home/digislinger/.local/bin/CodeBase
+Version=7.3.0
+Name=CodeBase v7.3.0
+Comment=Code repository browser and file manager (v7.3.0)
+Exec=CodeBase
 Icon=CodeBase
 Type=Application
 Categories=Development;Utility;
+Terminal=false
 StartupNotify=true
+StartupWMClass=CodeBase
 NoDisplay=false

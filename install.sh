@@ -6,7 +6,8 @@
 APP_NAME="CodeBase"
 EXEC_NAME="CodeBase" # Command to run the app
 MAIN_SCRIPT="main.py"
-ICON_NAME="icon.png" # Make sure you have an icon.png file
+PNG_ICON_NAME="icon.png"
+SVG_ICON_NAME="codebase-icon.svg"
 DESKTOP_FILE_NAME="codebase.desktop" # Name of the .desktop file template
 
 # --- Directories ---
@@ -16,17 +17,18 @@ SOURCE_DIR=$(dirname "$(realpath "$0")")
 # Use standard Freedesktop locations within the user's home directory
 BIN_DIR="$HOME/.local/bin"
 APPS_DIR="$HOME/.local/share/applications"
-ICON_DIR="$HOME/.local/share/icons/hicolor/128x128/apps" # Example size, adjust if needed
-PIXMAPS_DIR="$HOME/.local/share/pixmaps" # Fallback/alternative icon location
+PNG_ICON_DIR="$HOME/.local/share/icons/hicolor/128x128/apps"
+SVG_ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+PIXMAPS_DIR="$HOME/.local/share/pixmaps" # Fallback/alternative icon location for PNG icons
 
 # --- Source File Paths ---
 EXEC_SRC="$SOURCE_DIR/$MAIN_SCRIPT" # The main Python script
 WRAPPER_SCRIPT_DEST="$BIN_DIR/$EXEC_NAME" # A wrapper script to run the main python file
-ICON_SRC="$SOURCE_DIR/$ICON_NAME"
+PNG_ICON_SRC="$SOURCE_DIR/$PNG_ICON_NAME"
+SVG_ICON_SRC="$SOURCE_DIR/$SVG_ICON_NAME"
 DESKTOP_SRC="$SOURCE_DIR/$DESKTOP_FILE_NAME" # Template desktop file
 
 # --- Destination File Paths ---
-ICON_DEST="$ICON_DIR/$APP_NAME.png" # Use App Name for icon destination
 PIXMAP_DEST="$PIXMAPS_DIR/$APP_NAME.png"
 DESKTOP_DEST="$APPS_DIR/$DESKTOP_FILE_NAME"
 
@@ -49,11 +51,21 @@ if [ ! -f "$EXEC_SRC" ]; then
     echo "Error: Main script not found at $EXEC_SRC"
     exit 1
 fi
-if [ ! -f "$ICON_SRC" ]; then
-    echo "Warning: Icon file not found at $ICON_SRC. Installation will continue without icon."
-    # Do not exit, just skip icon steps
-else
+ICON_SRC=""
+ICON_DEST=""
+ICON_KIND=""
+if [ -f "$PNG_ICON_SRC" ]; then
     INSTALL_ICON=true
+    ICON_SRC="$PNG_ICON_SRC"
+    ICON_DEST="$PNG_ICON_DIR/$APP_NAME.png"
+    ICON_KIND="png"
+elif [ -f "$SVG_ICON_SRC" ]; then
+    INSTALL_ICON=true
+    ICON_SRC="$SVG_ICON_SRC"
+    ICON_DEST="$SVG_ICON_DIR/$APP_NAME.svg"
+    ICON_KIND="svg"
+else
+    echo "Warning: No icon file found at $PNG_ICON_SRC or $SVG_ICON_SRC. Installation will continue without icon."
 fi
 if [ ! -f "$DESKTOP_SRC" ]; then
     echo "Warning: Desktop file template not found at $DESKTOP_SRC. Skipping desktop integration."
@@ -102,8 +114,12 @@ if [ "$INSTALL_DESKTOP" = true ]; then
     mkdir -p "$APPS_DIR" || { echo "Error: Cannot create applications directory $APPS_DIR"; exit 1; }
 fi
 if [ "$INSTALL_ICON" = true ]; then
-    mkdir -p "$ICON_DIR" || { echo "Warning: Cannot create standard icon directory $ICON_DIR"; }
-    mkdir -p "$PIXMAPS_DIR" || { echo "Warning: Cannot create pixmaps directory $PIXMAPS_DIR"; }
+    if [ "$ICON_KIND" = "png" ]; then
+        mkdir -p "$PNG_ICON_DIR" || { echo "Warning: Cannot create standard icon directory $PNG_ICON_DIR"; }
+        mkdir -p "$PIXMAPS_DIR" || { echo "Warning: Cannot create pixmaps directory $PIXMAPS_DIR"; }
+    else
+        mkdir -p "$SVG_ICON_DIR" || { echo "Warning: Cannot create scalable icon directory $SVG_ICON_DIR"; }
+    fi
 fi
 
 # --- Create Wrapper Script ---
@@ -131,8 +147,13 @@ echo "Wrapper script created at $WRAPPER_SCRIPT_DEST"
 # --- Install Icon ---
 if [ "$INSTALL_ICON" = true ]; then
     echo "Installing icon..."
-    cp "$ICON_SRC" "$ICON_DEST" 2>/dev/null || echo "Warning: Failed to copy icon to $ICON_DIR. Trying pixmaps..."
-    cp "$ICON_SRC" "$PIXMAP_DEST" || echo "Warning: Failed to copy icon to $PIXMAPS_DIR."
+    cp "$ICON_SRC" "$ICON_DEST" || echo "Warning: Failed to copy icon to $ICON_DEST."
+    if [ "$ICON_KIND" = "png" ]; then
+        cp "$ICON_SRC" "$PIXMAP_DEST" || echo "Warning: Failed to copy icon to $PIXMAPS_DIR."
+    fi
+    if command -v gtk-update-icon-cache &> /dev/null; then
+        gtk-update-icon-cache -q -t "$HOME/.local/share/icons/hicolor" || echo "Warning: Failed to update icon cache."
+    fi
 fi
 
 # --- Install Desktop File ---

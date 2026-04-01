@@ -1,6 +1,6 @@
 # CodeBase - Project Board
 
-**Version 7.2.0** — A Linux desktop tool for preparing codebase content for LLM prompts and code reviews. Scan repositories, select files, preview combined content, and copy to clipboard with one click.
+**Version 7.3.0** — A Linux desktop tool for preparing codebase content for LLM prompts and code reviews. Scan repositories, select files, preview combined content, and copy to clipboard with one click.
 
 ## Overview
 Linux desktop application for scanning local repositories, selecting files, and copying combined content to clipboard for LLM prompts and code reviews.
@@ -48,6 +48,7 @@ python3 main.py
 ✅ **#3 Full type hints + mypy --strict** — Comprehensive type hints across core modules (constants, exceptions, path_utils, lru_cache, settings, security, error_handler, content_manager, file_scanner); handlers and tabs started; `mypy.ini` with strict + explicit_package_bases; external libs use `# type: ignore[import-untyped]` where stubs missing.
 
 ## Changelog
+- **7.3.0** — Root-anchored `.gitignore` entries such as `/.cypress-cache/` are now respected during scans, preventing accidental cache ingestion and token spikes. Local desktop installation also supports the bundled SVG icon for app menu integration.
 - **7.2.0** — SQLite Knowledge Graph, persistent copy history, knapsack-style optimal prompt building, and local module recommendations (Insights panel). Git Status panel selection checkboxes (selective copy for staged/unstaged files). Grok API removed; local heuristics retained.
 - **7.0.0** — Module Analysis Sprint 2: hierarchical clusters, dendrogram, Select This Cluster.
 - **6.9.0** — Module Analysis multi-language: regex-based imports for Python, JS/TS, Rust, Java, C/C++, Go, etc.; folder-as-module heuristic; in-degree centrality impact.

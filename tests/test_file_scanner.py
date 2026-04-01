@@ -108,6 +108,22 @@ def test_is_ignored_path_directory_patterns_match_nested_files(monkeypatch):
     assert is_ignored_path(os.path.join(repo_root, "src", "code.js"), repo_root, ignore_list, gui) == False
     assert is_ignored_path(os.path.join(repo_root, "apps", "web", "src", "page.tsx"), repo_root, ignore_list, gui) == False
 
+def test_is_ignored_path_root_anchored_patterns():
+    """Root-anchored gitignore patterns should only match from the repo root."""
+    repo_root = "/repo"
+    ignore_list = ['/.cypress-cache/', '/server/tmp', '/client/public/firebase-messaging-sw.js']
+    gui = MagicMock()
+    gui.settings.get.side_effect = lambda sec, key, default: 0 if key in ['exclude_node_modules', 'exclude_dist'] else default
+
+    assert is_ignored_path(os.path.join(repo_root, ".cypress-cache"), repo_root, ignore_list, gui) == True
+    assert is_ignored_path(os.path.join(repo_root, ".cypress-cache", "14.5.4", "Cypress", "index.js"), repo_root, ignore_list, gui) == True
+    assert is_ignored_path(os.path.join(repo_root, "server", "tmp", "upload.txt"), repo_root, ignore_list, gui) == True
+    assert is_ignored_path(os.path.join(repo_root, "client", "public", "firebase-messaging-sw.js"), repo_root, ignore_list, gui) == True
+
+    assert is_ignored_path(os.path.join(repo_root, "apps", "web", ".cypress-cache", "index.js"), repo_root, ignore_list, gui) == False
+    assert is_ignored_path(os.path.join(repo_root, "packages", "server", "tmp", "upload.txt"), repo_root, ignore_list, gui) == False
+    assert is_ignored_path(os.path.join(repo_root, "packages", "client", "public", "firebase-messaging-sw.js"), repo_root, ignore_list, gui) == False
+
 def test_is_ignored_path_settings_excludes(monkeypatch):
     repo_root = "/repo"
     ignore_list: list[str] = []
