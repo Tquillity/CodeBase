@@ -25,4 +25,5 @@ def generate_list_content(
         args=(files_to_copy, repo_path, lock, wrapped_completion, content_cache, list_read_errors, None, gui, current_format),
         daemon=True,
     )
+    gui.register_background_thread(thread)
     thread.start()

@@ -41,14 +41,14 @@ SKIP_DIRS = frozenset({
 # Patterns capture the first meaningful path or name.
 IMPORT_PATTERNS: Dict[str, str] = {
     # Python: import foo; from foo.bar import z (tighter: module name = word chars + dots only)
-    ".py": r"(?:^|\n)\s*(?:import\s+([a-zA-Z0-9_.]+)|from\s+([a-zA-Z0-9_.]+)\s+import)",
+    ".py": r"(?:^|\n)\s*(?:import\s+([a-zA-Z0-9_.]+(?:\s*,\s*[a-zA-Z0-9_.]+)*)|from\s+([a-zA-Z0-9_.]+)\s+import)",
     # JavaScript/TypeScript: import x from 'path'; require('path'); import('path')
-    ".js": r"(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
-    ".jsx": r"(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
-    ".ts": r"(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
-    ".tsx": r"(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
-    ".mjs": r"(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
-    ".cjs": r"(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
+    ".js": r"(?:^|\n)\s*(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
+    ".jsx": r"(?:^|\n)\s*(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
+    ".ts": r"(?:^|\n)\s*(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
+    ".tsx": r"(?:^|\n)\s*(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
+    ".mjs": r"(?:^|\n)\s*(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
+    ".cjs": r"(?:^|\n)\s*(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
     # Rust: use foo::bar; use crate::baz;
     ".rs": r"(?:^|\n)\s*use\s+([a-zA-Z0-9_::]+)",
     # Java/Kotlin: import pkg.Class;
@@ -100,11 +100,19 @@ def _get_imports_from_source(file_path: str) -> List[str]:
     try:
         for m in re.finditer(pattern, source, re.MULTILINE | re.DOTALL):
             for g in m.groups():
-                if g is not None and isinstance(g, str):
-                    g = g.strip()
-                    if g:
-                        refs.append(g)
-                    break
+                if g is None or not isinstance(g, str):
+                    continue
+                g = g.strip()
+                if not g:
+                    continue
+                if ext == ".py" and "," in g and "import" not in g:
+                    for part in g.split(","):
+                        part = part.strip()
+                        if part:
+                            refs.append(part)
+                else:
+                    refs.append(g)
+                break
     except re.error:
         logger.debug("Regex error for %s pattern", ext)
     return refs
@@ -144,6 +152,12 @@ def _normalize_module_ref(ref: str, current_dir: str) -> Optional[str]:
         first = ref.split(".")[0]
         if first and first != "node_modules":
             return first
+    # Rust module paths: foo::bar -> foo
+    if "::" in ref:
+        first = ref.split("::")[0]
+        if first in {"crate", "super", "self"}:
+            return None
+        return first if first else None
     # Single name: could be local module folder
     if ref and ref != "node_modules":
         return ref

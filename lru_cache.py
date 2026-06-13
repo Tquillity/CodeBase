@@ -95,6 +95,13 @@ class ThreadSafeLRUCache:
             )
             logging.debug(f"Evicted cache item: {key}")
 
+    def delete(self, key: str) -> None:
+        """Remove a single item from the cache."""
+        with self.lock:
+            if key in self.cache:
+                value = self.cache.pop(key)
+                self.current_memory_bytes -= self._estimate_memory_usage(key, value)
+
     def clear(self) -> None:
         """Clear all items from the cache."""
         with self.lock:

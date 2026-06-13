@@ -7,6 +7,8 @@ from typing import Any, Optional, cast
 
 import appdirs  # type: ignore[import-untyped]
 
+from constants import MAX_FILE_SIZE, TEXT_EXTENSIONS_DEFAULT
+
 
 class SettingsManager:
     def __init__(self) -> None:
@@ -26,6 +28,7 @@ class SettingsManager:
                 "expansion": "Collapsed",
                 "levels": 1,
                 "exclude_node_modules": 1,
+                "exclude_venv": 1,
                 "exclude_dist": 1,
                 "exclude_coverage": 1,
                 "exclude_test_files": 0,
@@ -50,7 +53,7 @@ class SettingsManager:
                 "tree_ui_update_interval": 100,
                 "tree_safety_limit": 10000,
                 # Security settings
-                "security_enabled": 1,
+                "security_enabled": 0,
                 "max_file_size_mb": 10,
                 "max_template_size_mb": 1,
                 "max_content_length_mb": 50,
@@ -61,7 +64,6 @@ class SettingsManager:
                 "error_logging_level": "ERROR",
                 "error_recovery_attempts": 3,
                 # Path normalization settings
-                "path_normalization_enabled": 1,
                 "cross_platform_paths": 1,
                 # URL sanitization settings
                 "sanitize_urls": 0,
@@ -105,7 +107,6 @@ class SettingsManager:
         # ** THE FIX IS HERE **
         # Ensure that any new default text extensions are merged into the loaded settings,
         # preserving the user's choices for existing extensions.
-        from constants import TEXT_EXTENSIONS_DEFAULT
         default_extensions: dict[str, int] = {
             ext: 1 for ext in TEXT_EXTENSIONS_DEFAULT
         }
@@ -131,6 +132,18 @@ class SettingsManager:
         """Gets a setting value, returning default if not found."""
         # Use the loaded self.settings which includes defaults
         return self.settings.get(section, {}).get(key, default)
+
+    def security_enabled(self) -> bool:
+        """Whether stricter file-size and content validation is active."""
+        return self.get('app', 'security_enabled', 0) == 1
+
+    def max_file_size_bytes(self) -> int:
+        """Configured max file size in bytes for security validation."""
+        try:
+            max_mb = int(self.get('app', 'max_file_size_mb', 10))
+            return max_mb * 1024 * 1024
+        except (TypeError, ValueError):
+            return MAX_FILE_SIZE
 
     def set(self, section: str, key: str, value: Any) -> None:
         """Sets a setting value."""

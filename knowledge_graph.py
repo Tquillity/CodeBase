@@ -97,8 +97,8 @@ def path_hash(path: str) -> str:
     return _path_hash(path)
 
 
-def record_repo_seen(repo_root: str) -> int:
-    """Ensure repo exists; update last_seen_at. Returns repo id."""
+def _ensure_repo_id(repo_root: str, *, touch_last_seen: bool = True) -> int:
+    """Ensure repo exists in the index. Optionally update last_seen_at."""
     conn = _get_connection()
     now = time.time()
     with _lock:
@@ -107,10 +107,11 @@ def record_repo_seen(repo_root: str) -> int:
         )
         row = cur.fetchone()
         if row:
-            conn.execute(
-                "UPDATE repos SET last_seen_at = ? WHERE id = ?", (now, row[0])
-            )
-            conn.commit()
+            if touch_last_seen:
+                conn.execute(
+                    "UPDATE repos SET last_seen_at = ? WHERE id = ?", (now, row[0])
+                )
+                conn.commit()
             return int(row[0])
         cur = conn.execute(
             "INSERT INTO repos (root_path, first_seen_at, last_seen_at) VALUES (?, ?, ?)",
@@ -118,6 +119,11 @@ def record_repo_seen(repo_root: str) -> int:
         )
         conn.commit()
         return cur.lastrowid or 0
+
+
+def record_repo_seen(repo_root: str) -> int:
+    """Ensure repo exists; update last_seen_at. Returns repo id."""
+    return _ensure_repo_id(repo_root, touch_last_seen=True)
 
 
 def record_clusters(repo_root: str, clusters: List[Tuple[str, List[str], int, float]]) -> None:
@@ -181,7 +187,7 @@ def get_files_often_copied_together(repo_root: str, current_path_hashes: List[st
     Return relative paths (for current repo) that were often copied together with the given paths.
     current_path_hashes: list of path hashes for files currently selected (optional; if empty, returns top copied files).
     """
-    repo_id = record_repo_seen(repo_root)
+    repo_id = _ensure_repo_id(repo_root, touch_last_seen=False)
     conn = _get_connection()
     cutoff = time.time() - (RECOMMENDATION_HISTORY_DAYS * 24 * 3600)
     with _lock:
@@ -219,7 +225,7 @@ def get_files_often_copied_together(repo_root: str, current_path_hashes: List[st
 
 def get_high_impact_cluster_names_from_history(repo_root: str, limit: int = 10) -> List[Tuple[str, float]]:
     """Return (cluster_name, aggregate_impact) for clusters we've seen for this repo, by impact."""
-    repo_id = record_repo_seen(repo_root)
+    repo_id = _ensure_repo_id(repo_root, touch_last_seen=False)
     conn = _get_connection()
     with _lock:
         cur = conn.execute(
@@ -230,8 +236,8 @@ def get_high_impact_cluster_names_from_history(repo_root: str, limit: int = 10) 
 
 
 def get_similar_clusters_from_other_repos(repo_root: str, cluster_name: str, limit: int = 5) -> List[Tuple[str, str]]:
-    """Return (other_repo_root, cluster_name) for clusters with same name from other repos. Does not export raw paths beyond what caller already has."""
-    repo_id = record_repo_seen(repo_root)
+    """Return (other_repo_root, cluster_name) for clusters with the same name in other repos."""
+    repo_id = _ensure_repo_id(repo_root, touch_last_seen=False)
     conn = _get_connection()
     with _lock:
         cur = conn.execute(
@@ -239,3 +245,12 @@ def get_similar_clusters_from_other_repos(repo_root: str, cluster_name: str, lim
             (repo_id, cluster_name, limit),
         )
         return [(row[0], row[1]) for row in cur.fetchall()]
+
+
+def close_connection() -> None:
+    """Close the singleton SQLite connection (call on application shutdown)."""
+    global _connection
+    with _lock:
+        if _connection is not None:
+            _connection.close()
+            _connection = None

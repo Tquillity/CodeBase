@@ -44,14 +44,15 @@ class RestartHandler(FileSystemEventHandler):
         self.process: Optional[subprocess.Popen[Any]] = None
         self.logger = get_logger(__name__)
         self.last_restart_time: float = 0.0
-        self.debounce_delay = 2
+        self.debounce_delay = 2  # throttle: minimum seconds between restarts
         self.start_script()
 
     def should_ignore_file(self, file_path: str) -> bool:
-        """Check if a file should be ignored based on patterns."""
+        """Check if a file should be ignored based on basename glob patterns."""
         import fnmatch
+        basename = os.path.basename(file_path)
         for pattern in IGNORE_PATTERNS:
-            if fnmatch.fnmatch(file_path, pattern) or pattern in file_path:
+            if fnmatch.fnmatch(basename, pattern):
                 return True
         return False
 
@@ -107,7 +108,7 @@ class RestartHandler(FileSystemEventHandler):
                 event.src_path.endswith(".yml")):
                 
                 current_time = time.time()
-                # Use debounce to prevent rapid restart loops
+                # Throttle restarts to prevent rapid restart loops
                 if current_time - self.last_restart_time >= self.debounce_delay:
                     logging.info(f"🔄 Detected change in {event.src_path}. Restarting {self.script_to_run}...")
                     self.start_script()

@@ -46,7 +46,7 @@ def build_binary() -> None:
         subprocess.check_call([sys.executable, "-m", "pip", "show", "pyinstaller"], stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         print("Warning: PyInstaller not found. Attempting to install...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller>=6.0.0,<7"])
 
     # Build command using python -m PyInstaller
     cmd = [

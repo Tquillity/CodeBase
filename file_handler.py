@@ -24,7 +24,7 @@ from exceptions import FileOperationError, ThreadingError, UIError
 from file_scanner import is_ignored_path, is_text_file
 from lru_cache import ThreadSafeLRUCache
 from module_analyzer import compute_optimal_prompt_paths
-from path_utils import is_same_path, normalize_for_cache
+from path_utils import normalize_for_cache
 
 if TYPE_CHECKING:
     from gui import RepoPromptGUI
@@ -94,7 +94,8 @@ class FileHandler:
         query_lower = query.lower()
         matches: list[str] = []
 
-        search_pool = self.scanned_text_files.union(self.loaded_files)
+        with self.lock:
+            search_pool = self.scanned_text_files.union(self.loaded_files)
 
         for file_path in search_pool:
             if query_lower in os.path.basename(file_path).lower():
@@ -487,6 +488,7 @@ class FileHandler:
             kwargs={"cancelled_callback": on_preview_cancelled},
             daemon=True,
         )
+        gui.register_background_thread(thread)
         thread.start()
 
     def expand_all(self, item: str = "", max_depth: Optional[int] = None) -> None:

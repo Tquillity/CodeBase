@@ -328,7 +328,7 @@ class RepoHandler:
         file_handler = self.gui.file_handler
         file_handler.repo_path = repo_path
         file_handler.ignore_patterns = ignore_patterns or []
-        file_handler.scanned_text_files = scanned_files or set()
+        file_handler.scanned_text_files = {normalize_for_cache(f) for f in (scanned_files or set())}
 
         with file_handler.lock:
             file_handler.loaded_files = loaded_files or set()
@@ -374,7 +374,7 @@ class RepoHandler:
         self.gui.show_loading_phase("Building tree...")
         file_handler = self.gui.file_handler
         file_handler.ignore_patterns = ignore_patterns or []
-        file_handler.scanned_text_files = scanned_files or set()
+        file_handler.scanned_text_files = {normalize_for_cache(f) for f in (scanned_files or set())}
 
         with file_handler.lock:
             normalized_scanned = {normalize_for_cache(p) for p in scanned_files}

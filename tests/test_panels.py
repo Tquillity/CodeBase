@@ -82,6 +82,7 @@ def test_right_panel_init(mock_parent, mock_gui):
          patch('ttkbootstrap.Checkbutton'), \
          patch('panels.panels.ContentTab'), \
          patch('panels.panels.StructureTab'), \
+         patch('panels.panels.ModuleAnalysisTab'), \
          patch('panels.panels.BasePromptTab'), \
          patch('panels.panels.SettingsTab'), \
          patch('panels.panels.FileListTab'):

@@ -1,10 +1,9 @@
 # tests/test_file_list_tab.py
+import os
 import tkinter as tk
 import pytest
 from unittest.mock import MagicMock, patch, ANY
 from tabs.file_list_tab import FileListTab
-from file_list_handler import generate_list_content
-from file_scanner import is_text_file
 
 @pytest.fixture
 def mock_gui():
@@ -21,6 +20,8 @@ def mock_gui():
     gui.base_prompt_tab = MagicMock(base_prompt_text=MagicMock(get=MagicMock(return_value="Prompt")))
     gui.copy_handler = MagicMock()
     gui.file_handler = MagicMock(lock=MagicMock(), content_cache={}, read_errors=[])
+    gui.settings = MagicMock()
+    gui.settings.security_enabled.return_value = False
     return gui
 
 @pytest.fixture
@@ -52,9 +53,6 @@ def test_setup_ui(mock_gui):
     finally:
         root.quit()
         root.destroy()
-
-def test_reconfigure_colors(file_list_tab, mock_gui):
-    pytest.skip("FileListTab uses ttkbootstrap theme styling and does not expose reconfigure_colors().")
 
 def test_perform_search(file_list_tab):
     file_list_tab.file_list_text.search.side_effect = ["1.0", "2.0", ""]
@@ -99,3 +97,57 @@ def test_load_file_list_success(file_list_tab, mock_gui, monkeypatch):
     file_list_tab.load_file_list()
     assert len(mock_gui.list_selected_files) == 2
     mock_gui.show_status_message.assert_called_with("Loaded 2 files from list.")
+
+
+def test_load_file_list_empty_input(file_list_tab, mock_gui):
+    file_list_tab.file_list_text.get.return_value = "   \n  "
+    file_list_tab.load_file_list()
+    mock_gui.show_status_message.assert_called_with("No file list provided.", error=True)
+    file_list_tab.copy_list_button.config.assert_called_with(state=tk.DISABLED)
+
+
+def test_load_file_list_relative_paths(file_list_tab, mock_gui, monkeypatch):
+    file_list_tab.file_list_text.get.return_value = "src/file.txt"
+    monkeypatch.setattr('os.path.isfile', lambda p: True)
+    monkeypatch.setattr('tabs.file_list_tab.is_text_file', lambda p, g: True)
+    file_list_tab.load_file_list()
+    assert mock_gui.list_selected_files == {os.path.join("/repo", "src/file.txt")}
+    mock_gui.show_status_message.assert_called_with("Loaded 1 files from list.")
+
+
+def test_load_file_list_absolute_paths_valid(file_list_tab, mock_gui, monkeypatch):
+    abs_path = os.path.join("/repo", "src", "file.txt")
+    file_list_tab.file_list_text.get.return_value = abs_path
+    monkeypatch.setattr('os.path.isfile', lambda p: True)
+    monkeypatch.setattr('tabs.file_list_tab.is_text_file', lambda p, g: True)
+    file_list_tab.load_file_list()
+    assert mock_gui.list_selected_files == {abs_path}
+    mock_gui.show_status_message.assert_called_with("Loaded 1 files from list.")
+
+
+def test_load_file_list_absolute_paths_invalid(file_list_tab, mock_gui, monkeypatch):
+    file_list_tab.file_list_text.get.return_value = "/outside/file.txt"
+    monkeypatch.setattr('os.path.isfile', lambda p: True)
+    file_list_tab.load_file_list()
+    assert mock_gui.list_selected_files == set()
+    assert any("Invalid (outside repo)" in err for err in mock_gui.list_read_errors)
+    mock_gui.show_status_message.assert_called_with("No valid files in list.", error=True)
+
+
+def test_load_file_list_non_text_file(file_list_tab, mock_gui, monkeypatch):
+    file_list_tab.file_list_text.get.return_value = "binary.bin"
+    monkeypatch.setattr('os.path.isfile', lambda p: True)
+    monkeypatch.setattr('tabs.file_list_tab.is_text_file', lambda p, g: False)
+    file_list_tab.load_file_list()
+    assert mock_gui.list_selected_files == set()
+    assert any("Non-text file: binary.bin" in err for err in mock_gui.list_read_errors)
+    mock_gui.show_status_message.assert_called_with("No valid files in list.", error=True)
+
+
+def test_load_file_list_no_repo_for_relative(file_list_tab, mock_gui, monkeypatch):
+    mock_gui.current_repo_path = None
+    file_list_tab.file_list_text.get.return_value = "file.txt"
+    file_list_tab.load_file_list()
+    assert mock_gui.list_selected_files == set()
+    assert any("No repo loaded for relative: file.txt" in err for err in mock_gui.list_read_errors)
+    mock_gui.show_status_message.assert_called_with("No valid files in list.", error=True)

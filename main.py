@@ -34,6 +34,8 @@ def signal_handler(signum: int, frame: Any) -> None:
     app = getattr(signal_handler, "app", None)
     if app:
         app.on_close()
+    else:
+        logging.warning("Shutdown signal received before application initialized")
     sys.exit(0)
 
 

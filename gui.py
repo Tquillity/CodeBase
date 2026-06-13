@@ -6,6 +6,7 @@ import os
 import re
 import queue
 import threading
+import time
 import tkinter as tk
 from tkinter import BooleanVar, IntVar, StringVar, colorchooser, filedialog, messagebox, Toplevel
 from typing import TYPE_CHECKING, Any, Callable, Optional, cast
@@ -32,6 +33,7 @@ from exceptions import ConfigurationError, ThreadingError, UIError
 from file_handler import FileHandler
 from file_list_handler import generate_list_content
 from file_scanner import is_text_file
+import knowledge_graph as kg
 from handlers.copy_handler import CopyHandler
 from handlers.git_handler import GitHandler
 from handlers.repo_handler import RepoHandler
@@ -185,6 +187,15 @@ class RepoPromptGUI:
         self.copy_handler = CopyHandler(self)
         self.repo_handler = RepoHandler(self)
         self.git_handler = GitHandler(self)
+
+        # Thread-safe queue and shutdown flags before UI setup (M8)
+        self._shutdown_requested = False
+        self._background_threads = []
+        self.task_queue = cast(
+            queue.Queue[tuple[Callable[..., Any], tuple[Any, ...]]], queue.Queue()
+        )
+        self._git_monitor_id = None
+
         self.setup_ui()
         self.bind_keys()
         
@@ -206,21 +217,11 @@ class RepoPromptGUI:
             self.update_lock_toggle_button()
         self.list_selected_files = set()
         self.list_read_errors = []
-        
-        # Resource cleanup tracking
-        self._shutdown_requested = False
-        self._background_threads = []
-        
-        # Queue for thread-safe Tkinter callbacks from background threads
-        self.task_queue = cast(
-            queue.Queue[tuple[Callable[..., Any], tuple[Any, ...]]], queue.Queue()
-        )
-        self._git_monitor_id = None
         self.toast_manager = ToastManager(self.root)
 
         # Update logging configuration based on settings
         self._update_logging_config()
-        
+
         self._poll_queue()
 
     def _on_drop(self, event: Any) -> None:
@@ -906,6 +907,7 @@ class RepoPromptGUI:
             else:
                  self.settings.set('app', 'levels', 1)
             self.settings.set('app', 'exclude_node_modules', self.settings_tab.exclude_node_modules_var.get())
+            self.settings.set('app', 'exclude_venv', self.settings_tab.exclude_venv_var.get())
             self.settings.set('app', 'exclude_dist', self.settings_tab.exclude_dist_var.get())
             self.settings.set('app', 'exclude_coverage', self.settings_tab.exclude_coverage_var.get())
             self.settings.set('app', 'exclude_lock_files', self.settings_tab.exclude_lock_files_var.get())
@@ -1022,6 +1024,13 @@ class RepoPromptGUI:
         """Clean up all application resources."""
         logging.info("Cleaning up resources...")
         
+        # Clear knowledge graph connection
+        try:
+            kg.close_connection()
+            logging.info("Knowledge graph connection closed.")
+        except Exception as e:
+            logging.error(f"Error closing knowledge graph: {e}")
+
         # Clear content cache
         try:
             if hasattr(self.file_handler, 'content_cache'):
@@ -1061,8 +1070,13 @@ class RepoPromptGUI:
             logging.error(f"Error clearing file lists: {e}")
     
     def _wait_for_threads(self, timeout: float = 5.0) -> None:
-        """Threads are daemonized, so we do not block the main Tkinter loop during shutdown."""
-        pass
+        """Wait for registered background threads to finish, up to timeout seconds."""
+        deadline = time.time() + timeout
+        for thread in list(self._background_threads):
+            remaining = max(0.0, deadline - time.time())
+            if remaining <= 0:
+                break
+            thread.join(timeout=remaining)
     
     def register_background_thread(self, thread: threading.Thread) -> None:
         """Register a background thread for cleanup tracking."""
@@ -1070,11 +1084,29 @@ class RepoPromptGUI:
         logging.debug(f"Registered background thread: {thread.name}")
 
     def bind_keys(self) -> None:
+        def _widget_is_text_entry(widget: Any) -> bool:
+            return isinstance(widget, (tk.Text, tk.Entry))
+
+        def _on_copy_contents(e: Any) -> None:
+            if _widget_is_text_entry(e.widget):
+                return
+            self.copy_handler.copy_contents()
+
+        def _on_copy_structure(e: Any) -> None:
+            if _widget_is_text_entry(e.widget):
+                return
+            self.copy_handler.copy_structure()
+
+        def _on_copy_all(e: Any) -> None:
+            if _widget_is_text_entry(e.widget):
+                return
+            self.copy_handler.copy_all()
+
         self.root.bind('<Control-r>', lambda e: self.repo_handler.select_repo())
         self.root.bind('<Control-F5>', lambda e: self.repo_handler.refresh_repo())
-        self.root.bind('<Control-c>', lambda e: self.copy_handler.copy_contents())
-        self.root.bind('<Control-s>', lambda e: self.copy_handler.copy_structure())
-        self.root.bind('<Control-a>', lambda e: self.copy_handler.copy_all())
+        self.root.bind('<Control-c>', _on_copy_contents)
+        self.root.bind('<Control-s>', _on_copy_structure)
+        self.root.bind('<Control-a>', _on_copy_all)
         self.root.bind('<Control-t>', lambda e: self.base_prompt_tab.save_template())
         self.root.bind('<Control-l>', lambda e: self.base_prompt_tab.load_template())
 if __name__ == "__main__":

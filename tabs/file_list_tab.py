@@ -8,11 +8,11 @@ import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.widgets.scrolled import ScrolledText
 
-from constants import SECURITY_ENABLED
 from file_list_handler import generate_list_content
 from file_scanner import is_text_file
 from path_utils import ensure_absolute_path, is_path_within_base, normalize_path
 from security import validate_file_size
+from widgets.search_utils import search_text_widget
 from widgets import Tooltip
 
 if TYPE_CHECKING:
@@ -76,17 +76,13 @@ class FileListTab(ttk.Frame):
 
 
     def perform_search(self, query: str, case_sensitive: bool, whole_word: bool) -> List[Tuple[str, str]]:
-        matches: List[Tuple[str, str]] = []
-        start_pos = "1.0"
-        while True:
-            pos = self.file_list_text.search(query, start_pos, stopindex=tk.END,
-                                             nocase=not case_sensitive,
-                                             regexp=whole_word)
-            if not pos: break
-            end_pos = f"{pos}+{len(query)}c"
-            matches.append((pos, end_pos))
-            start_pos = end_pos
-        return matches
+        return search_text_widget(
+            self.file_list_text,
+            query,
+            "1.0",
+            case_sensitive=case_sensitive,
+            whole_word=whole_word,
+        )
 
     def highlight_all_matches(self, matches: List[Tuple[str, str]]) -> None:
         for match_data in matches:
@@ -180,9 +176,9 @@ class FileListTab(ttk.Frame):
                 full_path = ensure_absolute_path(line, self.gui.current_repo_path)
             if os.path.isfile(full_path):
                 # Enhanced security validation (only for suspicious files)
-                if SECURITY_ENABLED:
-                    # Only validate file size for normal repository files
-                    is_valid, error = validate_file_size(full_path)
+                if self.gui.settings.security_enabled():
+                    max_size = self.gui.settings.max_file_size_bytes()
+                    is_valid, error = validate_file_size(full_path, max_size=max_size)
                     if not is_valid:
                         with self.gui.file_handler.lock:
                             self.gui.list_read_errors.append(f"Size: {line} - {error}")
@@ -206,7 +202,8 @@ class FileListTab(ttk.Frame):
             self.copy_list_button.config(state=tk.DISABLED)
             self.gui.show_status_message("No valid files in list.", error=True)
         if self.gui.list_read_errors:
-            self.error_label.config(text=f"Errors: {'; '.join(self.gui.list_read_errors[:3])}")
+            unique_errors = list(dict.fromkeys(self.gui.list_read_errors))
+            self.error_label.config(text=f"Errors: {'; '.join(unique_errors[:3])}")
         
         # Ensure text area remains editable after loading
         # ttkbootstrap ScrolledText is always editable
@@ -225,12 +222,9 @@ class FileListTab(ttk.Frame):
     def _show_context_menu(self, event: tk.Event[Any]) -> None:
         """Show right-click context menu for text editing."""
         try:
-            # Show context menu at cursor position
             self.context_menu.tk_popup(event.x_root, event.y_root)
         except Exception as e:
             logging.warning(f"Error showing context menu: {e}")
-        finally:
-             self.context_menu.grab_release()
 
     def _cut_text(self, event: Optional[tk.Event[Any]] = None) -> Optional[str]:
         """Cut selected text to clipboard."""

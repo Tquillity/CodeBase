@@ -13,6 +13,7 @@ from pygments.styles import get_style_by_name  # type: ignore[import-untyped]
 from pygments.token import Token  # type: ignore[import-untyped]
 
 from constants import ERROR_MESSAGE_DURATION, STATUS_MESSAGE_DURATION
+from widgets.search_utils import search_text_widget
 from path_utils import get_relative_path
 from widgets import Tooltip
 
@@ -60,18 +61,13 @@ class ContentTab(ttk.Frame):
 
 
     def perform_search(self, query: str, case_sensitive: bool, whole_word: bool) -> list[tuple[str, str]]:
-        matches: list[tuple[str, str]] = []
-        # ttkbootstrap ScrolledText is always editable
-        start_pos = "1.0"
-        while True:
-            pos = self.content_text.search(query, start_pos, stopindex=tk.END,
-                                           nocase=not case_sensitive,
-                                           regexp=whole_word)
-            if not pos: break
-            end_pos = f"{pos}+{len(query)}c"
-            matches.append((pos, end_pos))
-            start_pos = end_pos
-        return matches
+        return search_text_widget(
+            self.content_text,
+            query,
+            "1.0",
+            case_sensitive=case_sensitive,
+            whole_word=whole_word,
+        )
 
     def highlight_all_matches(self, matches: list[tuple[str, str]]) -> None:
         # ttkbootstrap ScrolledText is always editable

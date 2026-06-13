@@ -11,7 +11,7 @@ from typing import cast
 import pytest
 from unittest.mock import MagicMock, patch, ANY
 
-from file_scanner import scan_repo, parse_gitignore, is_ignored_path, is_text_file
+from file_scanner import scan_repo, parse_gitignore, is_ignored_path, is_text_file, is_test_file
 
 @pytest.fixture
 def temp_repo():
@@ -189,16 +189,33 @@ def test_is_text_file_size_limit():
     with patch('os.path.getsize', return_value=MAX_FILE_SIZE - 1):
         assert is_text_file("small.txt", gui) == True
 
+def test_is_test_file_boundaries():
+    assert is_test_file("/repo/contest.py", "contest.py") is False
+    assert is_test_file("/repo/latest.md", "latest.md") is False
+    assert is_test_file("/repo/tests/foo.py", "tests/foo.py") is True
+    assert is_test_file("/repo/foo_test.py", "foo_test.py") is True
+
+
 def test_is_ignored_path_venv(monkeypatch):
     repo_root = "/repo"
     ignore_list: list[str] = []
     gui = MagicMock()
-    gui.settings.get.side_effect = lambda sec, key, default: 0 # Disable other ignores
-    
-    assert is_ignored_path("/repo/venv/lib/python.py", repo_root, ignore_list, gui) == True
-    assert is_ignored_path("/repo/env/bin/activate", repo_root, ignore_list, gui) == True
-    assert is_ignored_path("/repo/ENV/settings.ini", repo_root, ignore_list, gui) == True
-    assert is_ignored_path("/repo/src/main.py", repo_root, ignore_list, gui) == False
+    gui.settings.get.side_effect = lambda sec, key, default: {
+        'exclude_venv': 1,
+        'exclude_node_modules': 0,
+        'exclude_dist': 0,
+        'exclude_coverage': 0,
+        'exclude_lock_files': 0,
+        'exclude_test_files': 0,
+    }.get(key, default)
+
+    assert is_ignored_path("/repo/.venv/lib/python.py", repo_root, ignore_list, gui) is True
+    assert is_ignored_path("/repo/venv/bin/activate", repo_root, ignore_list, gui) is True
+    assert is_ignored_path("/repo/virtualenv/site.py", repo_root, ignore_list, gui) is True
+    assert is_ignored_path("/repo/env/config.py", repo_root, ignore_list, gui) is False
+    assert is_ignored_path("/repo/.env/secrets", repo_root, ignore_list, gui) is False
+    assert is_ignored_path("/repo/src/main.py", repo_root, ignore_list, gui) is False
+
 
 def test_scan_repo_success(caplog, temp_repo, monkeypatch):
     caplog.set_level(logging.INFO)

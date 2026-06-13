@@ -59,7 +59,7 @@ class ToastManager:
             inner,
             text=message,
             font=("Arial", 10),
-            fg=style.colors.fg if hasattr(style.colors, "fg") else "#ececec",
+            fg="#ffffff",
             bg=color,
             wraplength=self._max_width,
             justify=tk.LEFT,

@@ -15,7 +15,9 @@ This document outlines the architectural standards, coding conventions, and rule
 *   **`main.py`**: Entry point. Handles signal trapping and global exception logging.
 *   **`gui.py`**: Main `RepoPromptGUI` class. Manages layout and high-level orchestration.
 *   **`tabs/`**: UI components separated by functional tab (e.g., `content_tab.py`, `structure_tab.py`).
-*   **`handlers/`**: Business logic separated by domain (e.g., `file_handler.py`, `repo_handler.py`, `search_handler.py`).
+*   **`panels/`**: Collapsible side panels (e.g., git status, module analysis).
+*   **`handlers/`**: Business logic separated by domain (e.g., `repo_handler.py`, `copy_handler.py`, `search_handler.py`).
+*   **`file_handler.py`**, **`search_handler.py`**, **`file_list_handler.py`**: Root-level handler modules (file I/O, search, file-list generation).
 *   **`constants.py`**: All configuration constants, default values, and version strings. **Update VERSION here.**
 *   **`assets/`**: Binary assets (icons).
 
@@ -28,7 +30,8 @@ This document outlines the architectural standards, coding conventions, and rule
 
 ### Error Handling
 *   Use the centralized `error_handler.py`.
-*   Wrap complex logic in `try/except` blocks that catch specific exceptions (`FileOperationError`, `RepositoryError`).
+*   Wrap complex logic in `try/except` blocks that catch specific exceptions (`FileOperationError`, `RepositoryError`, `OSError`).
+*   Prefer specific exceptions over bare `except Exception`. Bare `except Exception` is only acceptable at top-level worker entry points with `logging.exception`.
 *   Use `gui.show_status_message(msg, error=True)` for user feedback.
 
 ### Logging
@@ -45,4 +48,4 @@ This document outlines the architectural standards, coding conventions, and rule
 
 ## 6. Testing
 *   If adding new features, ensure they work with the "Live Reload" script (`live_reload.py`).
-*   Respect the `SECURITY_ENABLED` constants when implementing file reading features.
+*   Respect the `security_enabled` setting (`gui.settings.get('app', 'security_enabled', 0)`) when implementing file reading features.

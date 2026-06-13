@@ -8,11 +8,19 @@ import os
 import time
 from typing import Any, Callable, Generator, Optional
 
-from path_utils import get_relative_path, normalize_path
-from exceptions import RepositoryError, SecurityError
+from path_utils import get_relative_path, normalize_path, get_path_components
+from exceptions import RepositoryError
 from error_handler import handle_error
 from constants import ERROR_HANDLING_ENABLED, MAX_FILE_SIZE
 from security import is_repo_path_allowed
+
+# Virtual-env directory names (whole path component, case-insensitive).
+# Deliberately excludes bare `env/` and `.env/` to avoid hiding legitimate source/config dirs.
+VENV_DIR_NAMES = frozenset({'.venv', 'venv', '.virtualenv', 'virtualenv'})
+
+
+def _path_has_venv_dir(parts: list[str]) -> bool:
+    return any(part.lower() in VENV_DIR_NAMES for part in parts)
 
 
 def yield_repo_files(
@@ -186,8 +194,8 @@ def is_ignored_path(
             logging.debug(f"Ignored '{path}' due to coverage setting")
             return True
         
-        # Virtual environment check
-        if any(part in rel_path_parts for part in ['venv', 'env', 'ENV']):
+        # Virtual environment check (settings-gated; whole-component match)
+        if gui.settings.get('app', 'exclude_venv', 1) == 1 and _path_has_venv_dir(rel_path_parts):
             logging.debug(f"Ignored '{path}' (virtual environment)")
             return True
         
@@ -213,10 +221,11 @@ def is_ignored_path(
 
     except ValueError:
          # This can happen if path is not within repo_root
-         if '.git' in path.split(os.sep): return True
-         if gui.settings.get('app', 'exclude_node_modules', 1) == 1 and 'node_modules' in path.split(os.sep): return True
-         if gui.settings.get('app', 'exclude_dist', 1) == 1 and 'dist' in path.split(os.sep): return True
-         if gui.settings.get('app', 'exclude_coverage', 1) == 1 and any(part.lower() in ['coverage', 'htmlcov', 'cov_html'] for part in path.split(os.sep)): return True
+         if '.git' in get_path_components(path): return True
+         if gui.settings.get('app', 'exclude_node_modules', 1) == 1 and 'node_modules' in get_path_components(path): return True
+         if gui.settings.get('app', 'exclude_dist', 1) == 1 and 'dist' in get_path_components(path): return True
+         if gui.settings.get('app', 'exclude_coverage', 1) == 1 and any(part.lower() in ['coverage', 'htmlcov', 'cov_html'] for part in get_path_components(path)): return True
+         if gui.settings.get('app', 'exclude_venv', 1) == 1 and _path_has_venv_dir(get_path_components(path)): return True
          # Check for lock file exclusion (global override)
          if gui.settings.get('app', 'exclude_lock_files', 1) == 1:
              lock_file_names = [
@@ -301,18 +310,24 @@ def is_text_file(file_path: str, gui: Any) -> bool:
     return False
 
 def is_test_file(file_path: str, rel_path: Optional[str]) -> bool:
-    """Check if a file is a test file based on common test file patterns."""
+    """Check if a file is a test file based on boundary-aware patterns."""
     try:
         filename = os.path.basename(file_path).lower()
-        rel_path_lower = rel_path.lower() if rel_path else ""
-        
-        # Common test file patterns
-        test_patterns = [
-            # Test directories
-            'test', 'tests', 'testing', 'spec', 'specs', '__tests__', 'test_',
-            # Test file prefixes/suffixes
-            'test_', '_test', '.test.', '.spec.', '_spec',
-            # Common test file names
+        rel_parts = [p.lower() for p in (rel_path or "").split('/') if p]
+
+        dir_names = frozenset({'test', 'tests', 'testing', 'spec', 'specs', '__tests__'})
+        if any(part in dir_names for part in rel_parts[:-1] if rel_parts):
+            return True
+
+        if filename.startswith('test_') or filename.startswith('tests_'):
+            return True
+        stem, _ = os.path.splitext(filename)
+        if stem.endswith('_test') or stem.endswith('_spec'):
+            return True
+        if '.test.' in filename or '.spec.' in filename:
+            return True
+
+        exact_basenames = frozenset({
             'test.py', 'tests.py', 'test.js', 'tests.js', 'test.ts', 'tests.ts',
             'test.rb', 'tests.rb', 'test.go', 'tests.go', 'test.java', 'tests.java',
             'test.php', 'tests.php', 'test.c', 'tests.c', 'test.cpp', 'tests.cpp',
@@ -321,16 +336,10 @@ def is_test_file(file_path: str, rel_path: Optional[str]) -> bool:
             'test.exs', 'tests.exs', 'test.erl', 'tests.erl', 'test.hs', 'tests.hs',
             'test.ml', 'tests.ml', 'test.fs', 'tests.fs', 'test.f90', 'tests.f90',
             'test.pl', 'tests.pl', 'test.pm', 'tests.pm', 'test.t', 'tests.t',
-            'test.sh', 'tests.sh', 'test.bat', 'tests.bat', 'test.ps1', 'tests.ps1'
-        ]
-        
-        # Check if any part of the path contains test patterns
-        for pattern in test_patterns:
-            if pattern in rel_path_lower or pattern in filename:
-                return True
-                
-        return False
-        
+            'test.sh', 'tests.sh', 'test.bat', 'tests.bat', 'test.ps1', 'tests.ps1',
+        })
+        return filename in exact_basenames
+
     except Exception as e:
         logging.warning(f"Error checking if {file_path} is test file: {e}")
         return False

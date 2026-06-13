@@ -99,7 +99,8 @@ def test_handle_load_completion_success(repo_handler, mock_gui):
     assert mock_gui.current_repo_path == "/repo"
     assert mock_gui.file_handler.repo_path == "/repo"
     assert mock_gui.file_handler.ignore_patterns == ignore_patterns
-    assert mock_gui.file_handler.scanned_text_files == scanned
+    from path_utils import normalize_for_cache
+    assert mock_gui.file_handler.scanned_text_files == {normalize_for_cache(f) for f in scanned}
     assert mock_gui.file_handler.loaded_files == loaded
     mock_gui.file_handler.content_cache.clear.assert_called_once()
     mock_gui.file_handler.read_errors.clear.assert_called_once()

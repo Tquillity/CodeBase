@@ -10,13 +10,12 @@ from typing import Any, Callable, Optional
 import tiktoken
 from constants import (
     ERROR_HANDLING_ENABLED,
-    SECURITY_ENABLED,
     TEMPLATE_XML,
     FILE_SEPARATOR,
 )
 from lru_cache import ThreadSafeLRUCache
 from path_utils import get_relative_path, normalize_for_cache
-from exceptions import FileOperationError, RepositoryError
+from exceptions import FileOperationError
 from error_handler import handle_error
 from security import (
     neutralize_urls,
@@ -25,6 +24,9 @@ from security import (
 )
 
 __all__ = ["get_file_content", "generate_content", "FILE_SEPARATOR"]
+
+# Cache entries: (content, mtime_ns, size_bytes)
+CacheEntry = tuple[str, int, int]
 
 try:
     tokenizer: Optional[Any] = tiktoken.get_encoding("cl100k_base")
@@ -35,24 +37,53 @@ except Exception as e:
     tokenizer = None
 
 
+def _cached_content_if_valid(
+    file_path: str,
+    normalized_path: str,
+    content_cache: ThreadSafeLRUCache,
+) -> Optional[str]:
+    """Return cached content when mtime/size still match; invalidate stale entries."""
+    cached_entry = content_cache.get(normalized_path)
+    if cached_entry is None:
+        return None
+    if not (isinstance(cached_entry, tuple) and len(cached_entry) == 3):
+        content_cache.delete(normalized_path)
+        return None
+
+    cached_content, cached_mtime_ns, cached_size = cached_entry
+    try:
+        stat = os.stat(file_path)
+    except FileNotFoundError:
+        content_cache.delete(normalized_path)
+        return None
+
+    if stat.st_mtime_ns == cached_mtime_ns and stat.st_size == cached_size:
+        return str(cached_content)
+
+    content_cache.delete(normalized_path)
+    return None
+
+
 def get_file_content(
     file_path: str,
     content_cache: ThreadSafeLRUCache,
     lock: threading.Lock,
     read_errors: list[str],
     deleted_files: Optional[list[str]] = None,
+    *,
+    security_enabled: bool = False,
+    max_file_size: Optional[int] = None,
 ) -> Optional[str]:
     # Use normalized path for cache keys for cross-platform consistency
     normalized_path = normalize_for_cache(file_path)
-    
-    # Check cache (LRU cache handles its own locking)
-    cached_content = content_cache.get(normalized_path)
-    if cached_content is not None:
-        return str(cached_content)
 
-    # Enhanced security validation (only for suspicious files)
-    if SECURITY_ENABLED:
-        is_valid, err_msg = validate_file_size(file_path)
+    cached_content = _cached_content_if_valid(file_path, normalized_path, content_cache)
+    if cached_content is not None:
+        return cached_content
+
+    # Enhanced security validation (only when enabled via settings)
+    if security_enabled:
+        is_valid, err_msg = validate_file_size(file_path, max_size=max_file_size)
         if not is_valid:
             with lock:
                 read_errors.append(f"Size: {file_path} - {err_msg}")
@@ -64,7 +95,7 @@ def get_file_content(
             content = file.read()
             
             # Additional content security validation (only for suspicious content)
-            if SECURITY_ENABLED:
+            if security_enabled:
                 # Only validate content for files that might be dangerous
                 file_ext = os.path.splitext(file_path)[1].lower()
                 if file_ext in ['.html', '.htm', '.xml', '.svg']:
@@ -74,8 +105,12 @@ def get_file_content(
                             read_errors.append(f"Content: {file_path} - {err_msg}")
                         return None
             
-            # Store in LRU cache (handles its own locking)
-            content_cache.put(normalized_path, content)
+            # Store in LRU cache with mtime/size for invalidation on edit
+            stat = os.stat(file_path)
+            content_cache.put(
+                normalized_path,
+                (content, stat.st_mtime_ns, stat.st_size),
+            )
             return content
     except FileNotFoundError:
         if deleted_files is not None:
@@ -140,33 +175,29 @@ def generate_content(
     template_format: str = "Markdown (Grok)",
     cancelled_callback: Optional[CancelledCallback] = None,
 ) -> None:
-    try:
-        start_time = time.time()
-        content_parts: list[str] = []
-        
-        # Check if shutdown was requested
-        if gui and hasattr(gui, '_shutdown_requested') and gui._shutdown_requested:
-            logging.info("Shutdown requested, aborting content generation")
-            return
-        
-        # Clear the shared read_errors list before starting a new generation
-        with lock:
-            read_errors.clear()
-    except Exception as e:
-        error = RepositoryError(
-            f"Failed to initialize content generation: {str(e)}",
-            repo_path=repo_path,
-            operation="generate_content",
-            details={"error_type": type(e).__name__}
-        )
-        if ERROR_HANDLING_ENABLED:
-            handle_error(error, "generate_content", show_ui=True)
+    start_time = time.time()
+    content_parts: list[str] = []
+
+    with lock:
+        read_errors.clear()
+
+    # Check if shutdown was requested
+    if gui and hasattr(gui, '_shutdown_requested') and gui._shutdown_requested:
+        logging.info("Shutdown requested, aborting content generation")
         return
 
     sorted_files = sorted(list(files_to_include))
     total_files = len(sorted_files)
     processed_count = 0
     deleted_files: list[str] = []
+
+    security_enabled = False
+    max_file_size: Optional[int] = None
+    if gui and hasattr(gui, 'settings'):
+        settings = gui.settings
+        security_enabled = settings.security_enabled()
+        if security_enabled:
+            max_file_size = settings.max_file_size_bytes()
 
     for file_path in sorted_files:
         # Check for shutdown during processing
@@ -182,7 +213,15 @@ def generate_content(
 
         logging.debug(f"Processing file: {file_path}")
         
-        file_content = get_file_content(file_path, content_cache, lock, read_errors, deleted_files=deleted_files)
+        file_content = get_file_content(
+            file_path,
+            content_cache,
+            lock,
+            read_errors,
+            deleted_files=deleted_files,
+            security_enabled=security_enabled,
+            max_file_size=max_file_size,
+        )
 
         if file_content is not None:
             logging.info(f"[PREVIEW] Successfully read {os.path.basename(file_path)} ({len(file_content):,} chars)")

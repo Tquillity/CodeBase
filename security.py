@@ -88,11 +88,7 @@ class SecurityValidator:
         r'pickle\s*\.',                # pickle operations
         r'shelve\s*\.',                # shelve operations
         r'import\s+subprocess',        # subprocess imports
-        r'import\s+os',                # os imports
-        r'import\s+sys',               # sys imports
         r'from\s+subprocess',          # subprocess imports
-        r'from\s+os',                  # os imports
-        r'from\s+sys',                 # sys imports
     ]
     
     DANGEROUS_EXTENSIONS = {
@@ -125,17 +121,13 @@ class SecurityValidator:
             Tuple of (is_valid, error_message)
         """
         try:
+            raw_path = str(file_path)
+            raw_parts = [p for p in raw_path.replace('\\', '/').split('/') if p]
+            if '..' in raw_parts:
+                return False, f"Path traversal attempt detected: {file_path}"
+
             normalized_path = normalize_path(file_path)
-            
-            # Check for directory traversal attempts
-            if '..' in normalized_path:
-                if base_path:
-                    base_normalized = normalize_path(base_path)
-                    if not is_path_within_base(normalized_path, base_normalized):
-                        return False, f"Path traversal attempt detected: {file_path}"
-                else:
-                    return False, f"Path traversal attempt detected: {file_path}"
-            
+
             if base_path:
                 base_normalized = normalize_path(base_path)
                 if not is_path_within_base(normalized_path, base_normalized):

@@ -7,7 +7,7 @@ import os
 import sys
 from typing import Dict, Optional
 
-from constants import ERROR_LOGGING_LEVEL
+from constants import DEFAULT_LOG_LEVEL
 
 
 class LoggingConfig:
@@ -38,7 +38,7 @@ class LoggingConfig:
             return
         
         # Default configuration
-        default_level = level or ERROR_LOGGING_LEVEL or "INFO"
+        default_level = level or DEFAULT_LOG_LEVEL or "INFO"
         default_format = format_string or '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         
         # Convert string level to logging constant

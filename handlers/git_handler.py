@@ -14,6 +14,28 @@ if TYPE_CHECKING:
     from gui import RepoPromptGUI
 
 
+def _parse_git_branch_header(line: str) -> str:
+    """Parse branch name from `## branch...upstream` porcelain header."""
+    header = line[3:].strip()
+    if '...' in header:
+        return header.split('...', 1)[0].strip() or "main"
+    return header or "main"
+
+
+def _parse_porcelain_path(raw: str) -> str:
+    """Parse a path from git porcelain status (handles quotes and renames)."""
+    path_part = raw[3:] if len(raw) >= 4 else raw
+    if path_part.startswith('"') and path_part.endswith('"'):
+        inner = path_part[1:-1]
+        path_part = inner.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
+    if " -> " in path_part:
+        path_part = path_part.split(" -> ")[-1].strip()
+        if path_part.startswith('"') and path_part.endswith('"'):
+            inner = path_part[1:-1]
+            path_part = inner.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
+    return path_part.strip()
+
+
 class GitHandler:
     gui: Any
 
@@ -37,6 +59,7 @@ class GitHandler:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                timeout=30,
                 check=True
             )
             return result.stdout
@@ -122,17 +145,14 @@ class GitHandler:
 
             for line in lines:
                 if line.startswith('## '):
-                    branch = line.split('...')[0][3:].strip() or "main"
+                    branch = _parse_git_branch_header(line)
                     continue
-                if len(line) < 3:
+                if len(line) < 4:
                     continue
 
-                # XY PATH; D = deleted
                 x_status = line[0]
                 y_status = line[1]
-                path = line[3:].strip()
-                if " -> " in path:
-                    path = path.split(" -> ")[-1]
+                path = _parse_porcelain_path(line)
                 full_path = os.path.join(repo_path, path)
                 is_deleted = (x_status == 'D' or y_status == 'D')
 
@@ -152,7 +172,13 @@ class GitHandler:
                 'changes_deleted': changes_deleted,
                 'branch': branch
             }
-        except Exception as e:
+        except subprocess.TimeoutExpired:
+            logging.warning("Git status timed out")
+            return {'staged': [], 'changes': [], 'staged_deleted': set(), 'changes_deleted': set(), 'branch': 'error'}
+        except subprocess.CalledProcessError as e:
+            logging.warning(f"Git status failed: {e.stderr or e}")
+            return {'staged': [], 'changes': [], 'staged_deleted': set(), 'changes_deleted': set(), 'branch': 'error'}
+        except (OSError, FileNotFoundError) as e:
             logging.warning(f"Git status failed: {e}")
             return {'staged': [], 'changes': [], 'staged_deleted': set(), 'changes_deleted': set(), 'branch': 'error'}
 

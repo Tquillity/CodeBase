@@ -7,6 +7,7 @@ import logging
 import pytest
 from content_manager import get_file_content, generate_content, FILE_SEPARATOR
 from lru_cache import ThreadSafeLRUCache
+from path_utils import normalize_for_cache
 
 # Setup logging for tests
 from logging_config import setup_logging
@@ -43,19 +44,51 @@ def test_get_file_content_success(temp_repo):
 
     content = get_file_content(file1_path, content_cache, lock, read_errors)
     assert content == "Content of file1"
-    assert content_cache.get(os.path.normcase(file1_path)) == "Content of file1"  # Check caching
+    cached = content_cache.get(normalize_for_cache(file1_path))
+    assert cached is not None and cached[0] == "Content of file1"
     assert not read_errors
 
 def test_get_file_content_cached(temp_repo):
     temp_dir, file1_path, _, _, _ = temp_repo
     content_cache = ThreadSafeLRUCache(100, 10)
-    content_cache.put(os.path.normcase(file1_path), "Cached content")
+    stat = os.stat(file1_path)
+    content_cache.put(
+        normalize_for_cache(file1_path),
+        ("Cached content", stat.st_mtime_ns, stat.st_size),
+    )
     lock = threading.Lock()
     read_errors: list[str] = []
 
     content = get_file_content(file1_path, content_cache, lock, read_errors)
     assert content == "Cached content"
     assert not read_errors
+
+
+def test_get_file_content_cache_invalidated_on_edit(temp_repo):
+    temp_dir, file1_path, _, _, _ = temp_repo
+    content_cache = ThreadSafeLRUCache(100, 10)
+    lock = threading.Lock()
+    read_errors: list[str] = []
+
+    assert get_file_content(file1_path, content_cache, lock, read_errors) == "Content of file1"
+    with open(file1_path, "w", encoding="utf-8") as f:
+        f.write("Updated content")
+    content = get_file_content(file1_path, content_cache, lock, read_errors)
+    assert content == "Updated content"
+
+
+def test_get_file_content_cache_invalidated_on_delete(temp_repo):
+    temp_dir, file1_path, _, _, _ = temp_repo
+    content_cache = ThreadSafeLRUCache(100, 10)
+    lock = threading.Lock()
+    read_errors: list[str] = []
+
+    assert get_file_content(file1_path, content_cache, lock, read_errors) == "Content of file1"
+    os.remove(file1_path)
+    deleted: list[str] = []
+    content = get_file_content(file1_path, content_cache, lock, read_errors, deleted_files=deleted)
+    assert content is None
+    assert file1_path in deleted
 
 def test_get_file_content_missing_file(temp_repo):
     temp_dir, _, _, _, missing_path = temp_repo

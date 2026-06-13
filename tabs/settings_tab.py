@@ -26,6 +26,7 @@ class SettingsTab(ttk.Frame):
     copy_format_var: tk.StringVar
     levels_var: tk.StringVar
     exclude_node_modules_var: tk.IntVar
+    exclude_venv_var: tk.IntVar
     exclude_dist_var: tk.IntVar
     exclude_coverage_var: tk.IntVar
     exclude_lock_files_var: tk.IntVar
@@ -62,6 +63,7 @@ class SettingsTab(ttk.Frame):
         self.copy_format_var = tk.StringVar(value=self.settings.get('app', 'copy_format', TEMPLATE_MARKDOWN))
         self.levels_var = tk.StringVar(value=str(self.settings.get('app', 'levels', 1)))
         self.exclude_node_modules_var = tk.IntVar(value=self.settings.get('app', 'exclude_node_modules', 1))
+        self.exclude_venv_var = tk.IntVar(value=self.settings.get('app', 'exclude_venv', 1))
         self.exclude_dist_var = tk.IntVar(value=self.settings.get('app', 'exclude_dist', 1))
         self.exclude_coverage_var = tk.IntVar(value=self.settings.get('app', 'exclude_coverage', 1))
         self.exclude_lock_files_var = tk.IntVar(value=self.settings.get('app', 'exclude_lock_files', 1))
@@ -86,31 +88,17 @@ class SettingsTab(ttk.Frame):
         def _on_mousewheel(event: tk.Event[Any]) -> None:
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
-        def _bind_to_mousewheel(event: tk.Event[Any]) -> None:
-            canvas.bind_all("<MouseWheel>", _on_mousewheel)
-
-        def _unbind_from_mousewheel(event: tk.Event[Any]) -> None:
-            canvas.unbind_all("<MouseWheel>")
-
         inner_frame.bind("<Configure>", _on_configure)
-        
+
         # Linux/X11: mouse wheel events may arrive as Button-4/Button-5
         canvas.bind('<Button-4>', lambda e: canvas.yview_scroll(-1, "units"))
         canvas.bind('<Button-5>', lambda e: canvas.yview_scroll(1, "units"))
+        canvas.bind('<MouseWheel>', _on_mousewheel)
         inner_frame.bind('<Button-4>', lambda e: canvas.yview_scroll(-1, "units"))
         inner_frame.bind('<Button-5>', lambda e: canvas.yview_scroll(1, "units"))
-        
-        # Store references for later use
+
         self.canvas = canvas
         self.inner_frame = inner_frame
-        
-        # Bind mousewheel events when mouse enters the canvas area
-        canvas.bind('<Enter>', _bind_to_mousewheel)
-        canvas.bind('<Leave>', _unbind_from_mousewheel)
-        
-        # Also bind to the settings tab itself for broader coverage
-        self.bind('<Enter>', _bind_to_mousewheel)
-        self.bind('<Leave>', _unbind_from_mousewheel)
 
         # Default Tab Selection
         default_tab_label = ttk.Label(inner_frame, text="Default Tab:", font=("Arial", 10, "bold"))
@@ -151,24 +139,27 @@ class SettingsTab(ttk.Frame):
         exclude_node_modules_checkbox = ttk.Checkbutton(inner_frame, text="Exclude node_modules", variable=self.exclude_node_modules_var)
         exclude_node_modules_checkbox.grid(row=5, column=0, columnspan=2, padx=25, pady=4, sticky="w")
         Tooltip(exclude_node_modules_checkbox, "Hide 'node_modules' folders.")
+        exclude_venv_checkbox = ttk.Checkbutton(inner_frame, text="Exclude virtual environments", variable=self.exclude_venv_var)
+        exclude_venv_checkbox.grid(row=6, column=0, columnspan=2, padx=25, pady=4, sticky="w")
+        Tooltip(exclude_venv_checkbox, "Hide .venv, venv, and virtualenv folders (not bare env/ or .env/).")
         # Exclude dist/build folders
         exclude_dist_checkbox = ttk.Checkbutton(inner_frame, text="Exclude dist/build folders", variable=self.exclude_dist_var)
-        exclude_dist_checkbox.grid(row=6, column=0, columnspan=2, padx=25, pady=4, sticky="w")
+        exclude_dist_checkbox.grid(row=7, column=0, columnspan=2, padx=25, pady=4, sticky="w")
         Tooltip(exclude_dist_checkbox, "Hide build output directories.")
         # Exclude coverage folders
         exclude_coverage_checkbox = ttk.Checkbutton(inner_frame, text="Exclude Coverage folders", variable=self.exclude_coverage_var)
-        exclude_coverage_checkbox.grid(row=7, column=0, columnspan=2, padx=25, pady=4, sticky="w")
+        exclude_coverage_checkbox.grid(row=8, column=0, columnspan=2, padx=25, pady=4, sticky="w")
         Tooltip(exclude_coverage_checkbox, "Hide coverage report folders.")
         # Exclude All Lock Files (Global)
         exclude_lock_files_checkbox = ttk.Checkbutton(inner_frame, text="Exclude All Lock Files (Global)", variable=self.exclude_lock_files_var)
-        exclude_lock_files_checkbox.grid(row=8, column=0, columnspan=2, padx=25, pady=4, sticky="w")
+        exclude_lock_files_checkbox.grid(row=9, column=0, columnspan=2, padx=25, pady=4, sticky="w")
         Tooltip(exclude_lock_files_checkbox, "Hide all lock files (pnpm-lock.yaml, yarn.lock, package-lock.json, etc.) globally.")
         # Exclude Specific Files
         exclude_files_label = ttk.Label(inner_frame, text="Exclude Specific Files:", font=("Arial", 10, "bold"))
-        exclude_files_label.grid(row=9, column=0, columnspan=2, padx=25, pady=(15, 8), sticky="w")
+        exclude_files_label.grid(row=10, column=0, columnspan=2, padx=25, pady=(15, 8), sticky="w")
         Tooltip(exclude_files_label, "Check to hide specific lock files.")
         exclude_files = self.settings.get('app', 'exclude_files', {})
-        row = 10
+        row = 11
         for file, value in exclude_files.items():
             var = tk.IntVar(value=value)
             checkbox = ttk.Checkbutton(inner_frame, text=file, variable=var)
@@ -222,10 +213,14 @@ class SettingsTab(ttk.Frame):
         security_label.grid(row=row, column=0, columnspan=2, padx=20, pady=(20, 10), sticky="w")
         row += 1
 
-        self.security_enabled_var = tk.IntVar(value=self.settings.get('app', 'security_enabled', 1))
+        self.security_enabled_var = tk.IntVar(value=self.settings.get('app', 'security_enabled', 0))
         security_enabled_checkbox = ttk.Checkbutton(inner_frame, text="Enable Security Validation", variable=self.security_enabled_var)
         security_enabled_checkbox.grid(row=row, column=0, columnspan=2, padx=25, pady=5, sticky="w")
-        Tooltip(security_enabled_checkbox, "Block binary/suspicious files.")
+        Tooltip(
+            security_enabled_checkbox,
+            "When enabled, applies stricter file-size and content checks "
+            "(HTML/XML/SVG, large files) before inclusion. Default is off for normal local use.",
+        )
         row += 1
 
         self.max_file_size_var = tk.StringVar(value=str(self.settings.get('app', 'max_file_size_mb', 10)))

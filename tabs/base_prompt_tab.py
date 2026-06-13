@@ -9,9 +9,9 @@ import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.widgets.scrolled import ScrolledText
 
-from constants import SECURITY_ENABLED
 from security import sanitize_content, validate_content_security, validate_template_file
 from widgets import Tooltip
+from widgets.search_utils import search_text_widget
 
 if TYPE_CHECKING:
     from gui import RepoPromptGUI
@@ -57,17 +57,13 @@ class BasePromptTab(ttk.Frame):
 
 
     def perform_search(self, query: str, case_sensitive: bool, whole_word: bool) -> List[Tuple[str, str]]:
-        matches: List[Tuple[str, str]] = []
-        start_pos = "1.0"
-        while True:
-            pos = self.base_prompt_text.search(query, start_pos, stopindex=tk.END,
-                                               nocase=not case_sensitive,
-                                               regexp=whole_word)
-            if not pos: break
-            end_pos = f"{pos}+{len(query)}c"
-            matches.append((pos, end_pos))
-            start_pos = end_pos
-        return matches
+        return search_text_widget(
+            self.base_prompt_text,
+            query,
+            "1.0",
+            case_sensitive=case_sensitive,
+            whole_word=whole_word,
+        )
 
     def highlight_all_matches(self, matches: List[Tuple[str, str]]) -> None:
         for match_data in matches:
@@ -140,7 +136,7 @@ class BasePromptTab(ttk.Frame):
         if template_file:
             try:
                 # Enhanced security validation
-                if SECURITY_ENABLED:
+                if self.gui.settings.security_enabled():
                     is_valid, error = validate_template_file(template_file)
                     if not is_valid:
                         self.gui.show_toast(f"Template validation failed: {error}", toast_type="warning")
@@ -150,7 +146,7 @@ class BasePromptTab(ttk.Frame):
                     content = file.read()
                 
                 # Additional content security validation
-                if SECURITY_ENABLED:
+                if self.gui.settings.security_enabled():
                     is_valid, error = validate_content_security(content, "template")
                     if not is_valid:
                         self.gui.show_toast(f"Template content validation failed: {error}", toast_type="warning")

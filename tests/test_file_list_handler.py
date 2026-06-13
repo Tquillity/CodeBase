@@ -13,6 +13,8 @@ def mock_gui():
     gui.task_queue = MagicMock()
     gui.settings = MagicMock()
     gui.settings.get.return_value = "Markdown (Grok)"
+    gui.settings.security_enabled.return_value = False
+    gui.register_background_thread = MagicMock()
     gui._shutdown_requested = False
     gui._scan_cancel_requested = False
     # Make the task_queue.put method call the callback directly for testing
