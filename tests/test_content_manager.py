@@ -98,7 +98,9 @@ def test_get_file_content_missing_file(temp_repo):
 
     content = get_file_content(missing_path, content_cache, lock, read_errors)
     assert content is None
-    assert "Not Found: " + os.path.normcase(missing_path) in read_errors
+    # Error messages report the original-case path (better UX); the cache KEY
+    # is normcased, but user-facing strings are not.
+    assert "Not Found: " + missing_path in read_errors
 
 def test_get_file_content_permission_denied(monkeypatch, temp_repo):
     temp_dir, file1_path, _, _, _ = temp_repo
@@ -114,7 +116,8 @@ def test_get_file_content_permission_denied(monkeypatch, temp_repo):
 
     content = get_file_content(file1_path, content_cache, lock, read_errors)
     assert content is None
-    assert "Permission Denied: " + os.path.normcase(file1_path) in read_errors
+    # Original-case path in the user-facing error message (see note above).
+    assert "Permission Denied: " + file1_path in read_errors
 
 def test_get_file_content_binary_file(temp_repo):
     temp_dir, _, _, binary_path, _ = temp_repo
@@ -195,6 +198,31 @@ def test_generate_content_preserves_shared_read_errors(temp_repo):
         None,
         None,
     )
+
+
+def test_generate_content_preserves_path_case(temp_repo):
+    """Regression (Windows): the generated prompt must show the on-disk path
+    case, not a case-folded form. loaded_files stores normalize_path
+    (case-preserving); only the content-cache KEY is normcased. If the selection
+    set ever reverts to normalize_for_cache, the rendered path here lowercases on
+    Windows (a no-op assertion on case-sensitive POSIX, which is fine)."""
+    temp_dir, _, _, _, _ = temp_repo
+    mixed = os.path.join(temp_dir, "MyModule.py")
+    with open(mixed, 'w', encoding='utf-8') as f:
+        f.write("x = 1")
+
+    lock = threading.Lock()
+    content_cache = ThreadSafeLRUCache(100, 10)
+    read_errors: list[str] = []
+    captured: list[str] = []
+
+    def completion_callback(content, token_count, errors, deleted_files=None):
+        captured.append(content)
+
+    generate_content({mixed}, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
+
+    assert "File: MyModule.py" in captured[0]
+    assert "mymodule.py" not in captured[0]
 
 
 def test_generate_content_with_errors(temp_repo):

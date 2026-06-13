@@ -6,12 +6,10 @@ import pytest
 from widgets import Tooltip, FolderDialog
 
 @pytest.fixture
-def mock_root():
-    root = tk.Tk()
-    root.withdraw()
-    yield root
-    root.quit()
-    root.destroy()
+def mock_root(make_ttk_root):
+    # Per-test ttkbootstrap.Window via the retrying factory in conftest.py
+    # (handles the transient Tcl init race; cleans up at teardown).
+    return make_ttk_root()
 
 def test_tooltip_show_hide(mock_root):
     widget = tk.Button(mock_root, text="Hover me")

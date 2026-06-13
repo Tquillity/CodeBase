@@ -289,8 +289,13 @@ def test_scan_repo_security_error():
 def test_scan_repo_allows_configured_storage_root():
     gui = MagicMock()
     completion_callback = MagicMock()
+    # Build OS-appropriate absolute paths so the assertion holds on every
+    # platform (os.path.abspath prepends the current drive on Windows).
+    storage_root = os.path.abspath("/mnt/Storage")
+    repo = os.path.abspath("/mnt/Storage/project")
     gui.settings.get.side_effect = (
-        lambda sec, key, default: ["/home/user", "/mnt/Storage"] if key == 'allowed_repo_roots' else default
+        lambda sec, key, default: [os.path.abspath("/home/user"), storage_root]
+        if key == 'allowed_repo_roots' else default
     )
 
     def mock_after(delay, func, *args):
@@ -301,7 +306,7 @@ def test_scan_repo_allows_configured_storage_root():
     with patch('file_scanner.parse_gitignore', return_value=['.git']), \
          patch('file_scanner.yield_repo_files', return_value=iter(())):
         scan_repo(
-            "/mnt/Storage/project",
+            repo,
             gui,
             MagicMock(),
             completion_callback,
@@ -309,7 +314,7 @@ def test_scan_repo_allows_configured_storage_root():
         )
 
     completion_callback.assert_called_once_with(
-        "/mnt/Storage/project",
+        repo,
         ['.git'],
         set(),
         set(),

@@ -18,7 +18,11 @@ def test_load_settings_defaults(temp_settings_file):
     assert settings['app']['prepend_prompt'] == 1
     assert settings['app']['exclude_files']['package-lock.json'] == 1
     assert os.path.expanduser("~") in settings['app']['allowed_repo_roots']
-    assert "/mnt/Storage" in settings['app']['allowed_repo_roots']
+    # Default roots are platform-aware (home + '/mnt/Storage' on Linux, home +
+    # drive roots on Windows); assert against the same source of truth.
+    from security import default_allowed_repo_roots
+    for root in default_allowed_repo_roots():
+        assert root in settings['app']['allowed_repo_roots']
 
 def test_load_settings_from_file(temp_settings_file):
     with open(temp_settings_file, 'w') as f:

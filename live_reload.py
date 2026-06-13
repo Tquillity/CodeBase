@@ -11,7 +11,7 @@ from typing import Any, Optional
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from constants import DEFAULT_LOG_LEVEL, LOG_FILE_PATH, LOG_FORMAT, LOG_TO_CONSOLE, LOG_TO_FILE
+from constants import DEFAULT_LOG_LEVEL, LOG_FORMAT, LOG_TO_CONSOLE, LOG_TO_FILE, get_log_file_path
 from logging_config import get_logger, setup_logging
 
 # Files to ignore during live reload to prevent unnecessary restarts
@@ -32,7 +32,7 @@ IGNORE_PATTERNS = [
 # Setup logging for live reload
 setup_logging(
     level=DEFAULT_LOG_LEVEL,
-    log_file=LOG_FILE_PATH if LOG_TO_FILE else None,
+    log_file=get_log_file_path() if LOG_TO_FILE else None,
     console_output=LOG_TO_CONSOLE,
     format_string=LOG_FORMAT
 )
@@ -60,7 +60,8 @@ class RestartHandler(FileSystemEventHandler):
         self.stop_script()
         try:
             logging.info(f"Starting {self.script_to_run}...")
-            # Use python3 strictly for Linux environment
+            # Use the current interpreter (sys.executable) so this works on any
+            # platform (Windows/Linux) and inside a virtualenv.
             # Set environment variable to indicate this is a live reload instance
             env = os.environ.copy()
             env['CODEBASE_LIVE_RELOAD'] = '1'
@@ -88,7 +89,9 @@ class RestartHandler(FileSystemEventHandler):
                     self.process.kill()
                     self.process.wait()
                     logging.info(f"Process {self.process.pid} killed.")
-            except ProcessLookupError:
+            except (ProcessLookupError, OSError):
+                # OSError/PermissionError can be raised on Windows when the
+                # process has already exited during termination.
                 logging.warning(f"Process {self.process.pid} lookup failed, likely already stopped.")
             except Exception as e:
                 logging.error(f"Error stopping process {self.process.pid}: {e}")

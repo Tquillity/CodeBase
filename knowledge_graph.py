@@ -27,7 +27,15 @@ _connection: Optional[sqlite3.Connection] = None
 
 def _db_path() -> str:
     if appdirs is not None:
-        base = appdirs.user_data_dir("CodeBase", "")
+        # Use the SAME signature as settings.py / gui.py (author defaults to the
+        # app name) so the DB lives alongside settings.json. Passing author=""
+        # diverges on Windows (%LOCALAPPDATA%\CodeBase vs ...\CodeBase\CodeBase).
+        base = appdirs.user_data_dir("CodeBase")
+    elif os.name == "nt":
+        local = os.environ.get(
+            "LOCALAPPDATA", os.path.join(os.path.expanduser("~"), "AppData", "Local")
+        )
+        base = os.path.join(local, "CodeBase", "CodeBase")
     else:
         base = os.path.join(os.path.expanduser("~"), ".local", "share", "CodeBase")
     os.makedirs(base, exist_ok=True)

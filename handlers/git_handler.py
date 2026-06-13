@@ -153,7 +153,7 @@ class GitHandler:
                 x_status = line[0]
                 y_status = line[1]
                 path = _parse_porcelain_path(line)
-                full_path = os.path.join(repo_path, path)
+                full_path = os.path.normpath(os.path.join(repo_path, path))
                 is_deleted = (x_status == 'D' or y_status == 'D')
 
                 if x_status not in (' ', '?'):

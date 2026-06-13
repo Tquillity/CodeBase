@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import string
 import logging
 from typing import Any, List, Optional, Tuple, Union
 from path_utils import normalize_path, is_path_within_base
@@ -11,10 +12,37 @@ from exceptions import SecurityError
 from error_handler import handle_error
 from constants import ERROR_HANDLING_ENABLED
 
-DEFAULT_ALLOWED_REPO_ROOTS = [
-    os.path.expanduser("~"),
-    "/mnt/Storage",
-]
+
+def default_allowed_repo_roots() -> list[str]:
+    """Platform-aware default repository roots.
+
+    Linux keeps the user's home plus the maintainer's ``/mnt/Storage`` mount.
+    Windows allows the home directory plus every existing drive root
+    (``C:\\``, ``D:\\``, ...) so repositories on a secondary drive — the common
+    Windows layout — are permitted out of the box. A hard-coded POSIX path like
+    ``/mnt/Storage`` would normalize to a nonexistent ``C:\\mnt\\Storage`` on
+    Windows and silently allow nothing.
+
+    DELIBERATE POSTURE: enumerating drive roots makes the Windows default broad
+    (effectively any local path is allowed), which is wider than the Linux
+    default. This is intentional — the repo-root check is a soft, user-overridable
+    convenience guard (settings ``allowed_repo_roots``), not a privilege boundary
+    (the user already has full read access to their own filesystem), and Windows
+    developers routinely keep code outside their profile (``C:\\Dev``, ``D:\\src``).
+    Users who want a narrower allow-list can set ``allowed_repo_roots`` in settings.
+    """
+    roots = [os.path.expanduser("~")]
+    if os.name == "nt":
+        for letter in string.ascii_uppercase:
+            drive = f"{letter}:\\"
+            if os.path.exists(drive):
+                roots.append(drive)
+    else:
+        roots.append("/mnt/Storage")
+    return roots
+
+
+DEFAULT_ALLOWED_REPO_ROOTS = default_allowed_repo_roots()
 
 
 def get_allowed_repo_roots(settings_manager: Optional[Any] = None) -> list[str]:
@@ -133,10 +161,17 @@ class SecurityValidator:
                 if not is_path_within_base(normalized_path, base_normalized):
                     return False, f"Path traversal attempt detected: {file_path}"
             
-            # Check for dangerous characters
-            dangerous_chars = ['<', '>', '|', '&', ';', '`', '$', '(', ')', '{', '}']
-            if any(char in normalized_path for char in dangerous_chars):
-                return False, f"Dangerous characters in path: {file_path}"
+            # Reject only characters that are genuinely illegal in a filesystem
+            # path. The previous blacklist also rejected shell metacharacters
+            # ('(', ')', '&', ';', '$', '`', '{', '}') — but those are LEGAL in
+            # file names on both Windows and POSIX, so it wrongly rejected
+            # ubiquitous Windows paths such as 'C:\\Program Files (x86)\\...' and
+            # 'repo (1)'. These paths are never passed to a shell (git is invoked
+            # with argument lists), so shell-quoting is not a concern here.
+            drive, path_remainder = os.path.splitdrive(normalized_path)
+            reserved_chars = set('<>:"|?*') if os.name == "nt" else set()
+            if any((ch in reserved_chars) or (ord(ch) < 32) for ch in path_remainder):
+                return False, f"Invalid characters in path: {file_path}"
             
             # Check file extension
             _, ext = os.path.splitext(normalized_path)

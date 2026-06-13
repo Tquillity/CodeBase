@@ -19,6 +19,9 @@ class SettingsManager:
 
     def load_settings(self) -> dict[str, Any]:
         """Loads settings from JSON file, applying defaults for missing keys."""
+        # Imported lazily to keep the platform-aware default in one place
+        # (security.default_allowed_repo_roots) without a module-load cycle.
+        from security import default_allowed_repo_roots
         default_settings = {
             "app": {
                 "window_geometry": "1200x820",
@@ -69,10 +72,7 @@ class SettingsManager:
                 "sanitize_urls": 0,
                 # Folder selection settings
                 "default_start_folder": os.path.expanduser("~"),
-                "allowed_repo_roots": [
-                    os.path.expanduser("~"),
-                    "/mnt/Storage",
-                ],
+                "allowed_repo_roots": default_allowed_repo_roots(),
             },
             "repo": {}
         }

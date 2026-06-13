@@ -1,12 +1,24 @@
 # tests/test_install.py
 import os
 import shutil
+import sys
 import subprocess
 import tempfile
 
 import pytest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+# install.sh is a Linux-only installer (bash shebang, realpath, sed -i, chmod,
+# XDG ~/.local/{bin,share} and a .desktop file). On Windows, executing a .sh
+# directly raises WinError 193 ("not a valid Win32 application"), and the
+# installer has no Windows equivalent (Windows ships via build_windows.py +
+# an installer/shortcut), so these tests are skipped off POSIX.
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="install.sh is a Linux-only installer; Windows uses build_windows.py",
+)
 
 
 @pytest.fixture

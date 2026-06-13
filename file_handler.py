@@ -24,7 +24,7 @@ from exceptions import FileOperationError, ThreadingError, UIError
 from file_scanner import is_ignored_path, is_text_file
 from lru_cache import ThreadSafeLRUCache
 from module_analyzer import compute_optimal_prompt_paths
-from path_utils import normalize_for_cache
+from path_utils import is_same_path, normalize_path
 
 if TYPE_CHECKING:
     from gui import RepoPromptGUI
@@ -135,7 +135,7 @@ class FileHandler:
                     parent_id = created_items[current_path]
 
             filename = parts[-1]
-            item_path_norm = normalize_for_cache(file_path)
+            item_path_norm = normalize_path(file_path)
             is_selected = item_path_norm in self.loaded_files
             checkbox_state = "☑" if is_selected else "☐"
             tags = ['file_selected'] if is_selected else ['file_default']
@@ -180,7 +180,7 @@ class FileHandler:
         added_items = 0
         for item in items:
             item_path = os.path.join(path, item)
-            item_path_norm = normalize_for_cache(item_path)
+            item_path_norm = normalize_path(item_path)
 
             if is_ignored_path(item_path, self.repo_path, self.ignore_patterns, self.gui):
                 logging.debug(f"Ignored: {item_path}")
@@ -295,7 +295,7 @@ class FileHandler:
         new_state_bool = new_state_symbol == "☑"
 
         item_path = values[0]
-        item_path_norm = normalize_for_cache(item_path)
+        item_path_norm = normalize_path(item_path)
 
         tags = list(item_data['tags'])
         content_changed = False
@@ -334,7 +334,7 @@ class FileHandler:
         for p in paths:
             if not p or not os.path.isfile(p):
                 continue
-            paths_norm.add(normalize_for_cache(p))
+            paths_norm.add(normalize_path(p))
         with self.lock:
             self.loaded_files.update(paths_norm)
         gui = cast("RepoPromptGUI", self.gui)
@@ -351,7 +351,7 @@ class FileHandler:
                     update_item(child)
                 return
             if values and len(values) >= 2:
-                item_path_norm = normalize_for_cache(values[0])
+                item_path_norm = normalize_path(values[0])
                 if item_path_norm in paths_norm:
                     tree.item(item_id, values=(values[0], "☑"), tags=("file_selected",))
             for child in tree.get_children(item_id):
@@ -406,7 +406,7 @@ class FileHandler:
                 continue
 
             child_path = values[0]
-            child_path_norm = normalize_for_cache(child_path)
+            child_path_norm = normalize_path(child_path)
             tags = list(child_data['tags'])
             new_state_symbol = "☑" if selected else "☐"
 
