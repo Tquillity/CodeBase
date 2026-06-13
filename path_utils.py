@@ -14,7 +14,11 @@ from __future__ import annotations
 
 import os
 import logging
-from typing import Optional, Union
+from typing import NewType, Optional, Union
+
+DisplayPath = NewType("DisplayPath", str)
+CachePath = NewType("CachePath", str)
+
 
 def normalize_path(path: Union[str, os.PathLike[str]]) -> str:
     """
@@ -53,6 +57,15 @@ def normalize_for_cache(path: Union[str, os.PathLike[str]]) -> str:
         return ""
 
     return os.path.normcase(os.path.normpath(str(path)))
+
+
+def as_display_path(path: Union[str, os.PathLike[str]]) -> DisplayPath:
+    return DisplayPath(normalize_path(path))
+
+
+def as_cache_path(path: Union[str, os.PathLike[str]]) -> CachePath:
+    return CachePath(normalize_for_cache(path))
+
 
 def safe_join(
     base_path: Union[str, os.PathLike[str]],

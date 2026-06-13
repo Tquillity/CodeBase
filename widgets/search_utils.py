@@ -7,6 +7,24 @@ import tkinter as tk
 from typing import Any
 
 
+def label_matches_query(
+    label: str,
+    query: str,
+    *,
+    case_sensitive: bool,
+    whole_word: bool,
+) -> bool:
+    """Match a tree/list label against a search query (Python-side, not Tk text)."""
+    if not query:
+        return False
+    if whole_word:
+        flags = 0 if case_sensitive else re.IGNORECASE
+        return re.search(rf"\b{re.escape(query)}\b", label, flags) is not None
+    search_in = label if case_sensitive else label.lower()
+    query_term = query if case_sensitive else query.lower()
+    return query_term in search_in
+
+
 def search_text_widget(
     text_widget: Any,
     query: str,

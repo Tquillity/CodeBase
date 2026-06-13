@@ -401,7 +401,7 @@ class ModuleAnalysisTab(ttk.Frame):
         self._fallback_text = tk.Text(
             self._right_container,
             wrap=tk.WORD,
-            font=("Monospace", 9),
+            font=("Consolas", "Courier New", "DejaVu Sans Mono", "monospace", 9),
             yscrollcommand=sb.set,
             state=tk.DISABLED,
         )

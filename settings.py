@@ -7,7 +7,27 @@ from typing import Any, Optional, cast
 
 import appdirs  # type: ignore[import-untyped]
 
-from constants import MAX_FILE_SIZE, TEXT_EXTENSIONS_DEFAULT
+from constants import (
+    CACHE_MAX_MEMORY_MB,
+    CACHE_MAX_SIZE,
+    CROSS_PLATFORM_PATHS,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_WINDOW_SIZE,
+    ERROR_HANDLING_ENABLED,
+    ERROR_UI_FEEDBACK,
+    get_default_allowed_repo_roots,
+    LOG_TO_CONSOLE,
+    LOG_TO_FILE,
+    MAX_CONTENT_LENGTH,
+    MAX_FILE_SIZE,
+    MAX_TEMPLATE_SIZE,
+    SECURITY_STRICT_MODE,
+    TEMPLATE_MARKDOWN,
+    TEXT_EXTENSIONS_DEFAULT,
+    TREE_MAX_ITEMS,
+    TREE_SAFETY_LIMIT,
+    TREE_UI_UPDATE_INTERVAL,
+)
 
 
 class SettingsManager:
@@ -19,12 +39,9 @@ class SettingsManager:
 
     def load_settings(self) -> dict[str, Any]:
         """Loads settings from JSON file, applying defaults for missing keys."""
-        # Imported lazily to keep the platform-aware default in one place
-        # (security.default_allowed_repo_roots) without a module-load cycle.
-        from security import default_allowed_repo_roots
         default_settings = {
             "app": {
-                "window_geometry": "1200x820",
+                "window_geometry": DEFAULT_WINDOW_SIZE,
                 "default_tab": "Content Preview",
                 "prepend_prompt": 1,
                 "show_unloaded": 0,
@@ -45,34 +62,34 @@ class SettingsManager:
                 "search_case_sensitive": 0,
                 "search_whole_word": 0,
                 "default_base_prompt": "",
-                "copy_format": "Markdown (Grok)",
-                "log_level": "INFO",
-                "log_to_file": 1,
-                "log_to_console": 1,
+                "copy_format": TEMPLATE_MARKDOWN,
+                "log_level": DEFAULT_LOG_LEVEL,
+                "log_to_file": 1 if LOG_TO_FILE else 0,
+                "log_to_console": 1 if LOG_TO_CONSOLE else 0,
                 # Performance settings
-                "cache_max_size": 1000,
-                "cache_max_memory_mb": 100,
-                "tree_max_items": 10000,
-                "tree_ui_update_interval": 100,
-                "tree_safety_limit": 10000,
+                "cache_max_size": CACHE_MAX_SIZE,
+                "cache_max_memory_mb": CACHE_MAX_MEMORY_MB,
+                "tree_max_items": TREE_MAX_ITEMS,
+                "tree_ui_update_interval": TREE_UI_UPDATE_INTERVAL,
+                "tree_safety_limit": TREE_SAFETY_LIMIT,
                 # Security settings
                 "security_enabled": 0,
-                "max_file_size_mb": 10,
-                "max_template_size_mb": 1,
-                "max_content_length_mb": 50,
-                "security_strict_mode": 1,
+                "max_file_size_mb": MAX_FILE_SIZE // (1024 * 1024),
+                "max_template_size_mb": MAX_TEMPLATE_SIZE // (1024 * 1024),
+                "max_content_length_mb": MAX_CONTENT_LENGTH // (1024 * 1024),
+                "security_strict_mode": 1 if SECURITY_STRICT_MODE else 0,
                 # Error handling settings
-                "error_handling_enabled": 1,
-                "error_ui_feedback": 1,
+                "error_handling_enabled": 1 if ERROR_HANDLING_ENABLED else 0,
+                "error_ui_feedback": 1 if ERROR_UI_FEEDBACK else 0,
                 "error_logging_level": "ERROR",
                 "error_recovery_attempts": 3,
                 # Path normalization settings
-                "cross_platform_paths": 1,
+                "cross_platform_paths": 1 if CROSS_PLATFORM_PATHS else 0,
                 # URL sanitization settings
                 "sanitize_urls": 0,
                 # Folder selection settings
                 "default_start_folder": os.path.expanduser("~"),
-                "allowed_repo_roots": default_allowed_repo_roots(),
+                "allowed_repo_roots": get_default_allowed_repo_roots(),
             },
             "repo": {}
         }
@@ -144,6 +161,10 @@ class SettingsManager:
             return max_mb * 1024 * 1024
         except (TypeError, ValueError):
             return MAX_FILE_SIZE
+
+    def sanitize_urls_enabled(self) -> bool:
+        """Whether URL neutralization is applied during content generation."""
+        return self.get('app', 'sanitize_urls', 0) == 1
 
     def set(self, section: str, key: str, value: Any) -> None:
         """Sets a setting value."""

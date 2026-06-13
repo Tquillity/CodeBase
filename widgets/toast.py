@@ -42,8 +42,10 @@ class ToastManager:
         # Resolve theme color (ttkbootstrap uses style.colors)
         try:
             color = getattr(style.colors, style_key, None) or style.colors.primary
+            fg = getattr(style.colors, "fg", None) or getattr(style.colors, "inputfg", None) or "#ffffff"
         except Exception:
             color = "#375a7f"
+            fg = "#ffffff"
 
         tw = tk.Toplevel(self.root)
         tw.wm_overrideredirect(True)
@@ -59,7 +61,7 @@ class ToastManager:
             inner,
             text=message,
             font=("Arial", 10),
-            fg="#ffffff",
+            fg=fg,
             bg=color,
             wraplength=self._max_width,
             justify=tk.LEFT,

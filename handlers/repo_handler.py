@@ -21,7 +21,7 @@ from error_handler import handle_error
 from exceptions import FileOperationError, RepositoryError, SecurityError
 from file_scanner import is_text_file, parse_gitignore, yield_repo_files
 from lru_cache import ThreadSafeLRUCache
-from path_utils import normalize_for_cache, normalize_path
+from path_utils import as_display_path, normalize_path
 from security import is_repo_path_allowed
 from widgets import FolderDialog
 
@@ -272,9 +272,8 @@ class RepoHandler:
 
                 processed_count += 1
                 if is_text_file(file_path_abs, self.gui):
-                    normalized_path = normalize_path(file_path_abs)
-                    scanned_files_temp.add(normalized_path)
-                    loaded_files_temp.add(normalized_path)
+                    scanned_files_temp.add(as_display_path(file_path_abs))
+                    loaded_files_temp.add(as_display_path(file_path_abs))
 
                 if processed_count % progress_interval == 0 or processed_count == total_files:
                     pct = int((processed_count / total_files) * 100) if total_files else 100
@@ -328,7 +327,7 @@ class RepoHandler:
         file_handler = self.gui.file_handler
         file_handler.repo_path = repo_path
         file_handler.ignore_patterns = ignore_patterns or []
-        file_handler.scanned_text_files = {normalize_for_cache(f) for f in (scanned_files or set())}
+        file_handler.scanned_text_files = scanned_files or set()
 
         with file_handler.lock:
             file_handler.loaded_files = loaded_files or set()
@@ -374,10 +373,10 @@ class RepoHandler:
         self.gui.show_loading_phase("Building tree...")
         file_handler = self.gui.file_handler
         file_handler.ignore_patterns = ignore_patterns or []
-        file_handler.scanned_text_files = {normalize_for_cache(f) for f in (scanned_files or set())}
+        file_handler.scanned_text_files = scanned_files or set()
 
         with file_handler.lock:
-            normalized_scanned = {normalize_path(p) for p in scanned_files}
+            normalized_scanned = set(scanned_files)
             file_handler.loaded_files = normalized_scanned
             logging.debug(f"Aligned {len(normalized_scanned)} files after refresh.")
 

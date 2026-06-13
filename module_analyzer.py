@@ -50,7 +50,7 @@ IMPORT_PATTERNS: Dict[str, str] = {
     ".mjs": r"(?:^|\n)\s*(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
     ".cjs": r"(?:^|\n)\s*(?:import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]|import\s+['\"]([^'\"]+)['\"]|require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s*\(\s*['\"]([^'\"]+)['\"]\s*\))",
     # Rust: use foo::bar; use crate::baz;
-    ".rs": r"(?:^|\n)\s*use\s+([a-zA-Z0-9_::]+)",
+    ".rs": r"(?:^|\n)\s*use\s+([a-zA-Z0-9_]+(?:::[a-zA-Z0-9_]+)*)",
     # Java/Kotlin: import pkg.Class;
     ".java": r"(?:^|\n)\s*import\s+([a-zA-Z0-9_.]+)\s*;",
     ".kt": r"(?:^|\n)\s*import\s+([a-zA-Z0-9_.]+)\s*;",

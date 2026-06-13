@@ -7,7 +7,7 @@ import threading
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 import pyperclip  # type: ignore[import-untyped]
-from content_manager import generate_content
+from handlers.content_worker import start_content_generation
 from exceptions import RepositoryError
 
 if TYPE_CHECKING:
@@ -236,11 +236,15 @@ class GitHandler:
             gui.task_queue.put((_finish, (content, errors)))
 
         gui.show_loading_state(f"Preparing {title_lower}...")
-        thread = threading.Thread(
-            target=generate_content,
-            args=(set(file_paths), repo_path, fh.lock, completion, fh.content_cache, fh.read_errors, None, gui, current_format),
-            daemon=True
+        start_content_generation(
+            gui,
+            files=set(file_paths),
+            repo_path=repo_path,
+            lock=fh.lock,
+            content_cache=fh.content_cache,
+            template_format=current_format,
+            on_complete=completion,
+            thread_name=f"GitCopy-{title}",
+            error_prefix=f"Git copy ({title}) failed",
         )
-        gui.register_background_thread(thread)
-        thread.start()
 

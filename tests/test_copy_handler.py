@@ -26,7 +26,6 @@ def mock_gui():
     gui.register_background_thread = MagicMock()
     gui.current_repo_path = "/repo"
     gui.file_handler.content_cache = {}
-    gui.file_handler.read_errors = []
     gui.settings = MagicMock()
     gui.settings.get.return_value = "Markdown (Grok)"
     return gui
@@ -38,15 +37,15 @@ def copy_handler(mock_gui):
 
 
 def test_copy_contents_success(copy_handler, mock_gui):
-    with patch.object(copy_handler, '_start_generate_content') as mock_start:
+    with patch("handlers.copy_handler.start_content_generation") as mock_start:
         copy_handler.copy_contents()
         mock_gui.show_loading_state.assert_called_with("Preparing content for clipboard...")
         mock_start.assert_called_once()
-        files, repo_path, fmt, _on_complete = mock_start.call_args[0]
-        assert files == {"file1"}
-        assert repo_path == "/repo"
-        assert fmt == "Markdown (Grok)"
-        assert callable(_on_complete)
+        kwargs = mock_start.call_args.kwargs
+        assert kwargs["files"] == {"file1"}
+        assert kwargs["repo_path"] == "/repo"
+        assert kwargs["template_format"] == "Markdown (Grok)"
+        assert callable(kwargs["on_complete"])
 
 
 def test_copy_contents_no_files(copy_handler, mock_gui):
@@ -76,13 +75,13 @@ def test_copy_structure_empty(copy_handler, mock_gui):
 
 
 def test_copy_all_success(copy_handler, mock_gui):
-    with patch.object(copy_handler, '_start_generate_content') as mock_start:
+    with patch("handlers.copy_handler.start_content_generation") as mock_start:
         copy_handler.copy_all()
         mock_start.assert_called_once()
-        files, repo_path, fmt, _on_complete = mock_start.call_args[0]
-        assert files == {"file1"}
-        assert repo_path == "/repo"
-        assert fmt == "Markdown (Grok)"
+        kwargs = mock_start.call_args.kwargs
+        assert kwargs["files"] == {"file1"}
+        assert kwargs["repo_path"] == "/repo"
+        assert kwargs["template_format"] == "Markdown (Grok)"
 
 
 def test_copy_all_no_content(copy_handler, mock_gui):

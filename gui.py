@@ -27,13 +27,13 @@ from constants import (
     WINDOW_TOP_DURATION,
     get_log_file_path,
 )
-from content_manager import generate_content
+from gui_bindings import bind_app_shortcuts
+from gui_lifecycle import cleanup_resources, register_background_thread, wait_for_threads
 from error_handler import get_error_handler, handle_error, safe_execute
 from exceptions import ConfigurationError, ThreadingError, UIError
 from file_handler import FileHandler
 from file_list_handler import generate_list_content
 from file_scanner import is_text_file
-import knowledge_graph as kg
 from handlers.copy_handler import CopyHandler
 from handlers.git_handler import GitHandler
 from handlers.repo_handler import RepoHandler
@@ -1011,7 +1011,7 @@ class RepoPromptGUI:
             logging.error(f"Error saving settings: {e}")
         
         # Clean up resources
-        self._cleanup_resources()
+        cleanup_resources(self)
         
         # Destroy the window
         try:
@@ -1022,93 +1022,18 @@ class RepoPromptGUI:
     
     def _cleanup_resources(self) -> None:
         """Clean up all application resources."""
-        logging.info("Cleaning up resources...")
-        
-        # Clear knowledge graph connection
-        try:
-            kg.close_connection()
-            logging.info("Knowledge graph connection closed.")
-        except Exception as e:
-            logging.error(f"Error closing knowledge graph: {e}")
+        cleanup_resources(self)
 
-        # Clear content cache
-        try:
-            if hasattr(self.file_handler, 'content_cache'):
-                self.file_handler.content_cache.clear()
-                logging.info("Content cache cleared.")
-        except Exception as e:
-            logging.error(f"Error clearing content cache: {e}")
-        
-        # Clear repo handler cache
-        try:
-            if hasattr(self.repo_handler, 'content_cache'):
-                self.repo_handler.content_cache.clear()
-                logging.info("Repo handler cache cleared.")
-        except Exception as e:
-            logging.error(f"Error clearing repo handler cache: {e}")
-        
-        # Wait for background threads to finish (with timeout)
-        self._wait_for_threads(timeout=5.0)
-        
-        # Clear task queue
-        try:
-            while not self.task_queue.empty():
-                try:
-                    self.task_queue.get_nowait()
-                except queue.Empty:
-                    break
-            logging.info("Task queue cleared.")
-        except Exception as e:
-            logging.error(f"Error clearing task queue: {e}")
-        
-        # Clear file lists
-        try:
-            self.list_selected_files.clear()
-            self.list_read_errors.clear()
-            logging.info("File lists cleared.")
-        except Exception as e:
-            logging.error(f"Error clearing file lists: {e}")
-    
     def _wait_for_threads(self, timeout: float = 5.0) -> None:
         """Wait for registered background threads to finish, up to timeout seconds."""
-        deadline = time.time() + timeout
-        for thread in list(self._background_threads):
-            remaining = max(0.0, deadline - time.time())
-            if remaining <= 0:
-                break
-            thread.join(timeout=remaining)
-    
+        wait_for_threads(self, timeout)
+
     def register_background_thread(self, thread: threading.Thread) -> None:
         """Register a background thread for cleanup tracking."""
-        self._background_threads.append(thread)
-        logging.debug(f"Registered background thread: {thread.name}")
+        register_background_thread(self, thread)
 
     def bind_keys(self) -> None:
-        def _widget_is_text_entry(widget: Any) -> bool:
-            return isinstance(widget, (tk.Text, tk.Entry))
-
-        def _on_copy_contents(e: Any) -> None:
-            if _widget_is_text_entry(e.widget):
-                return
-            self.copy_handler.copy_contents()
-
-        def _on_copy_structure(e: Any) -> None:
-            if _widget_is_text_entry(e.widget):
-                return
-            self.copy_handler.copy_structure()
-
-        def _on_copy_all(e: Any) -> None:
-            if _widget_is_text_entry(e.widget):
-                return
-            self.copy_handler.copy_all()
-
-        self.root.bind('<Control-r>', lambda e: self.repo_handler.select_repo())
-        self.root.bind('<Control-F5>', lambda e: self.repo_handler.refresh_repo())
-        self.root.bind('<Control-c>', _on_copy_contents)
-        self.root.bind('<Control-s>', _on_copy_structure)
-        self.root.bind('<Control-a>', _on_copy_all)
-        self.root.bind('<Control-t>', lambda e: self.base_prompt_tab.save_template())
-        self.root.bind('<Control-l>', lambda e: self.base_prompt_tab.load_template())
+        bind_app_shortcuts(self)
 if __name__ == "__main__":
     root = ttk.Window(themename="darkly")
     app = RepoPromptGUI(root)

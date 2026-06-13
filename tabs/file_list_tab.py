@@ -202,7 +202,9 @@ class FileListTab(ttk.Frame):
             self.copy_list_button.config(state=tk.DISABLED)
             self.gui.show_status_message("No valid files in list.", error=True)
         if self.gui.list_read_errors:
-            unique_errors = list(dict.fromkeys(self.gui.list_read_errors))
+            with self.gui.file_handler.lock:
+                self.gui.list_read_errors = list(dict.fromkeys(self.gui.list_read_errors))
+            unique_errors = self.gui.list_read_errors
             self.error_label.config(text=f"Errors: {'; '.join(unique_errors[:3])}")
         
         # Ensure text area remains editable after loading
@@ -270,5 +272,11 @@ class FileListTab(ttk.Frame):
             self.gui.copy_handler._handle_copy_completion_final(prompt=prompt, content=content, structure=None, errors=errors,
                                                 status_message="Copied from file list" if not errors else "Copy failed with errors")
         # FIX: Pass self.gui to generate_list_content for queue access
-        generate_list_content(self.gui, self.gui.list_selected_files, self.gui.current_repo_path, self.gui.file_handler.lock,
-                            completion_callback, self.gui.file_handler.content_cache, self.gui.list_read_errors)
+        generate_list_content(
+            self.gui,
+            self.gui.list_selected_files,
+            self.gui.current_repo_path,
+            self.gui.file_handler.lock,
+            completion_callback,
+            self.gui.file_handler.content_cache,
+        )

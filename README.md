@@ -1,6 +1,6 @@
 # CodeBase
 
-**Version 7.3.0**
+**Version 7.5.0**
 
 CodeBase is a cross-platform desktop application (Linux and Windows) that scans a local source repository, lets you select files, previews the combined content, and copies the result to the clipboard for use in LLM prompts or code reviews.
 
@@ -91,4 +91,8 @@ The application reads local repository files and can enforce size/content safety
 ## License
 
 See `LICENSE`.
+
+## Changelog
+
+User-facing changes are documented in [`CHANGELOG.md`](CHANGELOG.md).
 

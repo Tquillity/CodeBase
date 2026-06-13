@@ -5,6 +5,7 @@ import time
 import threading
 import logging
 import pytest
+from content_generation_context import ContentGenerationContext
 from content_manager import get_file_content, generate_content, FILE_SEPARATOR
 from lru_cache import ThreadSafeLRUCache
 from path_utils import normalize_for_cache
@@ -161,7 +162,7 @@ def test_generate_content_success(temp_repo):
         token_counts.append(token_count)
         local_errors.extend(errors or [])
 
-    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
+    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, None)
 
     # Since it's sync, callback is called immediately
     assert len(generated_content) == 1
@@ -174,19 +175,16 @@ def test_generate_content_success(temp_repo):
 
     assert token_counts[0] > 0
     assert not local_errors
-    assert not read_errors
 
 
-def test_generate_content_preserves_shared_read_errors(temp_repo):
-    """Per-operation errors must not clear or overwrite the shared read_errors list."""
+def test_generate_content_isolated_operation_errors(temp_repo):
+    """Errors are returned via callback only, not via a shared list parameter."""
     temp_dir, file1_path, _, _, _ = temp_repo
     lock = threading.Lock()
     content_cache = ThreadSafeLRUCache(100, 10)
-    read_errors: list[str] = ["pre-existing error"]
 
     def completion_callback(content, token_count, errors, deleted_files=None):
         assert errors == []
-        assert read_errors == ["pre-existing error"]
 
     generate_content(
         {file1_path},
@@ -194,9 +192,7 @@ def test_generate_content_preserves_shared_read_errors(temp_repo):
         lock,
         completion_callback,
         content_cache,
-        read_errors,
-        None,
-        None,
+        ContentGenerationContext(),
     )
 
 
@@ -219,7 +215,7 @@ def test_generate_content_preserves_path_case(temp_repo):
     def completion_callback(content, token_count, errors, deleted_files=None):
         captured.append(content)
 
-    generate_content({mixed}, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
+    generate_content({mixed}, temp_dir, lock, completion_callback, content_cache, None)
 
     assert "File: MyModule.py" in captured[0]
     assert "mymodule.py" not in captured[0]
@@ -241,7 +237,7 @@ def test_generate_content_with_errors(temp_repo):
         local_errors.extend(errors or [])
         local_deleted.extend(deleted_files or [])
 
-    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
+    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, None)
 
     assert generated_content[0] == ""
     assert missing_path in local_deleted
@@ -263,7 +259,7 @@ def test_generate_content_sorted_order(temp_repo):
     def completion_callback(content, *args):
         generated_content.append(content)
 
-    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
+    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, None)
 
     content = generated_content[0]
     parts = content.split(FILE_SEPARATOR)
@@ -286,7 +282,7 @@ def test_generate_content_token_count(temp_repo):
     def completion_callback(_, token_count, __, ___=None):
         token_counts.append(token_count)
 
-    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
+    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, None)
 
     # Approximate, but >0
     assert token_counts[0] > 5
@@ -303,7 +299,7 @@ def test_generate_content_performance(caplog, temp_repo):
         pass
 
     start_time = time.time()
-    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, read_errors, None, None)
+    generate_content(files_to_include, temp_dir, lock, completion_callback, content_cache, None)
     duration = time.time() - start_time
 
     assert duration < 1  # Should be fast for small files

@@ -46,7 +46,7 @@ def ensure_pyinstaller() -> None:
         )
     except subprocess.CalledProcessError:
         print("Warning: PyInstaller not found. Attempting to install...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller>=6.0.0,<7"])
 
 
 def ensure_icon() -> None:

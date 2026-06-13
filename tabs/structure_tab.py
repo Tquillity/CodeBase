@@ -355,14 +355,19 @@ class StructureTab(ttk.Frame):
         else:
             self.expand_collapse_button.config(text="Expand All")
 
-    def perform_search(self, query: str, case_sensitive: int, whole_word: int) -> List[str]:
+    def perform_search(self, query: str, case_sensitive: bool, whole_word: bool) -> List[str]:
+        from widgets.search_utils import label_matches_query
+
         matches: List[str] = []
         if self.tree.get_children():
              def collect_matches(item: str) -> None:
                  item_text = self.tree.item(item)["text"]
-                 search_in = item_text.lower() if not case_sensitive else item_text
-                 query_term = query.lower() if not case_sensitive else query
-                 if query_term in search_in:
+                 if label_matches_query(
+                     item_text,
+                     query,
+                     case_sensitive=bool(case_sensitive),
+                     whole_word=bool(whole_word),
+                 ):
                      matches.append(item)
                  for child in self.tree.get_children(item):
                      collect_matches(child)

@@ -18,6 +18,7 @@ except ImportError:
     appdirs = None
 
 from constants import KNOWLEDGE_DB_FILENAME, RECOMMENDATION_HISTORY_DAYS
+from path_utils import normalize_for_cache
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def _db_path() -> str:
         local = os.environ.get(
             "LOCALAPPDATA", os.path.join(os.path.expanduser("~"), "AppData", "Local")
         )
-        base = os.path.join(local, "CodeBase", "CodeBase")
+        base = os.path.join(local, "CodeBase")
     else:
         base = os.path.join(os.path.expanduser("~"), ".local", "share", "CodeBase")
     os.makedirs(base, exist_ok=True)
@@ -97,7 +98,8 @@ def _init_schema(conn: sqlite3.Connection) -> None:
 
 
 def _path_hash(path: str) -> str:
-    return hashlib.sha256(path.encode("utf-8", errors="replace")).hexdigest()[:32]
+    key = normalize_for_cache(path)
+    return hashlib.sha256(key.encode("utf-8", errors="replace")).hexdigest()[:32]
 
 
 def path_hash(path: str) -> str:

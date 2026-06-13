@@ -7,7 +7,7 @@ This document outlines the architectural standards, coding conventions, and rule
 
 ## 2. Tech Stack & Libraries
 *   **UI Framework:** `ttkbootstrap` (Theme: `darkly` by default). Do not use standard `tkinter` widgets unless strictly necessary for functionality not present in `ttkbootstrap`.
-*   **Threading:** `threading` module. **Never** run file I/O or heavy processing on the main UI thread. Use the `gui.task_queue` pattern or `gui.register_background_thread`.
+*   **Threading:** `threading` module. **Never** run file I/O or heavy processing on the main UI thread. Use the `gui.task_queue` pattern or `gui.register_background_thread`. For content generation specifically, use `handlers.content_worker.start_content_generation`.
 *   **Icons/DnD:** `tkinterdnd2` for drag-and-drop.
 *   **Build System:** PyInstaller (both platforms) + FPM → RPM on Linux (`build_linux.py`); PyInstaller `--onefile` → `.exe` on Windows (`build_windows.py`).
 
@@ -17,6 +17,10 @@ This document outlines the architectural standards, coding conventions, and rule
 *   **`tabs/`**: UI components separated by functional tab (e.g., `content_tab.py`, `structure_tab.py`).
 *   **`panels/`**: Collapsible side panels (e.g., git status, module analysis).
 *   **`handlers/`**: Business logic separated by domain (e.g., `repo_handler.py`, `copy_handler.py`, `search_handler.py`).
+    *   **`handlers/content_worker.py`**: **Single entry point** for background `generate_content` (preview, copy, git, file-list). Never spawn content-generation threads elsewhere.
+*   **`content_manager.py`**: Synchronous file read + content assembly (`get_file_content`, `generate_content`).
+*   **`content_generation_context.py`**: Policy snapshot (`security_enabled`, `sanitize_urls`, abort flags) passed into `generate_content` — built via `build_content_context_from_gui()`.
+*   **`gui_bindings.py`**, **`gui_lifecycle.py`**: Global shortcuts and shutdown/thread cleanup extracted from `gui.py`.
 *   **`file_handler.py`**, **`search_handler.py`**, **`file_list_handler.py`**: Root-level handler modules (file I/O, search, file-list generation).
 *   **`constants.py`**: All configuration constants, default values, and version strings. **Update VERSION here.**
 *   **`assets/`**: Binary assets (icons).

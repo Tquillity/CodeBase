@@ -24,3 +24,28 @@ def test_python_multi_import():
         assert "pathlib" in refs
     finally:
         os.unlink(path)
+
+
+def test_rust_use_import_extraction():
+    with tempfile.NamedTemporaryFile(suffix=".rs", mode="w", delete=False) as f:
+        f.write("use std::collections::HashMap;\nuse crate::utils::helper;\n")
+        path = f.name
+    try:
+        refs = _get_imports_from_source(path)
+        assert "std::collections::HashMap" in refs
+        assert "crate::utils::helper" in refs
+        assert _normalize_module_ref(refs[0], "src") == "std"
+    finally:
+        os.unlink(path)
+
+
+def test_typescript_import_extraction():
+    with tempfile.NamedTemporaryFile(suffix=".ts", mode="w", delete=False) as f:
+        f.write("import { foo } from './utils/helper';\nrequire('lodash');\n")
+        path = f.name
+    try:
+        refs = _get_imports_from_source(path)
+        assert "./utils/helper" in refs
+        assert "lodash" in refs
+    finally:
+        os.unlink(path)

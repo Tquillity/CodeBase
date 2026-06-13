@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, cast
 
 import tkinter as tk
 
-from content_manager import generate_content
+from handlers.content_worker import start_content_generation
 from constants import (
     CACHE_MAX_MEMORY_MB,
     CACHE_MAX_SIZE,
@@ -24,7 +24,7 @@ from exceptions import FileOperationError, ThreadingError, UIError
 from file_scanner import is_ignored_path, is_text_file
 from lru_cache import ThreadSafeLRUCache
 from module_analyzer import compute_optimal_prompt_paths
-from path_utils import is_same_path, normalize_path
+from path_utils import normalize_path
 
 if TYPE_CHECKING:
     from gui import RepoPromptGUI
@@ -482,14 +482,19 @@ class FileHandler:
                 gui.show_toast("Preview generation cancelled.", "info")
             gui.task_queue.put((cleanup, ()))
 
-        thread = threading.Thread(
-            target=generate_content,
-            args=(files_to_include, self.repo_path, self.lock, wrapped_completion, self.content_cache, self.read_errors, queued_progress, self.gui, current_format),
-            kwargs={"cancelled_callback": on_preview_cancelled},
-            daemon=True,
+        start_content_generation(
+            gui,
+            files=files_to_include,
+            repo_path=self.repo_path,
+            lock=self.lock,
+            content_cache=self.content_cache,
+            template_format=current_format,
+            on_complete=wrapped_completion,
+            progress_callback=queued_progress,
+            cancelled_callback=on_preview_cancelled,
+            thread_name="PreviewGen",
+            error_prefix="Preview generation failed",
         )
-        gui.register_background_thread(thread)
-        thread.start()
 
     def expand_all(self, item: str = "", max_depth: Optional[int] = None) -> None:
         """Iterative expand_all implementation with smart depth limiting to prevent infinite loops."""

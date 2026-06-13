@@ -36,8 +36,14 @@ TEXT_EXTENSIONS_DEFAULT = {
 # File separator used in content generation
 FILE_SEPARATOR = "===FILE_SEPARATOR===\n"
 
+def get_default_allowed_repo_roots() -> list[str]:
+    """Platform-aware default repo roots (delegates to security module)."""
+    from security import default_allowed_repo_roots
+    return default_allowed_repo_roots()
+
+
 # Application version
-VERSION = "7.3.0"
+VERSION = "7.5.0"
 
 # Cache configuration
 CACHE_MAX_SIZE = 1000  # Maximum number of cached files
@@ -81,7 +87,6 @@ def get_log_file_path() -> str:
         return LOG_FILE_PATH
 
 # Security configuration
-SECURITY_ENABLED = False  # Enable via settings for stricter behavior
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file size
 MAX_TEMPLATE_SIZE = 1024 * 1024   # 1MB max template size
 MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max content length

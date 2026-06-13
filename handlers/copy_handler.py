@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import logging
-import threading
 import tkinter as tk
-from typing import TYPE_CHECKING, Any, Callable, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import pyperclip  # type: ignore[import-untyped]
 import knowledge_graph as kg
-from content_manager import generate_content
 from constants import ERROR_MESSAGE_DURATION
+from handlers.content_worker import start_content_generation
 
 if TYPE_CHECKING:
     from gui import RepoPromptGUI
@@ -19,45 +18,6 @@ class CopyHandler:
 
     def __init__(self, gui: Any) -> None:
         self.gui = gui
-
-    def _start_generate_content(
-        self,
-        files_to_copy: set[str],
-        repo_path: str,
-        current_format: str,
-        on_complete: Callable[[str, int, list[str], Optional[list[str]]], None],
-    ) -> None:
-        gui = cast("RepoPromptGUI", self.gui)
-        fh = gui.file_handler
-
-        def completion(
-            content: str,
-            token_count: int,
-            errors: list[str],
-            deleted_files: Optional[list[str]] = None,
-        ) -> None:
-            gui.task_queue.put((
-                on_complete,
-                (content, token_count, errors, deleted_files),
-            ))
-
-        thread = threading.Thread(
-            target=generate_content,
-            args=(
-                files_to_copy,
-                repo_path,
-                fh.lock,
-                completion,
-                fh.content_cache,
-                fh.read_errors,
-                None,
-                gui,
-                current_format,
-            ),
-            daemon=True,
-        )
-        gui.register_background_thread(thread)
-        thread.start()
 
     def copy_contents(self) -> None:
         gui = cast("RepoPromptGUI", self.gui)
@@ -81,18 +41,32 @@ class CopyHandler:
             gui.show_status_message("No repository loaded.", error=True)
             return
 
-        completion_lambda = lambda content, token_count, errors, deleted_files=None: self._handle_copy_completion_final(
-            prompt=prompt,
-            content=content,
-            structure=None,
-            errors=errors,
-            status_message="Copied selected file contents" if not errors else "Copy failed with errors",
-            deleted_files=deleted_files or [],
-            files_copied=list(files_to_copy),
-            repo_path=repo_path,
-        )
+        def completion(content: str, token_count: int, errors: list[str], deleted_files: Optional[list[str]] = None) -> None:
+            gui.task_queue.put((
+                self._handle_copy_completion_final,
+                (
+                    prompt,
+                    content,
+                    None,
+                    errors,
+                    "Copied selected file contents" if not errors else "Copy failed with errors",
+                    deleted_files or [],
+                    list(files_to_copy),
+                    repo_path,
+                ),
+            ))
 
-        self._start_generate_content(files_to_copy, repo_path, current_format, completion_lambda)
+        start_content_generation(
+            gui,
+            files=files_to_copy,
+            repo_path=repo_path,
+            lock=gui.file_handler.lock,
+            content_cache=gui.file_handler.content_cache,
+            template_format=current_format,
+            on_complete=completion,
+            thread_name="CopyContents",
+            error_prefix="Copy contents failed",
+        )
 
     def copy_structure(self) -> None:
         gui = cast("RepoPromptGUI", self.gui)
@@ -139,24 +113,49 @@ class CopyHandler:
 
         repo_path = gui.current_repo_path
 
-        completion_lambda = lambda content, token_count, errors, deleted_files=None: self._handle_copy_completion_final(
-            prompt=prompt,
-            content=content,
-            structure=structure,
-            errors=errors,
-            status_message="Copied All (Prompt, Content, Structure)" if not errors else "Copy All failed with errors",
-            deleted_files=deleted_files or [],
-            files_copied=list(files_to_copy) if files_to_copy else None,
-            repo_path=repo_path,
-        )
         if files_to_copy:
             if not repo_path:
                 gui.hide_loading_state()
                 gui.show_status_message("No repository loaded.", error=True)
                 return
-            self._start_generate_content(files_to_copy, repo_path, current_format, completion_lambda)
+
+            def completion(content: str, token_count: int, errors: list[str], deleted_files: Optional[list[str]] = None) -> None:
+                gui.task_queue.put((
+                    self._handle_copy_completion_final,
+                    (
+                        prompt,
+                        content,
+                        structure,
+                        errors,
+                        "Copied All (Prompt, Content, Structure)" if not errors else "Copy All failed with errors",
+                        deleted_files or [],
+                        list(files_to_copy),
+                        repo_path,
+                    ),
+                ))
+
+            start_content_generation(
+                gui,
+                files=files_to_copy,
+                repo_path=repo_path,
+                lock=gui.file_handler.lock,
+                content_cache=gui.file_handler.content_cache,
+                template_format=current_format,
+                on_complete=completion,
+                thread_name="CopyAll",
+                error_prefix="Copy all failed",
+            )
         else:
-            self._handle_copy_completion_final(prompt=prompt, content="", structure=structure, errors=[], status_message="Copied All (Prompt, Structure)", deleted_files=[], files_copied=None, repo_path=repo_path)
+            self._handle_copy_completion_final(
+                prompt=prompt,
+                content="",
+                structure=structure,
+                errors=[],
+                status_message="Copied All (Prompt, Structure)",
+                deleted_files=[],
+                files_copied=None,
+                repo_path=repo_path,
+            )
 
     def _handle_copy_completion_final(
         self,

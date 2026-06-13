@@ -1,14 +1,14 @@
 # CodeBase - Project Board
 
-**Version 7.3.0** — A Linux desktop tool for preparing codebase content for LLM prompts and code reviews. Scan repositories, select files, preview combined content, and copy to clipboard with one click.
+**Version 7.5.0** — A cross-platform desktop tool for preparing codebase content for LLM prompts and code reviews. Scan repositories, select files, preview combined content, and copy to clipboard with one click.
 
 ## Overview
-Linux desktop application for scanning local repositories, selecting files, and copying combined content to clipboard for LLM prompts and code reviews.
+Cross-platform desktop application (Linux and Windows) for scanning local repositories, selecting files, and copying combined content to clipboard for LLM prompts and code reviews.
 
 ## Tech Stack
 - **Language**: Python 3
 - **GUI Framework**: Tkinter + ttkbootstrap
-- **Platform**: Linux
+- **Platform**: Linux and Windows
 - **Dependencies**: See `requirements.txt`
 
 ## Key Features
@@ -22,21 +22,33 @@ Linux desktop application for scanning local repositories, selecting files, and 
 
 ## Quick Start
 ```bash
-# Development
+# Development (Linux)
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python3 main.py
 
-# User Install
+# User Install (Linux)
 ./install.sh
+
+# Development / Build (Windows)
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+
+# User Install / Build (Windows)
+python build_windows.py
+# Then run install.ps1 for shortcuts, or use dist\CodeBase.exe directly
 ```
 
 ## Project Status
 ✅ Core functionality complete  
+✅ Cross-platform Linux + Windows support  
 ✅ Test suite available (`pytest`)  
 ✅ Security checks implemented (`security.py`)  
 ✅ Settings management (`settings.py`)  
+✅ **2026-06-13 code review fixes** — cache invalidation, background copy threading, search boundaries, path consistency, config hygiene  
 ✅ **Sprint 2: Hierarchical Clustering** — scipy-based clustering, dendrogram, Select This Cluster.  
 ✅ **Sprint 3: Knowledge Graph & Intelligent Prompt Builder** — SQLite persistent memory, knapsack-style optimal prompt, local recommendations (Insights panel).
 
@@ -48,6 +60,7 @@ python3 main.py
 ✅ **#3 Full type hints + mypy --strict** — Comprehensive type hints across core modules (constants, exceptions, path_utils, lru_cache, settings, security, error_handler, content_manager, file_scanner); handlers and tabs started; `mypy.ini` with strict + explicit_package_bases; external libs use `# type: ignore[import-untyped]` where stubs missing.
 
 ## Changelog
+- **7.5.0** — Cross-platform Windows support; 2026-06-13 code review fixes (cache invalidation, background copy, search boundaries, path consistency, config hygiene). See `CHANGELOG.md`.
 - **7.3.0** — Root-anchored `.gitignore` entries such as `/.cypress-cache/` are now respected during scans, preventing accidental cache ingestion and token spikes. Local desktop installation also supports the bundled SVG icon for app menu integration.
 - **7.2.0** — SQLite Knowledge Graph, persistent copy history, knapsack-style optimal prompt building, and local module recommendations (Insights panel). Git Status panel selection checkboxes (selective copy for staged/unstaged files). Grok API removed; local heuristics retained.
 - **7.0.0** — Module Analysis Sprint 2: hierarchical clusters, dendrogram, Select This Cluster.
@@ -68,6 +81,7 @@ python3 main.py
 - `file_scanner.py` - Repository scanning
 - `content_manager.py` - Content generation
 - `handlers/` - Feature handlers (copy, git, repo, search)
+- `build_linux.py` / `build_windows.py` - Platform builds
 
 ## Testing
 ```bash
