@@ -239,7 +239,7 @@ def test_copy_contents(gui: RepoPromptGUI) -> None:
     gui.current_repo_path = "/repo"
     with patch.object(gui.base_prompt_tab.base_prompt_text, 'get', return_value="Prompt text\n"), \
          patch.object(gui, 'show_loading_state') as mock_show_loading, \
-         patch('handlers.content_worker.start_content_generation') as mock_start:
+         patch('handlers.copy_handler.start_content_generation') as mock_start:
         gui.copy_handler.copy_contents()
         mock_show_loading.assert_called_with("Preparing content for clipboard...")
         mock_start.assert_called_once()

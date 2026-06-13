@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import tkinter as tk
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
@@ -21,6 +22,10 @@ if TYPE_CHECKING:
     from gui import RepoPromptGUI
 
 logger = logging.getLogger(__name__)
+
+_MONO_FALLBACK_FONT: tuple[str, int] = (
+    ("Consolas", 9) if sys.platform == "win32" else ("DejaVu Sans Mono", 9)
+)
 
 # Matplotlib: explicit TkAgg for Linux (Wayland/X11)
 try:
@@ -401,7 +406,7 @@ class ModuleAnalysisTab(ttk.Frame):
         self._fallback_text = tk.Text(
             self._right_container,
             wrap=tk.WORD,
-            font=("Consolas", "Courier New", "DejaVu Sans Mono", "monospace", 9),
+            font=_MONO_FALLBACK_FONT,
             yscrollcommand=sb.set,
             state=tk.DISABLED,
         )

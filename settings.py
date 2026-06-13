@@ -152,7 +152,7 @@ class SettingsManager:
 
     def security_enabled(self) -> bool:
         """Whether stricter file-size and content validation is active."""
-        return self.get('app', 'security_enabled', 0) == 1
+        return bool(self.get('app', 'security_enabled', 0))
 
     def max_file_size_bytes(self) -> int:
         """Configured max file size in bytes for security validation."""
@@ -164,7 +164,7 @@ class SettingsManager:
 
     def sanitize_urls_enabled(self) -> bool:
         """Whether URL neutralization is applied during content generation."""
-        return self.get('app', 'sanitize_urls', 0) == 1
+        return bool(self.get('app', 'sanitize_urls', 0))
 
     def set(self, section: str, key: str, value: Any) -> None:
         """Sets a setting value."""
