@@ -2,7 +2,7 @@
 
 **Version 7.3.0**
 
-CodeBase is a Linux desktop application that scans a local source repository, lets you select files, previews the combined content, and copies the result to the clipboard for use in LLM prompts or code reviews.
+CodeBase is a cross-platform desktop application (Linux and Windows) that scans a local source repository, lets you select files, previews the combined content, and copies the result to the clipboard for use in LLM prompts or code reviews.
 
 ## Features
 
@@ -18,40 +18,71 @@ CodeBase is a Linux desktop application that scans a local source repository, le
 
 ## Requirements
 
-- Linux
-- Python 3
-- Tkinter (system package)
+- Linux or Windows
+- Python 3.10+
+- Tkinter (bundled with the official Windows installer; on Linux install the system `python3-tk` package)
 
 ## Install (Developer)
 
-Create a virtual environment and install dependencies:
+Create a virtual environment and install dependencies.
+
+**Linux:**
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 python3 -m pip install -r requirements-dev.txt
+python3 main.py
 ```
 
-Run the app:
+**Windows (PowerShell):**
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
+python main.py
+```
+
+## Build
+
+**Linux** (produces an RPM; requires [`fpm`](https://fpm.readthedocs.io)):
 
 ```bash
-python3 main.py
+python3 build_linux.py
+```
+
+**Windows** (produces `dist\CodeBase.exe` via PyInstaller):
+
+```powershell
+python build_windows.py
 ```
 
 ## Install (User)
 
-Use the installer script:
+**Linux** — use the installer script:
 
 ```bash
 ./install.sh
 ```
 
+**Windows** — build the executable, then run the installer (creates Start Menu / Desktop shortcuts under your user profile, no admin required):
+
+```powershell
+python build_windows.py
+powershell -ExecutionPolicy Bypass -File install.ps1 -Desktop
+```
+
 ## Tests
 
 ```bash
-python3 -m pytest
+python -m pytest
 ```
+
+The test suite runs on both Linux and Windows. Tests that exercise the Linux-only
+installer (`install.sh`) are skipped automatically on Windows.
 
 ## Security Notes
 

@@ -112,7 +112,7 @@ def test_handle_load_completion_success(repo_handler, mock_gui):
     mock_gui.show_status_message.assert_called_with("Loaded repo successfully.", duration=5000)
 
 def test_handle_refresh_completion_success(repo_handler, mock_gui):
-    from path_utils import normalize_for_cache
+    from path_utils import normalize_path
     scanned = set(["/repo/file1", "/repo/file2", "/repo/new_file"])
     previous = set(["/repo/file1"])
     expansion = set(["/repo/dir"])
@@ -121,7 +121,7 @@ def test_handle_refresh_completion_success(repo_handler, mock_gui):
 
     # hide_loading_state is not called on success; it is called when preview completes
     # Should now select ALL scanned files, normalized
-    expected_loaded = {normalize_for_cache(f) for f in scanned}
+    expected_loaded = {normalize_path(f) for f in scanned}
     assert mock_gui.file_handler.loaded_files == expected_loaded
     mock_gui.structure_tab.populate_tree.assert_called_with("/repo")
     mock_gui.trigger_preview_update.assert_called_once()

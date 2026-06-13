@@ -133,7 +133,9 @@ class GitHandler:
                 path = line[3:].strip()
                 if " -> " in path:
                     path = path.split(" -> ")[-1]
-                full_path = os.path.join(repo_path, path)
+                # git emits forward-slash paths even on Windows; normpath
+                # collapses them to the OS separator (no-op on POSIX).
+                full_path = os.path.normpath(os.path.join(repo_path, path))
                 is_deleted = (x_status == 'D' or y_status == 'D')
 
                 if x_status not in (' ', '?'):

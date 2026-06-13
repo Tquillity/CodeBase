@@ -19,12 +19,12 @@ from constants import (
     DEFAULT_WINDOW_SIZE,
     ERROR_MESSAGE_DURATION,
     LEFT_PANEL_WIDTH,
-    LOG_FILE_PATH,
     LOG_FORMAT,
     MAX_RECENT_FOLDERS,
     STATUS_MESSAGE_DURATION,
     VERSION,
     WINDOW_TOP_DURATION,
+    get_log_file_path,
 )
 from content_manager import generate_content
 from error_handler import get_error_handler, handle_error, safe_execute
@@ -264,7 +264,7 @@ class RepoPromptGUI:
             # Update logging configuration
             LoggingConfig.setup_logging(
                 level=log_level,
-                log_file=LOG_FILE_PATH if log_to_file else None,
+                log_file=get_log_file_path() if log_to_file else None,
                 console_output=log_to_console,
                 format_string=LOG_FORMAT,
                 force=True,

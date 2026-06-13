@@ -2,6 +2,7 @@
 # Centralized constants for CodeBase application
 from __future__ import annotations
 
+import os
 from typing import Any, TypeVar, cast
 
 T = TypeVar("T")
@@ -60,8 +61,27 @@ ERROR_RECOVERY_ATTEMPTS = 3  # Number of recovery attempts for recoverable error
 DEFAULT_LOG_LEVEL = "INFO"  # Default logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 LOG_TO_FILE = True  # Enable file logging
 LOG_TO_CONSOLE = True  # Enable console logging
-LOG_FILE_PATH = "codebase_debug.log"  # Default log file path
+LOG_FILE_PATH = "codebase_debug.log"  # Default log file name
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"  # Log format string
+
+
+def get_log_file_path() -> str:
+    """Absolute path to the log file under the per-user data directory.
+
+    Cross-platform: appdirs resolves ``%LOCALAPPDATA%\\CodeBase`` on Windows and
+    ``~/.local/share/CodeBase`` on Linux — the same place ``settings.json`` lives
+    — so logging works regardless of the current working directory. This matters
+    for a packaged executable launched from a shortcut, where the CWD may be a
+    read-only or unpredictable location. Falls back to the bare filename (CWD)
+    if the user data directory cannot be created.
+    """
+    try:
+        import appdirs  # type: ignore[import-untyped]
+        base = appdirs.user_data_dir("CodeBase")
+        os.makedirs(base, exist_ok=True)
+        return os.path.join(base, LOG_FILE_PATH)
+    except Exception:
+        return LOG_FILE_PATH
 
 # Security configuration
 SECURITY_ENABLED = False  # Enable via settings for stricter behavior

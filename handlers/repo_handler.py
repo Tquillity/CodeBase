@@ -21,7 +21,7 @@ from error_handler import handle_error
 from exceptions import FileOperationError, RepositoryError, SecurityError
 from file_scanner import is_text_file, parse_gitignore, yield_repo_files
 from lru_cache import ThreadSafeLRUCache
-from path_utils import normalize_for_cache
+from path_utils import normalize_path
 from security import is_repo_path_allowed
 from widgets import FolderDialog
 
@@ -272,7 +272,7 @@ class RepoHandler:
 
                 processed_count += 1
                 if is_text_file(file_path_abs, self.gui):
-                    normalized_path = normalize_for_cache(file_path_abs)
+                    normalized_path = normalize_path(file_path_abs)
                     scanned_files_temp.add(normalized_path)
                     loaded_files_temp.add(normalized_path)
 
@@ -377,7 +377,7 @@ class RepoHandler:
         file_handler.scanned_text_files = scanned_files or set()
 
         with file_handler.lock:
-            normalized_scanned = {normalize_for_cache(p) for p in scanned_files}
+            normalized_scanned = {normalize_path(p) for p in scanned_files}
             file_handler.loaded_files = normalized_scanned
             logging.debug(f"Aligned {len(normalized_scanned)} files after refresh.")
 

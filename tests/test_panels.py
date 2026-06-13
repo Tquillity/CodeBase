@@ -7,12 +7,9 @@ from constants import VERSION
 import tkinter.ttk as ttk
 
 @pytest.fixture
-def mock_root():
-    import ttkbootstrap as ttk
-    root = ttk.Window()
-    root.withdraw()
-    yield root
-    root.destroy()
+def mock_root(make_ttk_root):
+    # Per-test ttkbootstrap root via the retrying factory in conftest.py.
+    return make_ttk_root()
 
 @pytest.fixture
 def mock_parent(mock_root):
@@ -82,6 +79,7 @@ def test_right_panel_init(mock_parent, mock_gui):
          patch('ttkbootstrap.Checkbutton'), \
          patch('panels.panels.ContentTab'), \
          patch('panels.panels.StructureTab'), \
+         patch('panels.panels.ModuleAnalysisTab'), \
          patch('panels.panels.BasePromptTab'), \
          patch('panels.panels.SettingsTab'), \
          patch('panels.panels.FileListTab'):

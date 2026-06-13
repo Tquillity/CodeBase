@@ -26,12 +26,13 @@ from tabs.structure_tab import StructureTab
 
 
 @pytest.fixture
-def mock_root() -> Generator[tk.Tk, None, None]:
-    root = tk.Tk()
-    root.withdraw()
-    yield root
-    root.quit()
-    root.destroy()
+def mock_root(make_ttk_root) -> tk.Tk:
+    # Per-test ttkbootstrap.Window via the retrying factory in conftest.py.
+    # RepoPromptGUI builds ttkbootstrap widgets (e.g. the GitStatusPanel
+    # separator), so the Style singleton must bind to a live ttkbootstrap root;
+    # conftest resets ttkbootstrap global state between tests and retries the
+    # transient Tcl init race.
+    return make_ttk_root()
 
 @pytest.fixture
 def temp_repo_for_gui_tests() -> Generator[tuple[str, str, str, str], None, None]:
@@ -212,9 +213,10 @@ def test_select_repo(gui: RepoPromptGUI) -> None:
              patch.object(gui.repo_handler, 'load_repo') as mock_load_repo:
             gui.repo_handler.select_repo()
             mock_dialog.assert_called()
-            # FIX: Change assertion to match the actual implementation string.
             mock_show_loading.assert_called_with("Scanning repository...", show_cancel=True)
-            mock_load_repo.assert_called_with("/selected/folder", gui.show_status_message, ANY)
+            # select_repo passes the queued-progress callback (not show_status_message)
+            # and the load-completion handler — match the actual implementation.
+            mock_load_repo.assert_called_with("/selected/folder", gui._queue_loading_progress, ANY)
 
 def test_refresh_repo(gui: RepoPromptGUI) -> None:
     gui.current_repo_path = "/repo"
@@ -232,6 +234,9 @@ def test_refresh_repo(gui: RepoPromptGUI) -> None:
 def test_copy_contents(gui: RepoPromptGUI) -> None:
     gui.file_handler.loaded_files = {"file1"}
     gui.is_loading = False
+    # copy_contents returns early when no repo is loaded; set one so the
+    # content-generation path runs.
+    gui.current_repo_path = "/repo"
     with patch.object(gui.base_prompt_tab.base_prompt_text, 'get', return_value="Prompt text\n"), \
          patch.object(gui, 'show_loading_state') as mock_show_loading, \
          patch('handlers.copy_handler.generate_content') as mock_gen, \
@@ -241,23 +246,33 @@ def test_copy_contents(gui: RepoPromptGUI) -> None:
         mock_show_loading.assert_called_with("Preparing content for clipboard...")
         mock_gen.assert_called_with(set(["file1"]), gui.current_repo_path, ANY, ANY, ANY, ANY, None, gui, ANY)
 
-def test_load_file_list_empty_input(gui: RepoPromptGUI) -> None:
-    pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
+# File list parsing is covered by tests/test_file_list_tab.py. Skipped at the
+# decorator level so the heavy gui/ttkbootstrap.Window fixtures are never built.
+_FILELIST_SKIP = "File list parsing is covered by tests/test_file_list_tab.py."
 
-def test_load_file_list_relative_paths(gui: RepoPromptGUI, temp_repo_for_gui_tests: tuple[str, str, str, str], monkeypatch: pytest.MonkeyPatch) -> None:
-    pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
+@pytest.mark.skip(reason=_FILELIST_SKIP)
+def test_load_file_list_empty_input() -> None:
+    pass
 
-def test_load_file_list_absolute_paths_valid(gui: RepoPromptGUI, temp_repo_for_gui_tests: tuple[str, str, str, str], monkeypatch: pytest.MonkeyPatch) -> None:
-    pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
+@pytest.mark.skip(reason=_FILELIST_SKIP)
+def test_load_file_list_relative_paths() -> None:
+    pass
 
-def test_load_file_list_absolute_paths_invalid(gui: RepoPromptGUI, monkeypatch: pytest.MonkeyPatch) -> None:
-    pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
+@pytest.mark.skip(reason=_FILELIST_SKIP)
+def test_load_file_list_absolute_paths_valid() -> None:
+    pass
 
-def test_load_file_list_non_text_file(gui: RepoPromptGUI, temp_repo_for_gui_tests: tuple[str, str, str, str], monkeypatch: pytest.MonkeyPatch) -> None:
-    pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
+@pytest.mark.skip(reason=_FILELIST_SKIP)
+def test_load_file_list_absolute_paths_invalid() -> None:
+    pass
 
-def test_load_file_list_no_repo_for_relative(gui: RepoPromptGUI, monkeypatch: pytest.MonkeyPatch) -> None:
-    pytest.skip("File list parsing is covered by tests/test_file_list_tab.py.")
+@pytest.mark.skip(reason=_FILELIST_SKIP)
+def test_load_file_list_non_text_file() -> None:
+    pass
+
+@pytest.mark.skip(reason=_FILELIST_SKIP)
+def test_load_file_list_no_repo_for_relative() -> None:
+    pass
 
 def test_clear_current_content_tab(gui: RepoPromptGUI) -> None:
     cast(MagicMock, gui.notebook).index.side_effect = lambda x: 0 if x == 'current' else 5 if x == 'end' else None
@@ -341,9 +356,10 @@ def test_apply_default_tab(gui: RepoPromptGUI) -> None:
         cast(MagicMock, gui.notebook.select).assert_called_with(1)
 
 def test_show_about(gui: RepoPromptGUI) -> None:
-    with patch('tkinter.messagebox.showinfo') as mock_info:
+    # show_about now uses an in-app toast, not tkinter.messagebox.showinfo.
+    with patch.object(gui, 'show_toast') as mock_toast:
         gui.show_about()
-        cast(MagicMock, mock_info).assert_called_with("About CodeBase", ANY)
+        cast(MagicMock, mock_toast).assert_called_once_with(ANY, toast_type="info", duration=6000)
 
 def test_on_close(gui: RepoPromptGUI) -> None:
     with patch.object(gui.root, 'geometry', return_value="100x200+300+400"), \
@@ -353,25 +369,34 @@ def test_on_close(gui: RepoPromptGUI) -> None:
         gui.on_close()
         cast(MagicMock, mock_set).assert_called_with('app', 'window_geometry', "100x200+300+400")
 
-def test_reconfigure_ui_colors_propagation(gui: RepoPromptGUI) -> None:
-    pytest.skip("ThemeManager/colors are no longer used; ttkbootstrap styling is applied directly.")
+@pytest.mark.skip(reason="ThemeManager/colors are no longer used; ttkbootstrap styling is applied directly.")
+def test_reconfigure_ui_colors_propagation() -> None:
+    pass
 
 # --- New tests for tab classes (basic smoke tests) ---
+# Obsolete smoke tests: skipped at the decorator level so they don't construct a
+# ttkbootstrap.Window via the gui/mock_root fixtures only to skip immediately.
+_SMOKE_SKIP = "Smoke test is obsolete; ttkbootstrap widgets are initialized directly."
 
-def test_content_tab_init(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
-    pytest.skip("Smoke test is obsolete; ttkbootstrap widgets are initialized directly.")
+@pytest.mark.skip(reason=_SMOKE_SKIP)
+def test_content_tab_init() -> None:
+    pass
 
-def test_structure_tab_init(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
-    pytest.skip("Smoke test is obsolete; ttkbootstrap widgets are initialized directly.")
+@pytest.mark.skip(reason=_SMOKE_SKIP)
+def test_structure_tab_init() -> None:
+    pass
 
-def test_base_prompt_tab_init(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
-    pytest.skip("Smoke test is obsolete; ttkbootstrap widgets are initialized directly.")
+@pytest.mark.skip(reason=_SMOKE_SKIP)
+def test_base_prompt_tab_init() -> None:
+    pass
 
-def test_settings_tab_init(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
-    pytest.skip("Smoke test is obsolete; ttkbootstrap widgets are initialized directly.")
+@pytest.mark.skip(reason=_SMOKE_SKIP)
+def test_settings_tab_init() -> None:
+    pass
 
-def test_file_list_tab_init(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
-    pytest.skip("Smoke test is obsolete; ttkbootstrap widgets are initialized directly.")
+@pytest.mark.skip(reason=_SMOKE_SKIP)
+def test_file_list_tab_init() -> None:
+    pass
 
 def test_save_app_settings_invalid_levels(gui: RepoPromptGUI) -> None:
     # To prevent the 'save_app_settings' method from crashing on other missing
@@ -399,5 +424,6 @@ def test_save_app_settings_invalid_levels(gui: RepoPromptGUI) -> None:
     # The original assertion remains valid
     cast(MagicMock, gui.settings.set).assert_any_call('app', 'levels', 1)
 
-def test_content_tab_perform_search(mock_root: tk.Tk, gui: RepoPromptGUI) -> None:
-    pytest.skip("ContentTab search behavior is covered by tabs/content_tab.py unit tests.")
+@pytest.mark.skip(reason="ContentTab search behavior is covered by tabs/content_tab.py unit tests.")
+def test_content_tab_perform_search() -> None:
+    pass

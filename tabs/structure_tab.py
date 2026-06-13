@@ -10,7 +10,7 @@ import ttkbootstrap as ttk
 from constants import ERROR_HANDLING_ENABLED
 from error_handler import handle_error, safe_execute
 from exceptions import FileOperationError, UIError
-from path_utils import get_relative_path, normalize_for_cache
+from path_utils import get_relative_path, normalize_path
 from widgets import Tooltip
 
 
@@ -316,7 +316,7 @@ class StructureTab(ttk.Frame):
             elif values and len(values) > 0:
                  item_path = values[0]
                  # FIX: Normalize path for comparison with the set
-                 item_path_norm = normalize_for_cache(item_path)
+                 item_path_norm = normalize_path(item_path)
                  is_selected = item_path_norm in loaded_files_copy
 
                  if 'file_selected' in tags: tags.remove('file_selected')
