@@ -1,11 +1,8 @@
-import os
-import tempfile
 import pytest
 from unittest.mock import MagicMock, patch, ANY
-from tkinter import messagebox
 import pyperclip  # type: ignore[import-untyped]
 from handlers.copy_handler import CopyHandler
-from content_manager import generate_content
+
 
 @pytest.fixture
 def mock_gui():
@@ -24,6 +21,9 @@ def mock_gui():
     gui.show_loading_state = MagicMock()
     gui.hide_loading_state = MagicMock()
     gui.show_status_message = MagicMock()
+    gui.show_toast = MagicMock()
+    gui.task_queue = MagicMock()
+    gui.register_background_thread = MagicMock()
     gui.current_repo_path = "/repo"
     gui.file_handler.content_cache = {}
     gui.file_handler.read_errors = []
@@ -31,19 +31,36 @@ def mock_gui():
     gui.settings.get.return_value = "Markdown (Grok)"
     return gui
 
+
 @pytest.fixture
 def copy_handler(mock_gui):
     return CopyHandler(mock_gui)
 
+
 def test_copy_contents_success(copy_handler, mock_gui):
-    with patch('handlers.copy_handler.generate_content') as mock_gen:
+    with patch.object(copy_handler, '_start_generate_content') as mock_start:
         copy_handler.copy_contents()
-        mock_gen.assert_called_with(set(["file1"]), "/repo", ANY, ANY, {}, [], None, mock_gui, "Markdown (Grok)")
+        mock_gui.show_loading_state.assert_called_with("Preparing content for clipboard...")
+        mock_start.assert_called_once()
+        files, repo_path, fmt, _on_complete = mock_start.call_args[0]
+        assert files == {"file1"}
+        assert repo_path == "/repo"
+        assert fmt == "Markdown (Grok)"
+        assert callable(_on_complete)
+
 
 def test_copy_contents_no_files(copy_handler, mock_gui):
     mock_gui.file_handler.loaded_files = set()
     copy_handler.copy_contents()
     mock_gui.show_status_message.assert_called_with("No files selected to copy.", error=True)
+
+
+def test_copy_contents_no_repo(copy_handler, mock_gui):
+    mock_gui.current_repo_path = None
+    copy_handler.copy_contents()
+    mock_gui.hide_loading_state.assert_called_once()
+    mock_gui.show_status_message.assert_called_with("No repository loaded.", error=True)
+
 
 def test_copy_structure_success(copy_handler, mock_gui):
     with patch('pyperclip.copy') as mock_copy:
@@ -51,15 +68,22 @@ def test_copy_structure_success(copy_handler, mock_gui):
         mock_copy.assert_called_with("Structure\n")
         mock_gui.show_status_message.assert_called_with("Folder structure copied to clipboard.")
 
+
 def test_copy_structure_empty(copy_handler, mock_gui):
     mock_gui.structure_tab.generate_folder_structure_text.return_value = ""
     copy_handler.copy_structure()
     mock_gui.show_status_message.assert_called_with("Generated structure is empty.", error=True)
 
+
 def test_copy_all_success(copy_handler, mock_gui):
-    with patch('handlers.copy_handler.generate_content') as mock_gen:
+    with patch.object(copy_handler, '_start_generate_content') as mock_start:
         copy_handler.copy_all()
-        mock_gen.assert_called_with(set(["file1"]), "/repo", ANY, ANY, {}, [], None, mock_gui, "Markdown (Grok)")
+        mock_start.assert_called_once()
+        files, repo_path, fmt, _on_complete = mock_start.call_args[0]
+        assert files == {"file1"}
+        assert repo_path == "/repo"
+        assert fmt == "Markdown (Grok)"
+
 
 def test_copy_all_no_content(copy_handler, mock_gui):
     mock_gui.file_handler.loaded_files = set()
@@ -68,11 +92,13 @@ def test_copy_all_no_content(copy_handler, mock_gui):
     copy_handler.copy_all()
     mock_gui.show_status_message.assert_called_with("Nothing to copy.", error=True)
 
+
 def test_handle_copy_completion_final_success(copy_handler, mock_gui):
     with patch('pyperclip.copy') as mock_copy:
         copy_handler._handle_copy_completion_final("Prompt", "Content\n", "Structure\n", [], "Copied")
         mock_copy.assert_called_with("Prompt\n\n---\n\nContent\n\n---\n\nFolder Structure:\nStructure\n")
         mock_gui.show_status_message.assert_called_with("Copied")
+
 
 def test_handle_copy_completion_final_errors(copy_handler, mock_gui):
     copy_handler._handle_copy_completion_final("Prompt", "Content", "", ["error1", "error2"], "Failed")

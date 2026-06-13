@@ -177,9 +177,7 @@ def generate_content(
 ) -> None:
     start_time = time.time()
     content_parts: list[str] = []
-
-    with lock:
-        read_errors.clear()
+    operation_errors: list[str] = []
 
     # Check if shutdown was requested
     if gui and hasattr(gui, '_shutdown_requested') and gui._shutdown_requested:
@@ -217,7 +215,7 @@ def generate_content(
             file_path,
             content_cache,
             lock,
-            read_errors,
+            operation_errors,
             deleted_files=deleted_files,
             security_enabled=security_enabled,
             max_file_size=max_file_size,
@@ -268,4 +266,4 @@ def generate_content(
     end_time = time.time()
     logging.info(f"Content generation complete for {len(files_to_include)} files in {end_time - start_time:.2f} seconds. Tokens: {token_count}")
     logging.info(f"[PREVIEW] All files processed. Calling completion callback with {len(final_content):,} chars")
-    completion_callback(final_content, token_count, read_errors, deleted_files)
+    completion_callback(final_content, token_count, operation_errors, deleted_files)

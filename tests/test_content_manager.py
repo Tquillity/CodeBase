@@ -173,6 +173,30 @@ def test_generate_content_success(temp_repo):
     assert not local_errors
     assert not read_errors
 
+
+def test_generate_content_preserves_shared_read_errors(temp_repo):
+    """Per-operation errors must not clear or overwrite the shared read_errors list."""
+    temp_dir, file1_path, _, _, _ = temp_repo
+    lock = threading.Lock()
+    content_cache = ThreadSafeLRUCache(100, 10)
+    read_errors: list[str] = ["pre-existing error"]
+
+    def completion_callback(content, token_count, errors, deleted_files=None):
+        assert errors == []
+        assert read_errors == ["pre-existing error"]
+
+    generate_content(
+        {file1_path},
+        temp_dir,
+        lock,
+        completion_callback,
+        content_cache,
+        read_errors,
+        None,
+        None,
+    )
+
+
 def test_generate_content_with_errors(temp_repo):
     temp_dir, _, _, _, missing_path = temp_repo
     files_to_include = {missing_path}
